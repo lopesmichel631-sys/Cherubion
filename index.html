@@ -2,14 +2,14 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Minha Tela</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <style>
-  html, body { margin: 0; padding: 0; background: #f6f5f2; }
+  html, body { margin: 0; padding: 0; background: #F6F5F2; }
   #root { min-height: 100vh; }
 </style>
 </head>
@@ -19,29 +19,46 @@
 (function () {
   const PREFIX = 'mt-storage:';
   window.storage = {
-    async get(key, shared) {
-      const raw = localStorage.getItem(PREFIX + key);
-      if (raw === null) return null;
-      return { key, value: raw, shared: !!shared };
+    get: function (key, shared) {
+      return new Promise(function (resolve, reject) {
+        try {
+          const raw = window.localStorage.getItem(PREFIX + key);
+          if (raw === null) { resolve(null); return; }
+          resolve({ key: key, value: raw, shared: !!shared });
+        } catch (e) { reject(e); }
+      });
     },
-    async set(key, value, shared) {
-      localStorage.setItem(PREFIX + key, value);
-      return { key, value, shared: !!shared };
+    set: function (key, value, shared) {
+      return new Promise(function (resolve, reject) {
+        try {
+          window.localStorage.setItem(PREFIX + key, value);
+          resolve({ key: key, value: value, shared: !!shared });
+        } catch (e) { reject(e); }
+      });
     },
-    async delete(key, shared) {
-      const existed = localStorage.getItem(PREFIX + key) !== null;
-      localStorage.removeItem(PREFIX + key);
-      return { key, deleted: existed, shared: !!shared };
+    delete: function (key, shared) {
+      return new Promise(function (resolve, reject) {
+        try {
+          window.localStorage.removeItem(PREFIX + key);
+          resolve({ key: key, deleted: true, shared: !!shared });
+        } catch (e) { reject(e); }
+      });
     },
-    async list(prefix, shared) {
-      const keys = [];
-      const p = PREFIX + (prefix || '');
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith(p)) keys.push(k.slice(PREFIX.length));
-      }
-      return { keys, prefix: prefix, shared: !!shared };
-    },
+    list: function (prefix, shared) {
+      return new Promise(function (resolve, reject) {
+        try {
+          const keys = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (k && k.indexOf(PREFIX) === 0) {
+              const bare = k.slice(PREFIX.length);
+              if (!prefix || bare.indexOf(prefix) === 0) keys.push(bare);
+            }
+          }
+          resolve({ keys: keys, prefix: prefix, shared: !!shared });
+        } catch (e) { reject(e); }
+      });
+    }
   };
 })();
 </script>
@@ -4360,9 +4377,49 @@ function App() {
             setMsgBackup('Cole o texto manualmente no campo abaixo.');
         }
     };
-    const restaurarBackup = () => {
+    // ---- backup em arquivo: baixa um .json com os dados atuais, sem precisar copiar/colar ----
+    const baixarBackupArquivo = () => {
         try {
-            const dados = JSON.parse(textoRestaurar);
+            const blob = new Blob([textoBackup], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const agora = new Date();
+            const carimbo = agora.toISOString().slice(0, 10) + '_' + String(agora.getHours()).padStart(2, '0') + 'h' + String(agora.getMinutes()).padStart(2, '0');
+            a.href = url;
+            a.download = `minha-tela-backup-${carimbo}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            setMsgBackup('Arquivo baixado! No iPhone ele fica em Arquivos → Downloads (ou some a pedir onde salvar, dependendo do ajuste do Safari).');
+        }
+        catch (e) {
+            setMsgBackup('Não consegui gerar o arquivo aqui — use "Copiar" como alternativa.');
+        }
+    };
+    // ---- restaurar a partir de um arquivo .json escolhido, sem precisar colar texto ----
+    const arquivoRestaurarRef = useRef(null);
+    const abrirSeletorArquivoRestaurar = () => {
+        if (arquivoRestaurarRef.current)
+            arquivoRestaurarRef.current.click();
+    };
+    const arquivoRestaurarEscolhido = (e) => {
+        const arquivo = e.target.files && e.target.files[0];
+        if (!arquivo)
+            return;
+        const leitor = new FileReader();
+        leitor.onload = () => {
+            const texto = typeof leitor.result === 'string' ? leitor.result : '';
+            restaurarBackupDeTexto(texto);
+        };
+        leitor.onerror = () => setMsgBackup('Não consegui ler esse arquivo. Tente novamente ou use "Colar".');
+        leitor.readAsText(arquivo);
+        e.target.value = ''; // permite escolher o mesmo arquivo de novo depois, se precisar
+    };
+    const restaurarBackup = () => restaurarBackupDeTexto(textoRestaurar);
+    const restaurarBackupDeTexto = (texto) => {
+        try {
+            const dados = JSON.parse(texto);
             setCategorias(Array.isArray(dados.categorias) ? normalizarCategorias(dados.categorias) : []);
             setFixas(Array.isArray(dados.fixas) ? dados.fixas : []);
             setLista(Array.isArray(dados.lista) ? dados.lista : []);
@@ -6199,9 +6256,13 @@ function App() {
                         React.createElement("p", { className: "mt-backup-label" }, "SEUS DADOS ATUAIS (copie e guarde em algum lugar seu):"),
                         React.createElement("textarea", { className: "mt-textarea", readOnly: true, value: textoBackup, onClick: (e) => e.target.select() }),
                         React.createElement("div", { className: "mt-backup-actions" },
-                            React.createElement("button", { className: "mt-btn-sm primary", style: backupCopiado ? { background: '#6E8C82', borderColor: '#6E8C82' } : {}, onClick: copiarBackup }, backupCopiado ? '✓ Copiado' : 'Copiar')),
-                        React.createElement("p", { className: "mt-backup-label" }, "RESTAURAR (cole um backup salvo antes):"),
-                        React.createElement("textarea", { className: "mt-textarea", placeholder: "Cole aqui o texto do backup\u2026", value: textoRestaurar, onChange: (e) => setTextoRestaurar(e.target.value) }),
+                            React.createElement("button", { className: "mt-btn-sm primary", style: backupCopiado ? { background: '#6E8C82', borderColor: '#6E8C82' } : {}, onClick: copiarBackup }, backupCopiado ? '✓ Copiado' : 'Copiar'),
+                            React.createElement("button", { className: "mt-btn-sm", onClick: baixarBackupArquivo }, "\u2B07\uFE0F Baixar arquivo")),
+                        React.createElement("p", { className: "mt-backup-label" }, "RESTAURAR (de um arquivo baixado, ou colando o texto):"),
+                        React.createElement("div", { className: "mt-backup-actions" },
+                            React.createElement("button", { className: "mt-btn-sm primary", onClick: abrirSeletorArquivoRestaurar }, "\uD83D\uDCC2 Restaurar de arquivo"),
+                            React.createElement("input", { ref: arquivoRestaurarRef, type: "file", accept: "application/json,.json", style: { display: 'none' }, onChange: arquivoRestaurarEscolhido })),
+                        React.createElement("textarea", { className: "mt-textarea", placeholder: "Ou cole aqui o texto do backup\u2026", value: textoRestaurar, onChange: (e) => setTextoRestaurar(e.target.value) }),
                         React.createElement("div", { className: "mt-backup-actions" },
                             React.createElement("button", { className: "mt-btn-sm primary", onClick: colarRestaurar }, "Colar"),
                             React.createElement("button", { className: "mt-btn-sm", onClick: restaurarBackup, disabled: !textoRestaurar.trim() }, "Restaurar deste texto")),
@@ -6270,7 +6331,11 @@ function App() {
                 transform: `rotate(${p.rotacao}deg)`,
             } })))))));
 }
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+
+;(function () {
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(React.createElement(App));
+})();
 </script>
 </body>
 </html>
