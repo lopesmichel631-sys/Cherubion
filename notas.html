@@ -1413,8 +1413,6 @@ function MegApp() {
         sidebarOpen && (React.createElement("div", { className: "ob-backdrop", onClick: () => setSidebarOpen(false) })),
         React.createElement("div", { className: `ob-sidebar ${sidebarOpen ? '' : 'ob-sidebar-collapsed'}` },
             React.createElement("div", { className: "ob-sidebar-header" },
-                React.createElement("button", { className: "ob-icon-btn ob-voltar-mt", onClick: () => { window.location.href = 'index.html'; }, title: "Voltar ao Minha Tela", "aria-label": "Voltar ao Minha Tela" },
-                    React.createElement(ChevronLeft, { size: 18 })),
                 React.createElement("span", { className: "ob-brand" }, "\uD83D\uDCD3 Cofre"),
                 React.createElement("button", { className: "ob-icon-btn", onClick: () => {
                         createNote();
@@ -1450,6 +1448,8 @@ function MegApp() {
                 React.createElement("input", { type: "file", accept: "application/json", ref: fileInputRef, style: { display: 'none' }, onChange: importBackup }))),
         React.createElement("div", { className: "ob-main", ref: mainRef },
             React.createElement("div", { className: "ob-topbar" },
+                React.createElement("button", { className: "ob-icon-btn", style: { fontSize: 16 }, onClick: () => { window.location.href = 'index.html'; }, title: "Voltar ao Minha Tela", "aria-label": "Voltar ao Minha Tela" }, "\uD83C\uDFE0"),
+                React.createElement("button", { className: "ob-icon-btn", style: { fontSize: 16 }, onClick: () => { window.location.href = 'contatos.html'; }, title: "Baralho de Contatos", "aria-label": "Abrir o Baralho de Contatos" }, "\uD83D\uDCC7"),
                 React.createElement("button", { className: "ob-icon-btn", onClick: () => setSidebarOpen((s) => !s) },
                     React.createElement(Menu, { size: 18 })),
                 React.createElement("button", { className: "ob-icon-btn", onClick: voltarNavegacao, disabled: !podeVoltar, title: "Nota anterior", "aria-label": "Nota anterior" },
@@ -1854,7 +1854,12 @@ const CSS = `
   gap: 12px;
   padding: 8px 14px;
   border-bottom: 1px solid #e4e4e8;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.ob-topbar::-webkit-scrollbar { display: none; }
+.ob-topbar > * { flex-shrink: 0; }
 
 .ob-contador-abas {
   position: absolute;
