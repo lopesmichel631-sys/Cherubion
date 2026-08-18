@@ -2,68 +2,63 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>Minha Tela</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <style>
-  html, body { margin: 0; padding: 0; background: #F6F5F2; }
-  #root { min-height: 100vh; }
+  html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior: none; }
+  #root { height: 100%; }
 </style>
 </head>
 <body>
 <div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+
 <script>
-(function () {
-  const PREFIX = 'mt-storage:';
+// ---------- shim de window.storage (mesma assinatura get/set/delete/list) ----------
+// grava direto no localStorage real do navegador, sob o prefixo "mt-storage:"
+(function() {
+  var PREFIXO = 'mt-storage:';
   window.storage = {
-    get: function (key, shared) {
-      return new Promise(function (resolve, reject) {
-        try {
-          const raw = window.localStorage.getItem(PREFIX + key);
-          if (raw === null) { resolve(null); return; }
-          resolve({ key: key, value: raw, shared: !!shared });
-        } catch (e) { reject(e); }
+    get: function(chave) {
+      return Promise.resolve().then(function() {
+        var v = window.localStorage.getItem(PREFIXO + chave);
+        if (v === null) return null;
+        return { key: chave, value: v };
       });
     },
-    set: function (key, value, shared) {
-      return new Promise(function (resolve, reject) {
-        try {
-          window.localStorage.setItem(PREFIX + key, value);
-          resolve({ key: key, value: value, shared: !!shared });
-        } catch (e) { reject(e); }
+    set: function(chave, valor) {
+      return Promise.resolve().then(function() {
+        window.localStorage.setItem(PREFIXO + chave, valor);
+        return { key: chave, value: valor };
       });
     },
-    delete: function (key, shared) {
-      return new Promise(function (resolve, reject) {
-        try {
-          window.localStorage.removeItem(PREFIX + key);
-          resolve({ key: key, deleted: true, shared: !!shared });
-        } catch (e) { reject(e); }
+    delete: function(chave) {
+      return Promise.resolve().then(function() {
+        window.localStorage.removeItem(PREFIXO + chave);
+        return { key: chave, deleted: true };
       });
     },
-    list: function (prefix, shared) {
-      return new Promise(function (resolve, reject) {
-        try {
-          const keys = [];
-          for (let i = 0; i < window.localStorage.length; i++) {
-            const k = window.localStorage.key(i);
-            if (k && k.indexOf(PREFIX) === 0) {
-              const bare = k.slice(PREFIX.length);
-              if (!prefix || bare.indexOf(prefix) === 0) keys.push(bare);
-            }
-          }
-          resolve({ keys: keys, prefix: prefix, shared: !!shared });
-        } catch (e) { reject(e); }
+    list: function(prefixo) {
+      prefixo = prefixo || '';
+      return Promise.resolve().then(function() {
+        var keys = [];
+        for (var i = 0; i < window.localStorage.length; i++) {
+          var k = window.localStorage.key(i);
+          if (k && k.indexOf(PREFIXO + prefixo) === 0) keys.push(k.slice(PREFIXO.length));
+        }
+        return { keys: keys };
       });
-    }
+    },
   };
 })();
 </script>
+
 <script>
 "use strict";
+// ---------- Versão standalone (sem bundler) ----------
+// React vem de <script> CDN no HTML e fica disponível como global.
 const { useState, useEffect, useRef, useMemo } = React;
 const STORAGE_KEY = 'minhas-tarefas-data';
 const CORES = ['#5B7C99', '#D96C4F', '#6E8C82', '#A85C4D', '#8E6BAE', '#C9A227'];
@@ -538,6 +533,274 @@ const DESTAQUE_AGENDA_INFO = {
     proximo7: { label: 'Em 7 dias', cor: '#6E8C82', bg: '#EAF1EE' },
 };
 const storageExiste = () => typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+// ═══════════════════════════════════════════════════════════════════════
+// ESPELHAMENTO DE PASTAS: Notas Rápidas (Cherubion) ⇄ Cofre de Notas (Obsidian)
+// ═══════════════════════════════════════════════════════════════════════
+// Toda pasta das Notas Rápidas vira um link "[[Nome]]" numa nota do Cofre de Notas, e
+// vice-versa: todo link dentro da nota "Bem-vindo" (a página inicial fixa do Cofre) vira
+// uma pasta de primeiro nível aqui; todo link dentro da nota de UMA pasta vira uma subpasta
+// dela. Apagar em qualquer um dos dois lados apaga no outro. Renomear só é possível hoje do
+// lado do Cofre de Notas (mudando o título da nota) — o Cherubion ainda não tem tela de
+// renomear pasta, então esse sentido nunca acontece na prática.
+//
+// Os dois apps moram no mesmo domínio (GitHub Pages), então dá pra ler e escrever direto no
+// localStorage do outro — não precisa de nenhum servidor no meio. Essa sincronização roda
+// inteira aqui no Cherubion (ao carregar e sempre que as pastas mudam): ela lê o estado atual
+// dos dois lados, compara com o último estado que ela mesma salvou ("o espelho anterior") pra
+// distinguir "isso é novo" de "isso foi apagado do outro lado", e escreve as duas pontas de volta.
+const CHAVE_SYNC_PASTAS = 'pastas-espelho:v1';
+const PREFIXO_NOTAS_STORAGE = 'notas-storage:';
+const TITULO_INDICE_OBSIDIAN = 'bem-vindo';
+const lerEspelhoPastasAnterior = () => {
+    try {
+        const bruto = window.localStorage.getItem(CHAVE_SYNC_PASTAS);
+        const v = bruto ? JSON.parse(bruto) : [];
+        return Array.isArray(v) ? v : [];
+    }
+    catch (e) {
+        return [];
+    }
+};
+const salvarEspelhoPastas = (arvore) => {
+    try {
+        window.localStorage.setItem(CHAVE_SYNC_PASTAS, JSON.stringify(arvore));
+    }
+    catch (e) { /* não é crítico */ }
+};
+const lerDadosObsidian = () => {
+    try {
+        const bruto = window.localStorage.getItem(PREFIXO_NOTAS_STORAGE + 'notes-store');
+        if (!bruto)
+            return null;
+        const dados = JSON.parse(bruto);
+        return dados && dados.notes && typeof dados.notes === 'object' ? dados : null;
+    }
+    catch (e) {
+        return null;
+    }
+};
+const salvarDadosObsidian = (dados) => {
+    try {
+        window.localStorage.setItem(PREFIXO_NOTAS_STORAGE + 'notes-store', JSON.stringify(dados));
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+};
+const REGEX_WIKILINK_SYNC = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
+const linksUnicosDoTexto = (texto) => {
+    const vistos = new Set();
+    const out = [];
+    REGEX_WIKILINK_SYNC.lastIndex = 0;
+    let m;
+    while ((m = REGEX_WIKILINK_SYNC.exec(texto || '')) !== null) {
+        const t = m[1].trim();
+        const chave = t.toLowerCase();
+        if (t && !vistos.has(chave)) {
+            vistos.add(chave);
+            out.push(t);
+        }
+    }
+    return out;
+};
+const uidObsidianSync = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+// árvore canônica {id, nome, subpastas} a partir das notasPastas reais do Cherubion (recursiva)
+const arvoreCanonicaDoCherubion = (pastas) => (pastas || []).map((p) => ({ id: p.id, nome: p.nome, subpastas: arvoreCanonicaDoCherubion(p.subpastas) }));
+// {id -> nota} indexado por título normalizado
+const obsidianPorTitulo = (notes) => {
+    const m = {};
+    Object.values(notes || {}).forEach((n) => { m[(n.title || '').trim().toLowerCase()] = n; });
+    return m;
+};
+// subárvore canônica do Cofre de Notas a partir de UMA nota específica (segue os links dela)
+const subarvoreCanonicaDoObsidian = (notes, id, visitados) => {
+    const vis = visitados || new Set();
+    const nota = notes[id];
+    if (!nota || vis.has(id))
+        return { id, nome: nota ? nota.title : '', subpastas: [] };
+    vis.add(id);
+    const porTitulo = obsidianPorTitulo(notes);
+    const subpastas = linksUnicosDoTexto(nota.content)
+        .map((titulo) => {
+        const alvo = porTitulo[titulo.toLowerCase()];
+        return alvo ? subarvoreCanonicaDoObsidian(notes, alvo.id, vis) : null;
+    })
+        .filter(Boolean);
+    return { id, nome: nota.title, subpastas };
+};
+// converte uma subárvore canônica (vinda do Obsidian) pro formato de pasta do Cherubion
+const canonicaParaPastaCherubion = (no) => ({
+    id: no.id,
+    nome: no.nome,
+    palavraChave: '',
+    subpastas: (no.subpastas || []).map(canonicaParaPastaCherubion),
+});
+// adiciona "- [[Nome]]" ao fim do conteúdo de uma nota, se ela ainda não tiver esse link
+const adicionarLinkAoConteudo = (conteudo, nome) => {
+    const jaTem = linksUnicosDoTexto(conteudo).some((l) => l.toLowerCase() === nome.toLowerCase());
+    if (jaTem)
+        return conteudo || '';
+    const precisaQuebrarLinha = conteudo && !conteudo.endsWith('\n');
+    return `${conteudo || ''}${precisaQuebrarLinha ? '\n' : ''}- [[${nome}]]\n`;
+};
+// remove as linhas que são só um bullet "- [[Nome]]" apontando pro título informado
+const removerLinkDoConteudo = (conteudo, nome) => {
+    const alvo = nome.toLowerCase();
+    return (conteudo || '')
+        .split('\n')
+        .filter((linha) => {
+        const m = linha.match(/^\s*[-*]\s*\[\[([^\]|#]+)(?:[^\]]*)?\]\]\s*$/);
+        return !(m && m[1].trim().toLowerCase() === alvo);
+    })
+        .join('\n');
+};
+const criarNotaObsidianSeNaoExiste = (notes, id, titulo) => {
+    if (notes[id])
+        return notes;
+    const agora = Date.now();
+    return { ...notes, [id]: { id, title: titulo, content: '', createdAt: agora, updatedAt: agora } };
+};
+// cria (recursivamente) a nota de uma pasta do Cherubion no Obsidian, com uma nota por
+// subpasta e os links entre elas — usado quando a pasta é inteiramente nova pro Obsidian
+const criarSubarvoreNoObsidian = (notesEntrada, pastaCherubion) => {
+    let notes = criarNotaObsidianSeNaoExiste(notesEntrada, pastaCherubion.id, pastaCherubion.nome);
+    let conteudo = notes[pastaCherubion.id].content;
+    (pastaCherubion.subpastas || []).forEach((sub) => {
+        notes = criarSubarvoreNoObsidian(notes, sub);
+        conteudo = adicionarLinkAoConteudo(conteudo, sub.nome);
+    });
+    if (conteudo !== notes[pastaCherubion.id].content) {
+        notes = { ...notes, [pastaCherubion.id]: { ...notes[pastaCherubion.id], content: conteudo, updatedAt: Date.now() } };
+    }
+    return notes;
+};
+// apaga (recursivamente) a nota de uma pasta e todas as notas das subpastas dela no Obsidian
+const apagarSubarvoreDoObsidian = (notesEntrada, id) => {
+    let notes = notesEntrada;
+    const nota = notes[id];
+    if (!nota)
+        return notes;
+    const porTitulo = obsidianPorTitulo(notes);
+    linksUnicosDoTexto(nota.content).forEach((titulo) => {
+        const alvo = porTitulo[titulo.toLowerCase()];
+        if (alvo)
+            notes = apagarSubarvoreDoObsidian(notes, alvo.id);
+    });
+    const resto = { ...notes };
+    delete resto[id];
+    return resto;
+};
+// diff em 3 vias (espelho anterior vs. Cherubion atual vs. Obsidian atual) + aplicação nos
+// dois lados, nível por nível. Recursivo: containerId é a nota do Obsidian cujos links
+// representam este nível ('null' = usa a nota "Bem-vindo", a página inicial fixa).
+const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsidian, containerId, idsApagadosCherubion }) => {
+    let notes = notesObsidian;
+    const porTitulo = obsidianPorTitulo(notes);
+    const notaContainer = containerId
+        ? notes[containerId]
+        : Object.values(notes).find((n) => (n.title || '').trim().toLowerCase() === TITULO_INDICE_OBSIDIAN);
+    // se a página inicial fixa não existe mais (raro — o usuário teria que ter apagado a nota
+    // "Bem-vindo"), recria vazia; ela some, o Cherubion perde a referência dos links dela
+    let idContainerReal = notaContainer ? notaContainer.id : null;
+    if (!containerId && !notaContainer) {
+        const novoId = uidObsidianSync();
+        notes = criarNotaObsidianSeNaoExiste(notes, novoId, 'Bem-vindo');
+        idContainerReal = novoId;
+    }
+    const containerAtual = notes[idContainerReal];
+    let conteudoContainer = containerAtual ? containerAtual.content : '';
+    const remotoNivel = linksUnicosDoTexto(conteudoContainer)
+        .map((titulo) => porTitulo[titulo.toLowerCase()])
+        .filter(Boolean)
+        .map((n) => ({ id: n.id, nome: n.title }));
+    const mapaPorId = (lista) => { const m = {}; (lista || []).forEach((n) => { m[n.id] = n; }); return m; };
+    const A = mapaPorId(anteriorLista);
+    const L = mapaPorId(pastasCherubionNivel);
+    const R = mapaPorId(remotoNivel);
+    const todosIds = new Set([...Object.keys(A), ...Object.keys(L), ...Object.keys(R)]);
+    const novaListaCherubion = [];
+    const novaCanonica = [];
+    let mudouCherubion = false;
+    let mudouObsidian = false;
+    todosIds.forEach((id) => {
+        const emA = A[id];
+        const emL = L[id];
+        const emR = R[id];
+        if (emL && emR) {
+            // existe nos dois lados: reconcilia nome (só o Obsidian tem UI de renomear hoje)
+            let nomeFinal = emL.nome;
+            if (emA && emR.nome !== emA.nome && emL.nome === emA.nome)
+                nomeFinal = emR.nome;
+            if (nomeFinal !== emL.nome)
+                mudouCherubion = true;
+            if (nomeFinal !== notes[id].title) {
+                notes = { ...notes, [id]: { ...notes[id], title: nomeFinal, updatedAt: Date.now() } };
+            }
+            const filho = sincronizarNivelPastas({
+                anteriorLista: emA ? emA.subpastas : [],
+                pastasCherubionNivel: emL.subpastas,
+                notesObsidian: notes,
+                containerId: id,
+                idsApagadosCherubion,
+            });
+            notes = filho.notes;
+            if (filho.mudouCherubion)
+                mudouCherubion = true;
+            if (filho.mudouObsidian)
+                mudouObsidian = true;
+            novaListaCherubion.push({ ...emL, nome: nomeFinal, subpastas: filho.novaListaCherubion });
+            novaCanonica.push({ id, nome: nomeFinal, subpastas: filho.novaCanonica });
+        }
+        else if (emL && !emR) {
+            if (emA) {
+                // existia nos dois antes, sumiu do Obsidian agora -> o Obsidian apagou -> apaga aqui também
+                if (id === 'geral') {
+                    // 'Geral' nunca é apagada: só recria o link que faltou
+                    notes = criarNotaObsidianSeNaoExiste(notes, 'geral', 'Geral');
+                    conteudoContainer = adicionarLinkAoConteudo(conteudoContainer, 'Geral');
+                    mudouObsidian = true;
+                    novaListaCherubion.push(emL);
+                    novaCanonica.push({ id, nome: emL.nome, subpastas: arvoreCanonicaDoCherubion(emL.subpastas) });
+                }
+                else {
+                    mudouCherubion = true;
+                    if (idsApagadosCherubion)
+                        idsApagadosCherubion.push(id);
+                }
+            }
+            else {
+                // pasta nova só no Cherubion -> cria a nota (e as das subpastas) no Obsidian
+                notes = criarSubarvoreNoObsidian(notes, emL);
+                conteudoContainer = adicionarLinkAoConteudo(conteudoContainer, emL.nome);
+                mudouObsidian = true;
+                novaListaCherubion.push(emL);
+                novaCanonica.push({ id, nome: emL.nome, subpastas: arvoreCanonicaDoCherubion(emL.subpastas) });
+            }
+        }
+        else if (!emL && emR) {
+            if (emA) {
+                // existia nos dois antes, sumiu do Cherubion agora -> apaga a nota espelhada
+                notes = apagarSubarvoreDoObsidian(notes, id);
+                conteudoContainer = removerLinkDoConteudo(conteudoContainer, emR.nome);
+                mudouObsidian = true;
+            }
+            else {
+                // link novo só no Obsidian -> cria a pasta (e subpastas) aqui no Cherubion
+                const subarvore = subarvoreCanonicaDoObsidian(notes, id);
+                novaListaCherubion.push(canonicaParaPastaCherubion(subarvore));
+                novaCanonica.push(subarvore);
+                mudouCherubion = true;
+            }
+        }
+        // se sumiu dos dois lados, a exclusão já foi propagada numa sincronização anterior: ignora
+    });
+    if (containerAtual && conteudoContainer !== containerAtual.content) {
+        notes = { ...notes, [idContainerReal]: { ...notes[idContainerReal], content: conteudoContainer, updatedAt: Date.now() } };
+        mudouObsidian = true;
+    }
+    return { notes, novaListaCherubion, novaCanonica, mudouCherubion, mudouObsidian };
+};
 function App() {
     const [categorias, setCategorias] = useState([]);
     const [fixas, setFixas] = useState([]);
@@ -1041,6 +1304,79 @@ function App() {
     // roda a cada render, sem lista de dependências: garante que salvarRef.current seja sempre
     // a salvar() do render mais recente, com o estado já atualizado
     useEffect(() => { salvarRef.current = salvar; });
+    // ---- Espelhamento de pastas com o Cofre de Notas (Obsidian) ----
+    // Roda sempre que as pastas das Notas Rápidas mudam (criar/apagar pasta) e uma vez ao
+    // carregar o app. Só sincroniza se o Cofre de Notas já tiver sido aberto pelo menos uma vez
+    // (senão não existe nada em 'notas-storage:' ainda para ler).
+    useEffect(() => {
+        if (!dadosCarregadosRef.current)
+            return;
+        const t = setTimeout(() => {
+            const dadosObsidian = lerDadosObsidian();
+            if (!dadosObsidian)
+                return;
+            const anterior = lerEspelhoPastasAnterior();
+            const idsApagados = [];
+            const resultado = sincronizarNivelPastas({
+                anteriorLista: anterior,
+                pastasCherubionNivel: notasPastas,
+                notesObsidian: dadosObsidian.notes,
+                containerId: null,
+                idsApagadosCherubion: idsApagados,
+            });
+            if (resultado.mudouCherubion) {
+                setNotasPastas(resultado.novaListaCherubion);
+                if (idsApagados.length) {
+                    setNotasRapidas((ns) => ns.map((n) => (idsApagados.includes(n.pastaId) ? { ...n, pastaId: 'geral' } : n)));
+                }
+                marcarSujo();
+            }
+            if (resultado.mudouObsidian) {
+                salvarDadosObsidian({ ...dadosObsidian, notes: resultado.notes });
+            }
+            if (resultado.mudouCherubion || resultado.mudouObsidian) {
+                salvarEspelhoPastas(resultado.novaCanonica);
+            }
+        }, 500);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [notasPastas]);
+    // envia o texto de uma Nota Rápida pro Cofre de Notas: soma no INÍCIO do conteúdo da nota
+    // da pasta correspondente (a pasta já existe lá, graças ao espelhamento acima) e some daqui
+    const enviarNotaRapidaParaObsidian = (id) => {
+        const nota = notasRapidas.find((n) => n.id === id);
+        if (!nota)
+            return;
+        const dadosObsidian = lerDadosObsidian();
+        if (!dadosObsidian) {
+            setNotaCopiadaId({ id, estado: 'erro' });
+            setTimeout(() => setNotaCopiadaId((v) => (v && v.id === id ? null : v)), 1800);
+            return;
+        }
+        const pastaId = nota.pastaId || 'geral';
+        const notaDestino = dadosObsidian.notes[pastaId];
+        if (!notaDestino) {
+            // a pasta ainda não chegou no Cofre de Notas (sincronização não rodou ainda) — tenta de
+            // novo em instantes, sem apagar a nota daqui
+            setNotaCopiadaId({ id, estado: 'erro' });
+            setTimeout(() => setNotaCopiadaId((v) => (v && v.id === id ? null : v)), 1800);
+            return;
+        }
+        const carimbo = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const blocoNovo = `${nota.texto}\n— enviado do Cherubion em ${carimbo} —\n`;
+        const novoConteudo = notaDestino.content ? `${blocoNovo}\n${notaDestino.content}` : blocoNovo;
+        const ok = salvarDadosObsidian({
+            ...dadosObsidian,
+            notes: { ...dadosObsidian.notes, [pastaId]: { ...notaDestino, content: novoConteudo, updatedAt: Date.now() } },
+        });
+        if (!ok) {
+            setNotaCopiadaId({ id, estado: 'erro' });
+            setTimeout(() => setNotaCopiadaId((v) => (v && v.id === id ? null : v)), 1800);
+            return;
+        }
+        setNotasRapidas((ns) => ns.filter((n) => n.id !== id));
+        marcarSujo();
+    };
     // ---- PocketScribe: busca periódica das transcrições de voz do relógio, feitas pelo
     // Cloudflare Worker, e transforma cada uma numa Nota Rápida (pasta "Geral"). ----
     // URL do Worker que recebe as transcrições enviadas pelo relógio (só leitura aqui — o POST é feito pelo relógio direto pro servidor)
@@ -4347,7 +4683,36 @@ function App() {
         return (React.createElement("div", { className: "mt-janela-drag-handle", onTouchStart: (e) => onJanelaHandleTouchStart(e, id), onTouchMove: onJanelaHandleTouchMove, onTouchEnd: onJanelaHandleTouchEnd }, "\u2261 Arraste para reorganizar"));
     };
     // ---- backup manual (sempre funciona, independente do storage) ----
-    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }, null, 2);
+    // ---- Cofre de Notas (notas.html): lê todas as chaves salvas por ele no localStorage
+    // (prefixo "notas-storage:") para que o backup do Minha Tela leve também os dados do
+    // app de notas — os dois apps têm código separado, mas compartilham este .json ----
+    // ---- Baralho de Contatos (contatos.html): salva tudo numa única chave fixa
+    // ("baralho:v1"), sem prefixo — então basta ler essa chave direto para incluí-la
+    // no mesmo backup ----
+    const CHAVE_STORAGE_CONTATOS = 'baralho:v1';
+    const lerBackupAppContatos = () => {
+        try {
+            return window.localStorage.getItem(CHAVE_STORAGE_CONTATOS);
+        }
+        catch (e) {
+            return null;
+        }
+    };
+    const PREFIXO_STORAGE_NOTAS = 'notas-storage:';
+    const lerBackupAppNotas = () => {
+        const dados = {};
+        try {
+            for (let i = 0; i < window.localStorage.length; i++) {
+                const chave = window.localStorage.key(i);
+                if (chave && chave.startsWith(PREFIXO_STORAGE_NOTAS)) {
+                    dados[chave.slice(PREFIXO_STORAGE_NOTAS.length)] = window.localStorage.getItem(chave);
+                }
+            }
+        }
+        catch (e) { /* localStorage indisponível: backup segue só com os dados do Minha Tela */ }
+        return dados;
+    };
+    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
     const copiarBackup = () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -4493,6 +4858,24 @@ function App() {
             const prioridadeRestaurada = typeof dados.notaCatPrioridade === 'string' ? dados.notaCatPrioridade : 'aleatorio';
             setNotaCatPrioridade(prioridadeRestaurada);
             setNotaCat(prioridadeRestaurada);
+            // restaura também o Cofre de Notas (notas.html), se o backup tiver essa parte —
+            // grava direto no localStorage dele (prefixo "notas-storage:"); como esses dados
+            // não são estado do Minha Tela, não passam por nenhum setX daqui
+            if (dados.cofreDeNotas && typeof dados.cofreDeNotas === 'object') {
+                try {
+                    Object.keys(dados.cofreDeNotas).forEach((chave) => {
+                        window.localStorage.setItem(PREFIXO_STORAGE_NOTAS + chave, dados.cofreDeNotas[chave]);
+                    });
+                }
+                catch (e) { /* se falhar, o resto do backup do Minha Tela já foi restaurado normalmente */ }
+            }
+            // restaura também o Baralho de Contatos (contatos.html), se o backup tiver essa parte
+            if (typeof dados.baralhoDeContatos === 'string') {
+                try {
+                    window.localStorage.setItem(CHAVE_STORAGE_CONTATOS, dados.baralhoDeContatos);
+                }
+                catch (e) { /* idem: não impede a restauração do resto */ }
+            }
             setMsgBackup('Restaurado! Agora toque em "Salvar" no topo para guardar.');
             setSujo(true);
             setTextoRestaurar('');
@@ -4969,6 +5352,8 @@ function App() {
         React.createElement("div", { className: "mt-wrap" },
             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, position: 'relative' } },
                 React.createElement("h1", { className: "mt-header-nome", style: { flex: 1, minWidth: 0 } }, "Cherubion"),
+                React.createElement("button", { className: "mt-atalho-btn", style: { position: 'static', width: 36, height: 36, fontSize: 15 }, onClick: () => { window.location.href = 'contatos.html'; }, title: "Baralho de Contatos", "aria-label": "Abrir o Baralho de Contatos" }, "\uD83D\uDCC7"),
+                React.createElement("button", { className: "mt-atalho-btn", style: { position: 'static', width: 36, height: 36, fontSize: 15 }, onClick: () => { window.location.href = 'notas.html'; }, title: "Cofre de Notas", "aria-label": "Abrir o Cofre de Notas" }, "\uD83D\uDCD3"),
                 React.createElement("button", { className: "mt-atalhos-toggle", onClick: () => setAtalhosAbertos((v) => !v), title: atalhosAbertos ? 'Fechar atalhos' : 'Atalhos rápidos', "aria-label": atalhosAbertos ? 'Fechar atalhos' : 'Atalhos rápidos' }, atalhosAbertos ? '×' : '+'),
                 atalhosAbertos && (React.createElement("div", { className: "mt-atalhos-col" },
                     React.createElement("button", { className: "mt-atalho-btn", onClick: () => irParaAtalho('diarias'), title: "Tarefas di\u00E1rias" }, "T"),
@@ -5169,6 +5554,7 @@ function App() {
                                         color: '#232323', resize: 'vertical', fontFamily: 'inherit',
                                     } })) : (React.createElement("span", { style: { flex: 1 } }, n.texto)),
                                 React.createElement("button", { className: "mt-btn-sm", style: { flexShrink: 0, padding: '4px 9px', fontSize: 11.5 }, onClick: () => copiarNotaRapida(n.id, n.texto), title: "Copiar esta nota" }, notaCopiadaId && notaCopiadaId.id === n.id ? (notaCopiadaId.estado === 'ok' ? '✓ Copiado' : 'Copiar manualmente') : '📋 Copiar'),
+                                React.createElement("button", { className: "mt-btn-sm", style: { flexShrink: 0, padding: '4px 9px', fontSize: 11.5 }, onClick: () => enviarNotaRapidaParaObsidian(n.id), title: "Enviar esta nota para o Cofre de Notas (some daqui)" }, notaCopiadaId && notaCopiadaId.id === n.id && notaCopiadaId.estado === 'erro' ? '⏳ Ainda sincronizando' : '📓 Enviar'),
                                 React.createElement("button", { className: "mt-del", onClick: () => removerNotaRapida(n.id) }, "\u00D7")))))));
                         })())),
                 React.createElement("div", { className: `mt-janela-wrap ${draggingJanelaId === 'tarefasFixas' ? 'dragging' : ''} ${dragOverJanelaId === 'tarefasFixas' && draggingJanelaId !== 'tarefasFixas' ? 'drag-over' : ''}`, "data-janela-id": "tarefasFixas", style: { order: ordemJanelas.indexOf('tarefasFixas') } },
@@ -6331,11 +6717,10 @@ function App() {
                 transform: `rotate(${p.rotacao}deg)`,
             } })))))));
 }
+// ---------- Montagem ----------
+const raiz = ReactDOM.createRoot(document.getElementById('root'));
+raiz.render(React.createElement(App));
 
-;(function () {
-  const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(React.createElement(App));
-})();
 </script>
 </body>
 </html>
