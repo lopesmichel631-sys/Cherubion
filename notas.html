@@ -1,0 +1,2432 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Cofre de Notas</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior: none; }
+  #root { height: 100%; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+<script>
+"use strict";
+// ---------- Versão standalone (sem bundler) ----------
+// React e D3 vêm de <script> CDN no HTML e ficam disponíveis como globais.
+// Não há pacote "lucide-react" aqui: os ícones usados no app original são
+// recriados abaixo como componentes SVG simples e leves, com o mesmo nome
+// e as mesmas props (size, strokeWidth, className) — o resto do código não
+// precisa saber a diferença.
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+const d3 = window.d3;
+function criarIcone(miolo) {
+    return function Icone({ size = 24, strokeWidth = 2, className = '' }) {
+        return (React.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: strokeWidth, strokeLinecap: "round", strokeLinejoin: "round", className: className }, miolo));
+    };
+}
+const Search = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("circle", { cx: "11", cy: "11", r: "7" }),
+    React.createElement("line", { x1: "21", y1: "21", x2: "16.6", y2: "16.6" })));
+const Plus = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("line", { x1: "12", y1: "5", x2: "12", y2: "19" }),
+    React.createElement("line", { x1: "5", y1: "12", x2: "19", y2: "12" })));
+const FileText = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+    React.createElement("polyline", { points: "14 2 14 8 20 8" }),
+    React.createElement("line", { x1: "16", y1: "13", x2: "8", y2: "13" }),
+    React.createElement("line", { x1: "16", y1: "17", x2: "8", y2: "17" })));
+const Link2 = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M9 17H7a5 5 0 0 1 0-10h2" }),
+    React.createElement("path", { d: "M15 7h2a5 5 0 0 1 0 10h-2" }),
+    React.createElement("line", { x1: "8", y1: "12", x2: "16", y2: "12" })));
+const Menu = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("line", { x1: "3", y1: "6", x2: "21", y2: "6" }),
+    React.createElement("line", { x1: "3", y1: "12", x2: "21", y2: "12" }),
+    React.createElement("line", { x1: "3", y1: "18", x2: "21", y2: "18" })));
+const Download = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
+    React.createElement("polyline", { points: "7 10 12 15 17 10" }),
+    React.createElement("line", { x1: "12", y1: "15", x2: "12", y2: "3" })));
+const Upload = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
+    React.createElement("polyline", { points: "17 8 12 3 7 8" }),
+    React.createElement("line", { x1: "12", y1: "3", x2: "12", y2: "15" })));
+const Trash2 = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("polyline", { points: "3 6 5 6 21 6" }),
+    React.createElement("path", { d: "M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" }),
+    React.createElement("line", { x1: "10", y1: "11", x2: "10", y2: "17" }),
+    React.createElement("line", { x1: "14", y1: "11", x2: "14", y2: "17" }),
+    React.createElement("path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" })));
+const Share2 = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("circle", { cx: "18", cy: "5", r: "3" }),
+    React.createElement("circle", { cx: "6", cy: "12", r: "3" }),
+    React.createElement("circle", { cx: "18", cy: "19", r: "3" }),
+    React.createElement("line", { x1: "8.6", y1: "10.5", x2: "15.4", y2: "6.5" }),
+    React.createElement("line", { x1: "8.6", y1: "13.5", x2: "15.4", y2: "17.5" })));
+const Workflow = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("rect", { x: "3", y: "3", width: "8", height: "6", rx: "1" }),
+    React.createElement("rect", { x: "13", y: "15", width: "8", height: "6", rx: "1" }),
+    React.createElement("path", { d: "M7 9v2a2 2 0 0 0 2 2h6" })));
+const Undo2 = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M9 14 4 9l5-5" }),
+    React.createElement("path", { d: "M4 9h10.5a5.5 5.5 0 0 1 0 11H11" })));
+const Redo2 = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M15 14l5-5-5-5" }),
+    React.createElement("path", { d: "M20 9H9.5a5.5 5.5 0 0 0 0 11H13" })));
+const Brackets = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h2" }),
+    React.createElement("path", { d: "M16 3h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2" })));
+const File = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+    React.createElement("polyline", { points: "14 2 14 8 20 8" })));
+const Tag = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" }),
+    React.createElement("circle", { cx: "7", cy: "7", r: "0.6", fill: "currentColor", stroke: "none" })));
+const Paperclip = criarIcone(React.createElement("path", { d: "M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l8.94-8.94a4 4 0 0 1 5.66 5.66l-8.49 8.48a2 2 0 0 1-2.83-2.83l7.78-7.78" }));
+const Heading = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("line", { x1: "6", y1: "4", x2: "6", y2: "20" }),
+    React.createElement("line", { x1: "18", y1: "4", x2: "18", y2: "20" }),
+    React.createElement("line", { x1: "6", y1: "12", x2: "18", y2: "12" })));
+const Bold = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M6 4h8a4 4 0 0 1 0 8H6z" }),
+    React.createElement("path", { d: "M6 12h9a4 4 0 0 1 0 8H6z" })));
+const Italic = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("line", { x1: "19", y1: "4", x2: "10", y2: "4" }),
+    React.createElement("line", { x1: "14", y1: "20", x2: "5", y2: "20" }),
+    React.createElement("line", { x1: "15", y1: "4", x2: "9", y2: "20" })));
+const Keyboard = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("rect", { x: "2", y: "6", width: "20", height: "12", rx: "2" }),
+    React.createElement("circle", { cx: "6.5", cy: "10", r: "0.5", fill: "currentColor", stroke: "none" }),
+    React.createElement("circle", { cx: "10.5", cy: "10", r: "0.5", fill: "currentColor", stroke: "none" }),
+    React.createElement("circle", { cx: "14.5", cy: "10", r: "0.5", fill: "currentColor", stroke: "none" }),
+    React.createElement("circle", { cx: "17.5", cy: "10", r: "0.5", fill: "currentColor", stroke: "none" }),
+    React.createElement("path", { d: "M6 15h12" })));
+const X = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+    React.createElement("line", { x1: "6", y1: "6", x2: "18", y2: "18" })));
+const ChevronLeft = criarIcone(React.createElement("polyline", { points: "15 18 9 12 15 6" }));
+const ChevronRight = criarIcone(React.createElement("polyline", { points: "9 18 15 12 9 6" }));
+const BookOpen = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" }),
+    React.createElement("path", { d: "M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" })));
+const Pencil = criarIcone(React.createElement(React.Fragment, null,
+    React.createElement("path", { d: "M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" }),
+    React.createElement("path", { d: "M15 5l4 4" })));
+// ---------- Helpers ----------
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+// ambiente touch (celular/tablet)? Só nele faz sentido estimar a altura do teclado.
+const EH_TOUCH = typeof window !== 'undefined' &&
+    ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+const extractWikilinks = (text) => {
+    const re = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
+    const links = new Set();
+    let m;
+    while ((m = re.exec(text)) !== null)
+        links.add(m[1].trim());
+    return [...links];
+};
+// very small markdown renderer: headings, bold, italic, code, lists, wikilinks
+function renderMarkdown(text, notesByTitle, onLinkClick) {
+    if (!text)
+        return null;
+    const lines = text.split('\n');
+    const blocks = [];
+    let listBuffer = [];
+    const flushList = () => {
+        if (listBuffer.length) {
+            blocks.push(React.createElement("ul", { key: 'ul-' + blocks.length, className: "ob-list" }, listBuffer.map((item, i) => (React.createElement("li", { key: i }, inlineRender(item, notesByTitle, onLinkClick))))));
+            listBuffer = [];
+        }
+    };
+    lines.forEach((line, idx) => {
+        const h = line.match(/^(#{1,6})\s+(.*)/);
+        if (h) {
+            flushList();
+            const level = h[1].length;
+            const Tag = `h${Math.min(level, 6)}`;
+            blocks.push(React.createElement(Tag, { key: idx, className: `ob-h ob-h${level}` }, inlineRender(h[2], notesByTitle, onLinkClick)));
+            return;
+        }
+        const li = line.match(/^\s*[-*]\s+(.*)/);
+        if (li) {
+            listBuffer.push(li[1]);
+            return;
+        }
+        flushList();
+        if (line.trim() === '') {
+            blocks.push(React.createElement("div", { key: idx, className: "ob-spacer" }));
+        }
+        else {
+            blocks.push(React.createElement("p", { key: idx, className: "ob-p" }, inlineRender(line, notesByTitle, onLinkClick)));
+        }
+    });
+    flushList();
+    return blocks;
+}
+function inlineRender(text, notesByTitle, onLinkClick) {
+    const parts = [];
+    let remaining = text;
+    let key = 0;
+    const pattern = /(\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`)/;
+    while (remaining.length) {
+        const m = remaining.match(pattern);
+        if (!m) {
+            parts.push(remaining);
+            break;
+        }
+        const idx = m.index;
+        if (idx > 0)
+            parts.push(remaining.slice(0, idx));
+        if (m[2] !== undefined) {
+            const targetTitle = m[2].trim();
+            const label = m[3] || targetTitle;
+            const exists = !!notesByTitle[targetTitle.toLowerCase()];
+            parts.push(React.createElement("button", { key: key++, onClick: () => onLinkClick(targetTitle), className: exists ? 'ob-wikilink' : 'ob-wikilink ob-wikilink-broken', title: exists ? targetTitle : `Criar nota "${targetTitle}"` }, label));
+        }
+        else if (m[4] !== undefined) {
+            parts.push(React.createElement("strong", { key: key++ }, m[4]));
+        }
+        else if (m[5] !== undefined) {
+            parts.push(React.createElement("em", { key: key++ }, m[5]));
+        }
+        else if (m[6] !== undefined) {
+            parts.push(React.createElement("code", { key: key++, className: "ob-code" }, m[6]));
+        }
+        remaining = remaining.slice(idx + m[0].length);
+    }
+    return parts;
+}
+// ---------- Graph helpers (shared by force graph + sankey) ----------
+function buildGraphData(notes) {
+    const notesArr = Object.values(notes);
+    const idByTitle = {};
+    notesArr.forEach((n) => {
+        idByTitle[n.title.toLowerCase()] = n.id;
+    });
+    const outgoing = {};
+    const incomingCount = {};
+    const degree = {};
+    notesArr.forEach((n) => {
+        outgoing[n.id] = [];
+        degree[n.id] = 0;
+    });
+    notesArr.forEach((n) => {
+        const targets = extractWikilinks(n.content);
+        targets.forEach((t) => {
+            const targetId = idByTitle[t.toLowerCase()];
+            if (targetId && targetId !== n.id) {
+                outgoing[n.id].push(targetId);
+                incomingCount[targetId] = (incomingCount[targetId] || 0) + 1;
+                degree[n.id] += 1;
+                degree[targetId] = (degree[targetId] || 0) + 1;
+            }
+        });
+    });
+    return { notesArr, idByTitle, outgoing, incomingCount, degree };
+}
+// ---------- Force-Directed Graph View ----------
+function ForceGraphView({ notes, activeId, onSelectNote }) {
+    const svgRef = useRef(null);
+    const containerRef = useRef(null);
+    useEffect(() => {
+        var _a, _b;
+        const { notesArr, outgoing, degree } = buildGraphData(notes);
+        const nodes = notesArr.map((n) => ({ id: n.id, title: n.title }));
+        const linkSet = new Set();
+        const links = [];
+        notesArr.forEach((n) => {
+            (outgoing[n.id] || []).forEach((targetId) => {
+                const key = [n.id, targetId].sort().join('::');
+                if (!linkSet.has(key)) {
+                    linkSet.add(key);
+                    links.push({ source: n.id, target: targetId });
+                }
+            });
+        });
+        const width = ((_a = containerRef.current) === null || _a === void 0 ? void 0 : _a.clientWidth) || 800;
+        const height = ((_b = containerRef.current) === null || _b === void 0 ? void 0 : _b.clientHeight) || 560;
+        const radiusOf = (id) => 7 + Math.min(degree[id] || 0, 10) * 2.2;
+        const svg = d3.select(svgRef.current);
+        svg.selectAll('*').remove();
+        svg.attr('width', width).attr('height', height);
+        const g = svg.append('g');
+        svg.call(d3
+            .zoom()
+            .scaleExtent([0.25, 4])
+            .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        }));
+        const linkSel = g
+            .append('g')
+            .attr('stroke', '#d6d6dd')
+            .attr('stroke-width', 1.2)
+            .selectAll('line')
+            .data(links)
+            .join('line');
+        const nodeSel = g
+            .append('g')
+            .selectAll('circle')
+            .data(nodes)
+            .join('circle')
+            .attr('r', (d) => radiusOf(d.id))
+            .attr('fill', (d) => d.id === activeId ? '#4b3ac2' : degree[d.id] ? '#7c6af2' : '#c9c9d1')
+            .attr('stroke', '#ffffff')
+            .attr('stroke-width', 1.5)
+            .style('cursor', 'pointer')
+            .on('click', (event, d) => onSelectNote(d.id));
+        const labelSel = g
+            .append('g')
+            .selectAll('text')
+            .data(nodes)
+            .join('text')
+            .text((d) => d.title)
+            .attr('font-size', 11)
+            .attr('fill', '#3a3a42')
+            .attr('text-anchor', 'middle')
+            .style('pointer-events', 'none');
+        const simulation = d3
+            .forceSimulation(nodes)
+            .force('link', d3
+            .forceLink(links)
+            .id((d) => d.id)
+            .distance(95)
+            .strength(0.5))
+            .force('charge', d3.forceManyBody().strength(-260))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collide', d3.forceCollide((d) => radiusOf(d.id) + 8));
+        const dragBehavior = d3
+            .drag()
+            .on('start', (event, d) => {
+            if (!event.active)
+                simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        })
+            .on('drag', (event, d) => {
+            d.fx = event.x;
+            d.fy = event.y;
+        })
+            .on('end', (event, d) => {
+            if (!event.active)
+                simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        });
+        nodeSel.call(dragBehavior);
+        simulation.on('tick', () => {
+            linkSel
+                .attr('x1', (d) => d.source.x)
+                .attr('y1', (d) => d.source.y)
+                .attr('x2', (d) => d.target.x)
+                .attr('y2', (d) => d.target.y);
+            nodeSel.attr('cx', (d) => d.x).attr('cy', (d) => d.y);
+            labelSel.attr('x', (d) => d.x).attr('y', (d) => d.y - radiusOf(d.id) - 6);
+        });
+        return () => simulation.stop();
+    }, [notes, activeId, onSelectNote]);
+    return (React.createElement("div", { ref: containerRef, className: "ob-viz-container" },
+        React.createElement("svg", { ref: svgRef, className: "ob-viz-svg" }),
+        React.createElement("div", { className: "ob-viz-hint" }, "Arraste os n\u00F3s \u00B7 Scroll para zoom \u00B7 Clique para abrir a nota")));
+}
+// ---------- Sankey-style Graph View ----------
+function SankeyGraphView({ notes, activeId, onSelectNote }) {
+    const containerRef = useRef(null);
+    const [dims, setDims] = useState({ width: 800, height: 560 });
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el)
+            return;
+        const update = () => setDims({ width: el.clientWidth || 800, height: el.clientHeight || 560 });
+        update();
+        const ro = new ResizeObserver(update);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+    const { columns, links, degree, maxDepth } = useMemo(() => {
+        const { notesArr, outgoing, incomingCount, degree } = buildGraphData(notes);
+        const depth = {};
+        const roots = notesArr.filter((n) => !incomingCount[n.id]);
+        const queue = [];
+        (roots.length ? roots : notesArr).forEach((n) => {
+            if (depth[n.id] === undefined) {
+                depth[n.id] = 0;
+                queue.push(n.id);
+            }
+        });
+        let qi = 0;
+        while (qi < queue.length) {
+            const cur = queue[qi++];
+            (outgoing[cur] || []).forEach((t) => {
+                if (depth[t] === undefined) {
+                    depth[t] = depth[cur] + 1;
+                    queue.push(t);
+                }
+            });
+        }
+        notesArr.forEach((n) => {
+            if (depth[n.id] === undefined)
+                depth[n.id] = 0;
+        });
+        const maxDepth = notesArr.length ? Math.max(...notesArr.map((n) => depth[n.id])) : 0;
+        const cols = Array.from({ length: maxDepth + 1 }, () => []);
+        notesArr.forEach((n) => cols[depth[n.id]].push(n));
+        const linksArr = [];
+        notesArr.forEach((n) => {
+            (outgoing[n.id] || []).forEach((t) => {
+                linksArr.push({ sourceId: n.id, targetId: t });
+            });
+        });
+        return { columns: cols, links: linksArr, degree, maxDepth };
+    }, [notes]);
+    const { width, height } = dims;
+    const colWidth = maxDepth > 0 ? width / (maxDepth + 1) : width;
+    const nodeWidth = 14;
+    const positions = useMemo(() => {
+        const pos = {};
+        const usableHeight = Math.max(height - 40, 100);
+        const gap = 10;
+        columns.forEach((col, ci) => {
+            const rawHeights = col.map((n) => Math.max(18, Math.min(64, 14 + (degree[n.id] || 0) * 8)));
+            const totalRaw = rawHeights.reduce((a, b) => a + b, 0) + gap * Math.max(0, col.length - 1);
+            const scale = totalRaw > usableHeight && totalRaw > 0 ? usableHeight / totalRaw : 1;
+            let y = 20;
+            col.forEach((n, i) => {
+                const h = rawHeights[i] * scale;
+                pos[n.id] = {
+                    x: ci * colWidth + colWidth / 2 - nodeWidth / 2,
+                    y,
+                    height: h,
+                };
+                y += h + gap * scale;
+            });
+        });
+        return pos;
+    }, [columns, colWidth, height, degree]);
+    const linkPath = (l) => {
+        const s = positions[l.sourceId];
+        const t = positions[l.targetId];
+        if (!s || !t)
+            return '';
+        const sx = s.x + nodeWidth;
+        const sy = s.y + s.height / 2;
+        const tx = t.x;
+        const ty = t.y + t.height / 2;
+        const mx = (sx + tx) / 2;
+        return `M${sx},${sy} C${mx},${sy} ${mx},${ty} ${tx},${ty}`;
+    };
+    const allNotes = Object.values(notes);
+    return (React.createElement("div", { ref: containerRef, className: "ob-viz-container" },
+        React.createElement("svg", { width: width, height: height, className: "ob-viz-svg" },
+            React.createElement("g", null, links.map((l, i) => (React.createElement("path", { key: i, d: linkPath(l), className: "ob-sankey-link" })))),
+            React.createElement("g", null, allNotes.map((n) => {
+                const p = positions[n.id];
+                if (!p)
+                    return null;
+                return (React.createElement("g", { key: n.id, transform: `translate(${p.x},${p.y})`, className: "ob-sankey-node-group", onClick: () => onSelectNote(n.id) },
+                    React.createElement("rect", { width: nodeWidth, height: p.height, rx: 3, className: n.id === activeId
+                            ? 'ob-sankey-node ob-sankey-node-active'
+                            : 'ob-sankey-node' }),
+                    React.createElement("text", { x: nodeWidth + 6, y: p.height / 2, dy: "0.32em", className: "ob-sankey-label" }, n.title)));
+            }))),
+        React.createElement("div", { className: "ob-viz-hint" }, "Colunas = dist\u00E2ncia a partir das notas raiz (sem links de entrada) \u00B7 Clique para abrir")));
+}
+// ---------- Persistência (técnica do Cherubion) ----------
+// Nesta versão standalone não existe um "window.storage" de plataforma — ele é
+// substituído por este shim, que grava direto no localStorage real do navegador
+// com um prefixo próprio ("notas-storage:"), diferente do prefixo usado pelo
+// Minha Tela ("mt-storage:"), para os dois apps nunca colidirem nem se misturarem
+// mesmo compartilhando o mesmo domínio (github.io/Cherubion).
+const PREFIXO_STORAGE = 'notas-storage:';
+window.storage = {
+    async get(chave) {
+        try {
+            const v = window.localStorage.getItem(PREFIXO_STORAGE + chave);
+            if (v === null)
+                return null;
+            return { key: chave, value: v };
+        }
+        catch (e) {
+            throw e;
+        }
+    },
+    async set(chave, valor) {
+        window.localStorage.setItem(PREFIXO_STORAGE + chave, valor);
+        return { key: chave, value: valor };
+    },
+    async delete(chave) {
+        window.localStorage.removeItem(PREFIXO_STORAGE + chave);
+        return { key: chave, deleted: true };
+    },
+    async list(prefixo = '') {
+        const keys = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (k && k.startsWith(PREFIXO_STORAGE + prefixo))
+                keys.push(k.slice(PREFIXO_STORAGE.length));
+        }
+        return { keys };
+    },
+};
+// Espelho extra num prefixo separado ("meg-fallback:"): é a rede de segurança
+// original do app — se por qualquer motivo o window.storage acima falhar,
+// os dados ainda ficam salvos aqui.
+const lsSet = (chave, valor) => {
+    try {
+        window.localStorage.setItem('meg-fallback:' + chave, valor);
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+};
+const lsGet = (chave) => {
+    try {
+        return window.localStorage.getItem('meg-fallback:' + chave);
+    }
+    catch (e) {
+        return null;
+    }
+};
+const storageExiste = () => typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+// tenta salvar no window.storage com retry; sempre espelha no localStorage
+const tentarSalvarComRetry = async (chave, valor, retries = 1) => {
+    try {
+        const res = await window.storage.set(chave, valor);
+        lsSet(chave, valor); // espelha sempre que o window.storage funciona
+        return res;
+    }
+    catch (e) {
+        if (retries > 0) {
+            await new Promise((r) => setTimeout(r, 700));
+            return tentarSalvarComRetry(chave, valor, retries - 1);
+        }
+        throw e;
+    }
+};
+// ---------- Live Preview (formatação enquanto digita) ----------
+const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const TOKEN_MD = /(!?\[\[[^\]\n]*\]\]|\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`)/g;
+function highlightMarkdown(text) {
+    const render = (s, base) => {
+        let out = '';
+        let ultimo = 0;
+        let m;
+        TOKEN_MD.lastIndex = 0;
+        while ((m = TOKEN_MD.exec(s)) !== null) {
+            out += escapeHtml(s.slice(ultimo, m.index));
+            const bruto = m[0];
+            let open, close, cls;
+            if (bruto.startsWith('![[')) {
+                open = '![[';
+                close = ']]';
+                cls = 'lp-embed';
+            }
+            else if (bruto.startsWith('[[')) {
+                open = '[[';
+                close = ']]';
+                cls = 'lp-link';
+            }
+            else if (bruto.startsWith('**')) {
+                open = '**';
+                close = '**';
+                cls = 'lp-b';
+            }
+            else if (bruto.startsWith('`')) {
+                open = '`';
+                close = '`';
+                cls = 'lp-code';
+            }
+            else {
+                open = '*';
+                close = '*';
+                cls = 'lp-i';
+            }
+            const ini = base + m.index;
+            const fim = ini + bruto.length;
+            const conteudo = escapeHtml(bruto.slice(open.length, bruto.length - close.length));
+            out +=
+                `<span class="${cls}" data-ini="${ini}" data-fim="${fim}">` +
+                    `<span class="lp-m">${escapeHtml(open)}</span>` +
+                    conteudo +
+                    `<span class="lp-m">${escapeHtml(close)}</span>` +
+                    `</span>`;
+            ultimo = m.index + bruto.length;
+        }
+        out += escapeHtml(s.slice(ultimo));
+        return out;
+    };
+    let offset = 0;
+    return (text
+        .split('\n')
+        .map((line) => {
+        const inicioLinha = offset;
+        offset += line.length + 1;
+        const h = line.match(/^(#{1,6})\s/);
+        if (h) {
+            const marcador = escapeHtml(line.slice(0, h[0].length));
+            const resto = render(line.slice(h[0].length), inicioLinha + h[0].length);
+            return (`<span class="lp-h lp-h${h[1].length}" data-ini="${inicioLinha}" data-fim="${inicioLinha + line.length}">` +
+                `<span class="lp-m">${marcador}</span>${resto}</span>`);
+        }
+        return render(line, inicioLinha);
+    })
+        .join('\n') +
+        (text.endsWith('\n') ? '<br>' : ''));
+}
+function aplicarRevelacao(root, cursor) {
+    if (!root)
+        return;
+    root.querySelectorAll('[data-ini]').forEach((el) => {
+        const ini = +el.dataset.ini;
+        const fim = +el.dataset.fim;
+        const dentro = cursor >= ini && cursor <= fim;
+        el.querySelectorAll(':scope > .lp-m').forEach((mk) => {
+            mk.classList.toggle('lp-m-show', dentro);
+        });
+    });
+}
+function extrairAlvoDoLink(textoBruto) {
+    const m = (textoBruto || '').match(/\[\[([^\]|#]+)/);
+    return m ? m[1].trim() : null;
+}
+function obterOffsets(root) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0)
+        return [0, 0];
+    const range = sel.getRangeAt(0);
+    const pre = range.cloneRange();
+    pre.selectNodeContents(root);
+    pre.setEnd(range.startContainer, range.startOffset);
+    const start = pre.cloneContents().textContent.length;
+    const len = range.cloneContents().textContent.length;
+    return [start, start + len];
+}
+function definirSelecao(root, start, end) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let pos = 0;
+    let startNode = null, startOff = 0, endNode = null, endOff = 0;
+    let node;
+    while ((node = walker.nextNode())) {
+        const len = node.textContent.length;
+        if (!startNode && pos + len >= start) {
+            startNode = node;
+            startOff = start - pos;
+        }
+        if (!endNode && pos + len >= end) {
+            endNode = node;
+            endOff = end - pos;
+            break;
+        }
+        pos += len;
+    }
+    const sel = window.getSelection();
+    const range = document.createRange();
+    if (!startNode) {
+        range.selectNodeContents(root);
+        range.collapse(false);
+    }
+    else {
+        range.setStart(startNode, Math.min(startOff, startNode.textContent.length));
+        range.setEnd(endNode || startNode, Math.min(endOff || startOff, (endNode || startNode).textContent.length));
+    }
+    sel.removeAllRanges();
+    sel.addRange(range);
+}
+// ---------- Proteção contra tela branca ----------
+class LimiteDeErro extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { erro: null };
+    }
+    static getDerivedStateFromError(erro) {
+        return { erro };
+    }
+    render() {
+        if (this.state.erro) {
+            return (React.createElement("div", { style: { padding: 24, fontFamily: 'monospace', color: '#c0362c', background: '#fff', minHeight: '100vh' } },
+                React.createElement("h2", { style: { marginTop: 0 } }, "O Meg encontrou um erro"),
+                React.createElement("p", null, "Seus dados est\u00E3o salvos. Copie a mensagem abaixo e envie para o desenvolvedor:"),
+                React.createElement("pre", { style: { whiteSpace: 'pre-wrap', background: '#fbe4e2', padding: 12, borderRadius: 8 } }, String((this.state.erro && this.state.erro.stack) || this.state.erro)),
+                React.createElement("button", { onClick: () => this.setState({ erro: null }), style: { padding: '10px 18px', borderRadius: 8, border: 'none', background: '#7c6af2', color: '#fff', fontSize: 14 } }, "Tentar de novo")));
+        }
+        return this.props.children;
+    }
+}
+// ---------- Main App ----------
+function MegApp() {
+    const [notes, setNotes] = useState({});
+    const [activeId, setActiveId] = useState(null);
+    const [abas, setAbas] = useState([]);
+    const [seletorAbas, setSeletorAbas] = useState(false);
+    const [nav, setNav] = useState({ pilha: [], indice: -1 });
+    const tabsRef = useRef(null);
+    const [query, setQuery] = useState('');
+    const [mode, setMode] = useState('edit');
+    const [mainView, setMainView] = useState('notes');
+    const [sidebarOpen, setSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth > 700);
+    const [loaded, setLoaded] = useState(false);
+    const [toast, setToast] = useState('');
+    const [saveStatus, setSaveStatus] = useState('');
+    const fileInputRef = useRef(null);
+    const textareaRef = useRef(null);
+    const historicoRef = useRef({});
+    const pendingSelRef = useRef(null);
+    const ultimaSelRef = useRef([0, 0]);
+    const selCongeladaRef = useRef(false);
+    const selAnuladaRef = useRef(false);
+    const sincronizandoRef = useRef(false);
+    const posCursorRef = useRef(-1);
+    const [editorFocado, setEditorFocado] = useState(false);
+    const [menuTitulo, setMenuTitulo] = useState(false);
+    const snapToqueRef = useRef(null);
+    const [barY, setBarY] = useState(null);
+    const [folgaFinal, setFolgaFinal] = useState(0);
+    const barRef = useRef(null);
+    const mainRef = useRef(null);
+    const editorFocadoRef = useRef(false);
+    useEffect(() => {
+        editorFocadoRef.current = editorFocado;
+    }, [editorFocado]);
+    const contadorNaTelaRef = useRef(false);
+    useEffect(() => {
+        contadorNaTelaRef.current = mainView === 'notes' && abas.length > 0 && !editorFocado;
+    }, [mainView, abas.length, editorFocado]);
+    const sidebarOpenRef = useRef(sidebarOpen);
+    useEffect(() => {
+        sidebarOpenRef.current = sidebarOpen;
+    }, [sidebarOpen]);
+    useEffect(() => {
+        let x0 = 0;
+        let y0 = 0;
+        let ativo = false;
+        let decidido = false;
+        const onTouchStart = (e) => {
+            const alvo = e.target;
+            if (alvo && alvo.closest && alvo.closest('.ob-toolbar')) {
+                ativo = false;
+                return;
+            }
+            const t = e.touches[0];
+            x0 = t.clientX;
+            y0 = t.clientY;
+            decidido = false;
+            ativo = sidebarOpenRef.current || t.clientX <= 32;
+        };
+        const onTouchMove = (e) => {
+            if (!ativo || decidido)
+                return;
+            const t = e.touches[0];
+            const dx = t.clientX - x0;
+            const dy = t.clientY - y0;
+            if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx)) {
+                ativo = false;
+                return;
+            }
+            if (dx > 50 && !sidebarOpenRef.current) {
+                decidido = true;
+                setSidebarOpen(true);
+            }
+            else if (dx < -50 && sidebarOpenRef.current) {
+                decidido = true;
+                setSidebarOpen(false);
+            }
+        };
+        document.addEventListener('touchstart', onTouchStart, { passive: true });
+        document.addEventListener('touchmove', onTouchMove, { passive: true });
+        return () => {
+            document.removeEventListener('touchstart', onTouchStart);
+            document.removeEventListener('touchmove', onTouchMove);
+        };
+    }, []);
+    const FOLGA_BARRA = 6;
+    const ALTURA_BARRA_IOS = 52;
+    const ALTURA_CONTADOR = 52;
+    useEffect(() => {
+        let ativo = true;
+        const passo = () => {
+            if (!ativo)
+                return;
+            const main = mainRef.current;
+            const bar = barRef.current;
+            if (!main || !bar) {
+                requestAnimationFrame(passo);
+                return;
+            }
+            const vv = window.visualViewport;
+            const alturaBar = bar.offsetHeight || 52;
+            const alturaJanela = window.innerHeight;
+            const tecladoReal = vv
+                ? Math.max(0, alturaJanela - vv.height - vv.offsetTop)
+                : 0;
+            const temTecladoReal = tecladoReal > 60;
+            const tecladoEstimado = !temTecladoReal && EH_TOUCH && editorFocadoRef.current
+                ? Math.round(alturaJanela * 0.42) + ALTURA_BARRA_IOS
+                : 0;
+            const fundoVisivel = temTecladoReal
+                ? vv.offsetTop + vv.height
+                : (vv ? vv.offsetTop + vv.height : alturaJanela) - tecladoEstimado;
+            const mainTop = main.getBoundingClientRect().top;
+            const zonaContador = contadorNaTelaRef.current ? ALTURA_CONTADOR : 0;
+            const topLocal = fundoVisivel - mainTop - alturaBar - FOLGA_BARRA - zonaContador;
+            setBarY(Math.max(0, Math.round(topLocal)));
+            const obstrucao = Math.round(alturaJanela - fundoVisivel + alturaBar + 16 + zonaContador);
+            setFolgaFinal(Math.max(0, obstrucao));
+            requestAnimationFrame(passo);
+        };
+        requestAnimationFrame(passo);
+        return () => {
+            ativo = false;
+        };
+    }, []);
+    const chaveRevelacao = (texto, i) => {
+        const linha = texto.slice(0, i).split('\n').length - 1;
+        const inicioLinha = texto.lastIndexOf('\n', i - 1) + 1;
+        const idxFim = texto.indexOf('\n', inicioLinha);
+        const linhaTxt = texto.slice(inicioLinha, idxFim === -1 ? texto.length : idxFim);
+        let chave = `L${linha}`;
+        TOKEN_MD.lastIndex = 0;
+        let m;
+        while ((m = TOKEN_MD.exec(linhaTxt)) !== null) {
+            const ini = inicioLinha + m.index;
+            const fim = ini + m[0].length;
+            if (i >= ini && i <= fim) {
+                chave += `:T${ini}-${fim}`;
+                break;
+            }
+        }
+        return chave;
+    };
+    const chaveRevelacaoRef = useRef('');
+    useEffect(() => {
+        posCursorRef.current = -1;
+        chaveRevelacaoRef.current = '';
+    }, [activeId]);
+    const registrarCursor = (texto, i, aplicar = true) => {
+        chaveRevelacaoRef.current = chaveRevelacao(texto, i);
+        posCursorRef.current = i;
+        if (aplicar)
+            aplicarRevelacao(textareaRef.current, i);
+    };
+    const revelacaoAgendadaRef = useRef(0);
+    const atualizarLinhaAtiva = () => {
+        if (revelacaoAgendadaRef.current)
+            return;
+        revelacaoAgendadaRef.current = requestAnimationFrame(() => {
+            var _a, _b;
+            revelacaoAgendadaRef.current = 0;
+            if (sincronizandoRef.current)
+                return;
+            const el = textareaRef.current;
+            if (!el || !activeId)
+                return;
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0)
+                return;
+            if (!el.contains(sel.getRangeAt(0).startContainer))
+                return;
+            const texto = (_b = (_a = notes[activeId]) === null || _a === void 0 ? void 0 : _a.content) !== null && _b !== void 0 ? _b : '';
+            const [i] = obterOffsets(el);
+            if (chaveRevelacao(texto, i) === chaveRevelacaoRef.current)
+                return;
+            registrarCursor(texto, i);
+        });
+    };
+    useEffect(() => {
+        return () => {
+            if (revelacaoAgendadaRef.current) {
+                cancelAnimationFrame(revelacaoAgendadaRef.current);
+                revelacaoAgendadaRef.current = 0;
+            }
+        };
+    }, [activeId]);
+    useEffect(() => {
+        const aoMudarSelecao = () => {
+            if (sincronizandoRef.current)
+                return;
+            const el = textareaRef.current;
+            const sel = window.getSelection();
+            if (!el || !sel || sel.rangeCount === 0) {
+                selAnuladaRef.current = true;
+                return;
+            }
+            const range = sel.getRangeAt(0);
+            if (!el.contains(range.startContainer)) {
+                selAnuladaRef.current = true;
+                return;
+            }
+            if (range.collapsed && (selAnuladaRef.current || selCongeladaRef.current))
+                return;
+            ultimaSelRef.current = obterOffsets(el);
+        };
+        document.addEventListener('selectionchange', aoMudarSelecao);
+        return () => document.removeEventListener('selectionchange', aoMudarSelecao);
+    }, []);
+    const confiarNaSelecao = () => {
+        selCongeladaRef.current = false;
+        selAnuladaRef.current = false;
+    };
+    useEffect(() => {
+        var _a;
+        const el = textareaRef.current;
+        if (!el || mode !== 'edit')
+            return;
+        sincronizandoRef.current = true;
+        const conteudo = (activeId && ((_a = notes[activeId]) === null || _a === void 0 ? void 0 : _a.content)) || '';
+        const html = highlightMarkdown(conteudo);
+        let houveReset = false;
+        if (el.innerHTML !== html) {
+            el.innerHTML = html;
+            houveReset = true;
+            aplicarRevelacao(el, posCursorRef.current);
+        }
+        if (pendingSelRef.current) {
+            const [i, f] = pendingSelRef.current;
+            pendingSelRef.current = null;
+            el.focus({ preventScroll: true });
+            definirSelecao(el, i, f);
+            ultimaSelRef.current = [i, f];
+            const area = el.closest('.ob-editor-area');
+            const sel = window.getSelection();
+            if (area && sel && sel.rangeCount > 0) {
+                const r = sel.getRangeAt(0).cloneRange();
+                r.collapse(false);
+                let rect = r.getClientRects()[0] || r.getBoundingClientRect();
+                if (!rect || (rect.top === 0 && rect.height === 0)) {
+                    const nodo = r.startContainer;
+                    const elBase = nodo.nodeType === 1 ? nodo : nodo.parentElement;
+                    if (elBase)
+                        rect = elBase.getBoundingClientRect();
+                }
+                if (rect) {
+                    const areaRect = area.getBoundingClientRect();
+                    const margem = 80;
+                    if (rect.top < areaRect.top + margem) {
+                        area.scrollTop -= areaRect.top + margem - rect.top;
+                    }
+                    else if (rect.bottom > areaRect.bottom - margem) {
+                        area.scrollTop += rect.bottom - (areaRect.bottom - margem);
+                    }
+                }
+            }
+        }
+        else if (houveReset && document.activeElement === el) {
+            definirSelecao(el, ultimaSelRef.current[0], ultimaSelRef.current[1]);
+        }
+        setTimeout(() => {
+            sincronizandoRef.current = false;
+        }, 0);
+    });
+    useEffect(() => {
+        (async () => {
+            try {
+                let valorSalvo = null;
+                if (storageExiste()) {
+                    try {
+                        const result = await window.storage.get('notes-store');
+                        if (result && result.value)
+                            valorSalvo = result.value;
+                    }
+                    catch (err) {
+                        valorSalvo = null;
+                    }
+                }
+                if (!valorSalvo)
+                    valorSalvo = lsGet('notes-store');
+                let parsed = null;
+                try {
+                    parsed = valorSalvo ? JSON.parse(valorSalvo) : null;
+                }
+                catch (err) {
+                    console.error('Dados salvos ilegíveis', err);
+                    parsed = null;
+                }
+                if (parsed && parsed.notes && Object.keys(parsed.notes).length) {
+                    setNotes(parsed.notes);
+                    const savedActive = parsed.activeId;
+                    const ativa = savedActive && parsed.notes[savedActive]
+                        ? savedActive
+                        : Object.keys(parsed.notes)[0];
+                    setActiveId(ativa);
+                    const salvas = Array.isArray(parsed.abas)
+                        ? parsed.abas.filter((id) => parsed.notes[id])
+                        : [];
+                    setAbas(salvas.includes(ativa) ? salvas : [...salvas, ativa]);
+                }
+                else {
+                    const id = uid();
+                    const id2 = uid();
+                    const welcome = {
+                        id,
+                        title: 'Bem-vindo',
+                        content: '# Bem-vindo ao seu cofre\n\nEsta é uma réplica personalizável de um app de notas estilo Obsidian.\n\n- Use `[[Nome da Nota]]` para criar links entre notas\n- Use **negrito**, *itálico* e `código`\n- Crie novas notas com o botão "+"\n- Veja o [[Grafo]] das suas notas\n\nExperimente criar um link para [[Minhas Ideias]].',
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                    };
+                    const graphNote = {
+                        id: id2,
+                        title: 'Grafo',
+                        content: '# Grafo\n\nEsta nota existe só para demonstrar os links. Volte para [[Bem-vindo]] quando quiser.',
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                    };
+                    setNotes({ [id]: welcome, [id2]: graphNote });
+                    setActiveId(id);
+                    setAbas([id]);
+                }
+            }
+            catch (e) {
+                console.error('Erro ao carregar notas', e);
+            }
+            finally {
+                setLoaded(true);
+            }
+        })();
+    }, []);
+    useEffect(() => {
+        if (!loaded)
+            return;
+        if (Object.keys(notes).length === 0)
+            return;
+        setSaveStatus('saving');
+        const t = setTimeout(async () => {
+            const dados = JSON.stringify({ notes, activeId, abas });
+            try {
+                if (!storageExiste())
+                    throw new Error('window.storage indisponível');
+                const res = await tentarSalvarComRetry('notes-store', dados);
+                setSaveStatus(res ? 'saved' : 'error');
+            }
+            catch (e) {
+                const salvouLocal = lsSet('notes-store', dados);
+                if (salvouLocal) {
+                    setSaveStatus('saved');
+                }
+                else {
+                    console.error('Erro ao salvar', e);
+                    setSaveStatus('error');
+                }
+            }
+        }, 400);
+        return () => clearTimeout(t);
+    }, [notes, activeId, abas, loaded]);
+    useEffect(() => {
+        if (!loaded)
+            return;
+        const flush = () => {
+            if (Object.keys(notes).length === 0)
+                return;
+            const dados = JSON.stringify({ notes, activeId, abas });
+            lsSet('notes-store', dados);
+            try {
+                if (storageExiste())
+                    window.storage.set('notes-store', dados);
+            }
+            catch (e) { /* localStorage já salvou */ }
+        };
+        window.addEventListener('beforeunload', flush);
+        document.addEventListener('visibilitychange', flush);
+        return () => {
+            window.removeEventListener('beforeunload', flush);
+            document.removeEventListener('visibilitychange', flush);
+        };
+    }, [notes, activeId, abas, loaded]);
+    const notesByTitle = useMemo(() => {
+        const map = {};
+        Object.values(notes).forEach((n) => {
+            map[n.title.toLowerCase()] = n;
+        });
+        return map;
+    }, [notes]);
+    const noteList = useMemo(() => {
+        const arr = Object.values(notes);
+        arr.sort((a, b) => b.updatedAt - a.updatedAt);
+        if (!query.trim())
+            return arr;
+        const q = query.toLowerCase();
+        return arr.filter((n) => n.title.toLowerCase().includes(q) ||
+            n.content.toLowerCase().includes(q));
+    }, [notes, query]);
+    const activeNote = activeId ? notes[activeId] : null;
+    const backlinks = useMemo(() => {
+        if (!activeNote)
+            return [];
+        return Object.values(notes).filter((n) => {
+            if (n.id === activeNote.id)
+                return false;
+            const links = extractWikilinks(n.content).map((l) => l.toLowerCase());
+            return links.includes(activeNote.title.toLowerCase());
+        });
+    }, [notes, activeNote]);
+    const navegarParaNota = useCallback((id) => {
+        if (!id)
+            return;
+        setActiveId(id);
+        setNav((prev) => {
+            if (prev.pilha[prev.indice] === id)
+                return prev;
+            const cortada = prev.pilha.slice(0, prev.indice + 1);
+            const nova = [...cortada, id];
+            return { pilha: nova, indice: nova.length - 1 };
+        });
+    }, []);
+    const podeVoltar = nav.indice > 0;
+    const podeAvancar = nav.indice >= 0 && nav.indice < nav.pilha.length - 1;
+    const voltarNavegacao = useCallback(() => {
+        setNav((prev) => {
+            if (prev.indice <= 0)
+                return prev;
+            const novoIndice = prev.indice - 1;
+            const id = prev.pilha[novoIndice];
+            if (notes[id]) {
+                setActiveId(id);
+                setAbas((abasPrev) => (abasPrev.includes(id) ? abasPrev : [...abasPrev, id]));
+                setMainView('notes');
+            }
+            return { ...prev, indice: novoIndice };
+        });
+    }, [notes]);
+    const avancarNavegacao = useCallback(() => {
+        setNav((prev) => {
+            if (prev.indice >= prev.pilha.length - 1)
+                return prev;
+            const novoIndice = prev.indice + 1;
+            const id = prev.pilha[novoIndice];
+            if (notes[id]) {
+                setActiveId(id);
+                setAbas((abasPrev) => (abasPrev.includes(id) ? abasPrev : [...abasPrev, id]));
+                setMainView('notes');
+            }
+            return { ...prev, indice: novoIndice };
+        });
+    }, [notes]);
+    useEffect(() => {
+        if (loaded && activeId && nav.pilha.length === 0) {
+            setNav({ pilha: [activeId], indice: 0 });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loaded, activeId]);
+    const abrirEmAba = useCallback((id) => {
+        if (!id)
+            return;
+        setAbas((prev) => {
+            if (prev.includes(id))
+                return prev;
+            const pos = prev.indexOf(activeId);
+            if (pos === -1)
+                return [...prev, id];
+            return [...prev.slice(0, pos + 1), id, ...prev.slice(pos + 1)];
+        });
+        navegarParaNota(id);
+        setMainView('notes');
+    }, [activeId, navegarParaNota]);
+    const fecharOutrasAbas = () => {
+        if (abas.length <= 1)
+            return;
+        const primeira = abas[0];
+        setAbas([primeira]);
+        setActiveId(primeira);
+    };
+    const fecharAba = (id) => {
+        var _a, _b;
+        const idx = abas.indexOf(id);
+        const restantes = abas.filter((x) => x !== id);
+        setAbas(restantes);
+        if (id === activeId) {
+            setActiveId((_b = (_a = restantes[idx]) !== null && _a !== void 0 ? _a : restantes[idx - 1]) !== null && _b !== void 0 ? _b : null);
+        }
+    };
+    useEffect(() => {
+        const cont = tabsRef.current;
+        if (!cont)
+            return;
+        const el = cont.querySelector('.ob-tab-ativa');
+        if (!el)
+            return;
+        const c = cont.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        if (r.left < c.left)
+            cont.scrollLeft -= c.left - r.left + 8;
+        else if (r.right > c.right)
+            cont.scrollLeft += r.right - c.right + 8;
+    }, [activeId, abas]);
+    const showToast = (msg) => {
+        setToast(msg);
+        setTimeout(() => setToast(''), 2000);
+    };
+    const createNote = useCallback((titleGuess) => {
+        const id = uid();
+        let title = (titleGuess || 'Nova nota').trim();
+        let finalTitle = title;
+        let counter = 2;
+        while (notesByTitle[finalTitle.toLowerCase()]) {
+            finalTitle = `${title} ${counter++}`;
+        }
+        const n = {
+            id,
+            title: finalTitle,
+            content: `# ${finalTitle}\n\n`,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        };
+        setNotes((prev) => ({ ...prev, [id]: n }));
+        setAbas((prev) => {
+            const pos = prev.indexOf(activeId);
+            return pos === -1 ? [...prev, id] : [...prev.slice(0, pos + 1), id, ...prev.slice(pos + 1)];
+        });
+        setActiveId(id);
+        setMode('edit');
+        setMainView('notes');
+        return id;
+    }, [notesByTitle, activeId]);
+    const updateActiveContent = (content) => {
+        if (!activeId)
+            return;
+        setNotes((prev) => ({
+            ...prev,
+            [activeId]: { ...prev[activeId], content, updatedAt: Date.now() },
+        }));
+    };
+    const editarConteudo = (novoConteudo) => {
+        var _a, _b;
+        if (!activeId)
+            return;
+        const pilha = historicoRef.current[activeId] ||
+            (historicoRef.current[activeId] = { passado: [], futuro: [], ignorarProximo: false, ultimoRegistro: 0 });
+        if (pilha.ignorarProximo) {
+            pilha.ignorarProximo = false;
+        }
+        else {
+            const anterior = (_b = (_a = notes[activeId]) === null || _a === void 0 ? void 0 : _a.content) !== null && _b !== void 0 ? _b : '';
+            const agora = Date.now();
+            if (agora - pilha.ultimoRegistro > 500) {
+                pilha.passado = [...pilha.passado, anterior].slice(-100);
+                pilha.futuro = [];
+                pilha.ultimoRegistro = agora;
+            }
+        }
+        updateActiveContent(novoConteudo);
+    };
+    const aplicarNoTextarea = (transform) => {
+        var _a, _b;
+        const el = textareaRef.current;
+        if (!el || !activeId)
+            return;
+        const texto = (_b = (_a = notes[activeId]) === null || _a === void 0 ? void 0 : _a.content) !== null && _b !== void 0 ? _b : '';
+        const snap = snapToqueRef.current;
+        const usarSnap = snap && Date.now() - snap.t < 3000;
+        const [ini, fim] = usarSnap ? snap.sel : ultimaSelRef.current;
+        snapToqueRef.current = null;
+        const selecionado = texto.slice(ini, fim);
+        const { novoTexto, selIni, selFim } = transform(texto, ini, fim, selecionado);
+        pendingSelRef.current = [selIni, selFim];
+        editarConteudo(novoTexto);
+    };
+    const envolver = (antes, depois = antes, placeholder = '') => aplicarNoTextarea((texto, ini, fim, sel) => {
+        const conteudo = sel || placeholder;
+        const novoTexto = texto.slice(0, ini) + antes + conteudo + depois + texto.slice(fim);
+        const selIni = ini + antes.length;
+        const selFim = selIni + conteudo.length;
+        return { novoTexto, selIni, selFim };
+    });
+    const definirTitulo = (nivel) => aplicarNoTextarea((texto, ini, fim) => {
+        const inicioLinha = texto.lastIndexOf('\n', ini - 1) + 1;
+        const fimLinha = texto.indexOf('\n', inicioLinha) === -1 ? texto.length : texto.indexOf('\n', inicioLinha);
+        const linha = texto.slice(inicioLinha, fimLinha);
+        const atual = linha.match(/^(#{1,6})\s+/);
+        const semMarcador = atual ? linha.slice(atual[0].length) : linha;
+        const novoMarcador = nivel > 0 ? '#'.repeat(nivel) + ' ' : '';
+        const novaLinha = novoMarcador + semMarcador;
+        const novoTexto = texto.slice(0, inicioLinha) + novaLinha + texto.slice(fimLinha);
+        const desloc = novoMarcador.length - (atual ? atual[0].length : 0);
+        const min = inicioLinha + novoMarcador.length;
+        return {
+            novoTexto,
+            selIni: Math.max(min, ini + desloc),
+            selFim: Math.max(min, fim + desloc),
+        };
+    });
+    const nivelTituloAtual = (() => {
+        var _a, _b;
+        if (!activeId)
+            return 0;
+        const texto = (_b = (_a = notes[activeId]) === null || _a === void 0 ? void 0 : _a.content) !== null && _b !== void 0 ? _b : '';
+        const [ini] = ultimaSelRef.current;
+        const inicioLinha = texto.lastIndexOf('\n', ini - 1) + 1;
+        const idxFim = texto.indexOf('\n', inicioLinha);
+        const linha = texto.slice(inicioLinha, idxFim === -1 ? texto.length : idxFim);
+        const m = linha.match(/^(#{1,6})\s+/);
+        return m ? m[1].length : 0;
+    })();
+    const desfazer = () => {
+        var _a, _b;
+        if (!activeId)
+            return;
+        const pilha = historicoRef.current[activeId];
+        if (!pilha || pilha.passado.length === 0)
+            return;
+        const atual = (_b = (_a = notes[activeId]) === null || _a === void 0 ? void 0 : _a.content) !== null && _b !== void 0 ? _b : '';
+        const anterior = pilha.passado[pilha.passado.length - 1];
+        pilha.passado = pilha.passado.slice(0, -1);
+        pilha.futuro = [atual, ...pilha.futuro];
+        pilha.ignorarProximo = true;
+        updateActiveContent(anterior);
+    };
+    const refazer = () => {
+        var _a, _b;
+        if (!activeId)
+            return;
+        const pilha = historicoRef.current[activeId];
+        if (!pilha || pilha.futuro.length === 0)
+            return;
+        const atual = (_b = (_a = notes[activeId]) === null || _a === void 0 ? void 0 : _a.content) !== null && _b !== void 0 ? _b : '';
+        const proximo = pilha.futuro[0];
+        pilha.futuro = pilha.futuro.slice(1);
+        pilha.passado = [...pilha.passado, atual];
+        pilha.ignorarProximo = true;
+        updateActiveContent(proximo);
+    };
+    const updateActiveTitle = (title) => {
+        if (!activeId)
+            return;
+        setNotes((prev) => ({
+            ...prev,
+            [activeId]: { ...prev[activeId], title, updatedAt: Date.now() },
+        }));
+    };
+    const deleteNote = (id) => {
+        var _a, _b, _c;
+        delete historicoRef.current[id];
+        const idx = abas.indexOf(id);
+        const abasRestantes = abas.filter((x) => x !== id);
+        setAbas(abasRestantes);
+        setNotes((prev) => {
+            const copy = { ...prev };
+            delete copy[id];
+            return copy;
+        });
+        if (activeId === id) {
+            const vizinha = (_b = (_a = abasRestantes[idx]) !== null && _a !== void 0 ? _a : abasRestantes[idx - 1]) !== null && _b !== void 0 ? _b : null;
+            setActiveId((_c = vizinha !== null && vizinha !== void 0 ? vizinha : Object.keys(notes).find((k) => k !== id)) !== null && _c !== void 0 ? _c : null);
+        }
+    };
+    const handleLinkClick = (title) => {
+        const existing = notesByTitle[title.toLowerCase()];
+        if (existing) {
+            abrirEmAba(existing.id);
+        }
+        else {
+            createNote(title);
+        }
+    };
+    useEffect(() => {
+        setMenuTitulo(false);
+    }, [activeId, mode, mainView]);
+    useEffect(() => {
+        if (mainView !== 'notes')
+            setSeletorAbas(false);
+    }, [mainView]);
+    const previaDoTexto = (texto = '') => texto
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/!?\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g, (m, alvo, rotulo) => rotulo || alvo)
+        .replace(/[*`]/g, '')
+        .replace(/^\s*[-+]\s+/gm, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 100);
+    const handleSelectFromViz = useCallback((id) => {
+        abrirEmAba(id);
+    }, [abrirEmAba]);
+    const exportBackup = () => {
+        const data = JSON.stringify({ notes, activeId }, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cofre-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Backup exportado!');
+    };
+    const sanitizarNotas = (bruto) => {
+        if (!bruto || typeof bruto !== 'object')
+            return null;
+        const limpas = {};
+        Object.values(bruto).forEach((n) => {
+            if (!n || typeof n !== 'object')
+                return;
+            if (typeof n.id !== 'string' || typeof n.title !== 'string' || typeof n.content !== 'string')
+                return;
+            limpas[n.id] = {
+                id: n.id,
+                title: n.title.slice(0, 300),
+                content: n.content,
+                createdAt: typeof n.createdAt === 'number' ? n.createdAt : Date.now(),
+                updatedAt: typeof n.updatedAt === 'number' ? n.updatedAt : Date.now(),
+            };
+        });
+        return Object.keys(limpas).length ? limpas : null;
+    };
+    const importBackup = (e) => {
+        const file = e.target.files[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const parsed = JSON.parse(ev.target.result);
+                const limpas = sanitizarNotas(parsed && parsed.notes);
+                if (limpas) {
+                    setNotes(limpas);
+                    const ativa = parsed.activeId && limpas[parsed.activeId]
+                        ? parsed.activeId
+                        : Object.keys(limpas)[0];
+                    setActiveId(ativa);
+                    setAbas([ativa]);
+                    showToast('Backup importado!');
+                }
+                else {
+                    showToast('Arquivo de backup inválido');
+                }
+            }
+            catch (err) {
+                showToast('Erro ao importar arquivo');
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+    };
+    if (!loaded) {
+        return (React.createElement("div", { className: "ob-root ob-loading" },
+            React.createElement("div", { className: "ob-spinner" })));
+    }
+    return (React.createElement("div", { className: "ob-root" },
+        React.createElement("style", null, CSS),
+        !sidebarOpen && (React.createElement("button", { className: "ob-edge-zone", onClick: () => setSidebarOpen(true), "aria-label": "Abrir painel lateral", title: "Abrir painel lateral" },
+            React.createElement("span", { className: "ob-edge-grip" }))),
+        sidebarOpen && (React.createElement("div", { className: "ob-backdrop", onClick: () => setSidebarOpen(false) })),
+        React.createElement("div", { className: `ob-sidebar ${sidebarOpen ? '' : 'ob-sidebar-collapsed'}` },
+            React.createElement("div", { className: "ob-sidebar-header" },
+                React.createElement("button", { className: "ob-icon-btn ob-voltar-mt", onClick: () => { window.location.href = 'index.html'; }, title: "Voltar ao Minha Tela", "aria-label": "Voltar ao Minha Tela" },
+                    React.createElement(ChevronLeft, { size: 18 })),
+                React.createElement("span", { className: "ob-brand" }, "\uD83D\uDCD3 Cofre"),
+                React.createElement("button", { className: "ob-icon-btn", onClick: () => {
+                        createNote();
+                        if (window.innerWidth <= 700)
+                            setSidebarOpen(false);
+                    }, title: "Nova nota" },
+                    React.createElement(Plus, { size: 18 }))),
+            React.createElement("div", { className: "ob-search" },
+                React.createElement(Search, { size: 14, className: "ob-search-icon" }),
+                React.createElement("input", { value: query, onChange: (e) => setQuery(e.target.value), placeholder: "Buscar notas..." })),
+            React.createElement("div", { className: "ob-note-list" },
+                noteList.length === 0 && (React.createElement("div", { className: "ob-empty" }, "Nenhuma nota encontrada")),
+                noteList.map((n) => (React.createElement("div", { key: n.id, className: `ob-note-item ${n.id === activeId && mainView === 'notes' ? 'ob-note-item-active' : ''}`, onClick: () => {
+                        abrirEmAba(n.id);
+                        if (window.innerWidth <= 700)
+                            setSidebarOpen(false);
+                    } },
+                    React.createElement(FileText, { size: 14, className: "ob-note-item-icon" }),
+                    React.createElement("span", { className: "ob-note-item-title" }, n.title),
+                    React.createElement("button", { className: "ob-note-item-delete", onClick: (e) => {
+                            e.stopPropagation();
+                            if (confirm(`Excluir "${n.title}"?`))
+                                deleteNote(n.id);
+                        } },
+                        React.createElement(Trash2, { size: 12 })))))),
+            React.createElement("div", { className: "ob-sidebar-footer" },
+                React.createElement("button", { className: "ob-footer-btn", onClick: exportBackup },
+                    React.createElement(Download, { size: 13 }),
+                    " Exportar"),
+                React.createElement("button", { className: "ob-footer-btn", onClick: () => fileInputRef.current.click() },
+                    React.createElement(Upload, { size: 13 }),
+                    " Importar"),
+                React.createElement("input", { type: "file", accept: "application/json", ref: fileInputRef, style: { display: 'none' }, onChange: importBackup }))),
+        React.createElement("div", { className: "ob-main", ref: mainRef },
+            React.createElement("div", { className: "ob-topbar" },
+                React.createElement("button", { className: "ob-icon-btn", onClick: () => setSidebarOpen((s) => !s) },
+                    React.createElement(Menu, { size: 18 })),
+                React.createElement("button", { className: "ob-icon-btn", onClick: voltarNavegacao, disabled: !podeVoltar, title: "Nota anterior", "aria-label": "Nota anterior" },
+                    React.createElement(ChevronLeft, { size: 18 })),
+                React.createElement("button", { className: "ob-icon-btn", onClick: avancarNavegacao, disabled: !podeAvancar, title: "Pr\u00F3xima nota", "aria-label": "Pr\u00F3xima nota" },
+                    React.createElement(ChevronRight, { size: 18 })),
+                React.createElement("div", { className: "ob-view-tabs" },
+                    React.createElement("button", { className: mainView === 'notes' ? 'ob-view-tab ob-view-tab-active' : 'ob-view-tab', onClick: () => setMainView('notes') },
+                        React.createElement(FileText, { size: 14 }),
+                        " Notas"),
+                    React.createElement("button", { className: mainView === 'graph' ? 'ob-view-tab ob-view-tab-active' : 'ob-view-tab', onClick: () => setMainView('graph') },
+                        React.createElement(Share2, { size: 14 }),
+                        " Grafo"),
+                    React.createElement("button", { className: mainView === 'sankey' ? 'ob-view-tab ob-view-tab-active' : 'ob-view-tab', onClick: () => setMainView('sankey') },
+                        React.createElement(Workflow, { size: 14 }),
+                        " Sankey")),
+                saveStatus && (React.createElement("span", { className: `ob-save-status ob-save-${saveStatus}` },
+                    saveStatus === 'saving' && 'Salvando...',
+                    saveStatus === 'saved' && 'Salvo ✓',
+                    saveStatus === 'error' && 'Erro ao salvar!')),
+                mainView === 'notes' && activeNote && (React.createElement("button", { className: "ob-mode-single", onClick: () => setMode((m) => (m === 'edit' ? 'preview' : 'edit')), title: mode === 'edit' ? 'Ver formatado' : 'Voltar a editar' }, mode === 'edit' ? (React.createElement(React.Fragment, null,
+                    React.createElement(BookOpen, { size: 15 }),
+                    " Visualizar")) : (React.createElement(React.Fragment, null,
+                    React.createElement(Pencil, { size: 15 }),
+                    " Editar")))),
+                mainView !== 'notes' && React.createElement("div", { className: "ob-mode-toggle-spacer" })),
+            mainView === 'notes' && abas.length > 0 && (React.createElement("div", { className: "ob-tabs", ref: tabsRef },
+                abas.map((id) => {
+                    const n = notes[id];
+                    if (!n)
+                        return null;
+                    return (React.createElement("div", { key: id, className: id === activeId ? 'ob-tab ob-tab-ativa' : 'ob-tab', onClick: () => navegarParaNota(id), title: n.title },
+                        React.createElement(FileText, { size: 12, className: "ob-tab-icone" }),
+                        React.createElement("span", { className: "ob-tab-titulo" }, n.title),
+                        React.createElement("button", { className: "ob-tab-fechar", "aria-label": `Fechar ${n.title}`, onClick: (e) => {
+                                e.stopPropagation();
+                                fecharAba(id);
+                            } },
+                            React.createElement(X, { size: 11 }))));
+                }),
+                React.createElement("button", { className: "ob-tab-nova", onClick: () => createNote(), title: "Nova nota" },
+                    React.createElement(Plus, { size: 14 })))),
+            mainView === 'graph' && (React.createElement(ForceGraphView, { notes: notes, activeId: activeId, onSelectNote: handleSelectFromViz })),
+            mainView === 'sankey' && (React.createElement(SankeyGraphView, { notes: notes, activeId: activeId, onSelectNote: handleSelectFromViz })),
+            mainView === 'notes' && (!activeNote ? (React.createElement("div", { className: "ob-no-note" },
+                React.createElement(FileText, { size: 40, strokeWidth: 1 }),
+                React.createElement("p", null, "Selecione ou crie uma nota para come\u00E7ar"),
+                React.createElement("button", { className: "ob-primary-btn", onClick: () => createNote() },
+                    React.createElement(Plus, { size: 16 }),
+                    " Nova nota"))) : (React.createElement("div", { className: "ob-editor-area" },
+                React.createElement("input", { className: "ob-title-input", value: activeNote.title, onChange: (e) => updateActiveTitle(e.target.value), placeholder: "T\u00EDtulo da nota" }),
+                mode === 'edit' ? (React.createElement(React.Fragment, null,
+                    React.createElement("div", { ref: textareaRef, className: "ob-liveeditor", contentEditable: true, suppressContentEditableWarning: true, spellCheck: false, onPointerDown: confiarNaSelecao, onInput: (e) => {
+                            confiarNaSelecao();
+                            const el = e.currentTarget;
+                            const [i, f] = obterOffsets(el);
+                            pendingSelRef.current = [i, f];
+                            const novoTexto = el.textContent;
+                            registrarCursor(novoTexto, i, false);
+                            editarConteudo(novoTexto);
+                        }, onKeyUp: atualizarLinhaAtiva, onClick: (e) => {
+                            const alvoEl = e.target.closest && e.target.closest('.lp-link, .lp-embed');
+                            const emEdicao = alvoEl && alvoEl.querySelector('.lp-m-show');
+                            if (alvoEl && !emEdicao) {
+                                const alvo = extrairAlvoDoLink(alvoEl.textContent);
+                                if (alvo) {
+                                    handleLinkClick(alvo);
+                                    return;
+                                }
+                            }
+                            atualizarLinhaAtiva();
+                        }, onFocus: () => { setEditorFocado(true); atualizarLinhaAtiva(); }, onBlur: () => setTimeout(() => setEditorFocado(false), 150), onKeyDown: (e) => {
+                            confiarNaSelecao();
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const el = e.currentTarget;
+                                const sel = window.getSelection();
+                                if (!sel || sel.rangeCount === 0)
+                                    return;
+                                const range = sel.getRangeAt(0);
+                                range.deleteContents();
+                                const tn = document.createTextNode('\n');
+                                range.insertNode(tn);
+                                range.setStartAfter(tn);
+                                range.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                                const [i] = obterOffsets(el);
+                                const novoTexto = el.textContent;
+                                pendingSelRef.current = [i, i];
+                                registrarCursor(novoTexto, i, false);
+                                editarConteudo(novoTexto);
+                            }
+                        }, onPaste: (e) => {
+                            e.preventDefault();
+                            const el = e.currentTarget;
+                            const colado = (e.clipboardData || window.clipboardData).getData('text/plain');
+                            if (!colado)
+                                return;
+                            const sel = window.getSelection();
+                            if (!sel || sel.rangeCount === 0)
+                                return;
+                            const range = sel.getRangeAt(0);
+                            range.deleteContents();
+                            const tn = document.createTextNode(colado);
+                            range.insertNode(tn);
+                            range.setStartAfter(tn);
+                            range.collapse(true);
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                            const [i] = obterOffsets(el);
+                            const novoTexto = el.textContent;
+                            pendingSelRef.current = [i, i];
+                            registrarCursor(novoTexto, i, false);
+                            editarConteudo(novoTexto);
+                        } }))) : (React.createElement("div", { className: "ob-preview" }, renderMarkdown(activeNote.content, notesByTitle, handleLinkClick))),
+                backlinks.length > 0 && (React.createElement("div", { className: "ob-backlinks" },
+                    React.createElement("div", { className: "ob-backlinks-title" },
+                        React.createElement(Link2, { size: 13 }),
+                        " Vinculado de ",
+                        backlinks.length,
+                        ' ',
+                        backlinks.length === 1 ? 'nota' : 'notas'),
+                    backlinks.map((b) => (React.createElement("button", { key: b.id, className: "ob-backlink-item", onClick: () => abrirEmAba(b.id) }, b.title))))),
+                mode === 'edit' && folgaFinal > 0 && (React.createElement("div", { className: "ob-scroll-runway", style: { height: folgaFinal } }))))),
+            mainView === 'notes' && abas.length > 0 && !editorFocado && (React.createElement("button", { className: "ob-contador-abas", onClick: () => setSeletorAbas(true), "aria-label": `${abas.length} ${abas.length === 1 ? 'aba aberta' : 'abas abertas'}`, title: "Abas abertas" }, abas.length)),
+            seletorAbas && (React.createElement("div", { className: "ob-grade" },
+                React.createElement("div", { className: "ob-grade-lista" }, abas.map((id) => {
+                    const n = notes[id];
+                    if (!n)
+                        return null;
+                    return (React.createElement("div", { key: id, className: "ob-grade-item" },
+                        React.createElement("div", { className: id === activeId
+                                ? 'ob-cartao ob-cartao-ativo'
+                                : 'ob-cartao', onClick: () => {
+                                navegarParaNota(id);
+                                setSeletorAbas(false);
+                            } },
+                            React.createElement("div", { className: "ob-cartao-janela" },
+                                React.createElement("div", { className: "ob-cartao-escala" }, renderMarkdown(n.content, notesByTitle, () => { }))),
+                            React.createElement("button", { className: "ob-cartao-x", "aria-label": `Fechar ${n.title || 'aba'}`, onClick: (e) => {
+                                    e.stopPropagation();
+                                    fecharAba(id);
+                                } },
+                                React.createElement(X, { size: 16, strokeWidth: 2.4 }))),
+                        React.createElement("div", { className: "ob-grade-rotulo" }, n.title || 'Sem título')));
+                })),
+                React.createElement("div", { className: "ob-grade-rodape" },
+                    React.createElement("button", { className: "ob-grade-mais", "aria-label": "Nova nota", onClick: () => {
+                            createNote();
+                            setSeletorAbas(false);
+                        } },
+                        React.createElement(Plus, { size: 24, strokeWidth: 2.2 })),
+                    React.createElement("button", { className: "ob-grade-limpar ob-grade-destaque", onClick: fecharOutrasAbas, disabled: abas.length <= 1, title: "Fecha todas as abas menos a primeira (as notas continuam salvas)" }, "Fechar abas"),
+                    React.createElement("span", { className: "ob-grade-contagem" },
+                        abas.length,
+                        " ",
+                        abas.length === 1 ? 'aba' : 'abas')))),
+            mainView === 'notes' && activeNote && mode === 'edit' && (React.createElement("div", { ref: barRef, className: "ob-toolbar", style: barY !== null ? { transform: `translateY(${barY}px)` } : undefined, onTouchStart: () => {
+                    const el = textareaRef.current;
+                    const sel = window.getSelection();
+                    const viva = el && sel && sel.rangeCount > 0 &&
+                        el.contains(sel.getRangeAt(0).startContainer);
+                    const offs = viva ? obterOffsets(el) : ultimaSelRef.current.slice();
+                    snapToqueRef.current = { sel: offs, t: Date.now() };
+                }, onPointerDown: (e) => {
+                    e.preventDefault();
+                    selCongeladaRef.current = true;
+                } },
+                menuTitulo && (React.createElement("div", { className: "ob-tb-menu" }, [
+                    { n: 1, rotulo: 'Grande' },
+                    { n: 2, rotulo: 'Médio' },
+                    { n: 3, rotulo: 'Pequeno' },
+                    { n: 0, rotulo: 'Texto normal' },
+                ].map(({ n, rotulo }) => (React.createElement("button", { key: n, className: n === nivelTituloAtual
+                        ? 'ob-tb-menu-item ob-tb-menu-item-ativo'
+                        : 'ob-tb-menu-item', onClick: () => {
+                        definirTitulo(n);
+                        setMenuTitulo(false);
+                    } },
+                    React.createElement("span", { className: n > 0 ? `ob-tb-menu-amostra ob-tb-menu-h${n}` : 'ob-tb-menu-amostra' }, "Aa"),
+                    React.createElement("span", { className: "ob-tb-menu-rotulo" }, rotulo)))))),
+                React.createElement("div", { className: "ob-tb-pill" },
+                    React.createElement("button", { className: "ob-tb-btn", onClick: desfazer, title: "Desfazer" },
+                        React.createElement(Undo2, { size: 22, strokeWidth: 2 })),
+                    React.createElement("button", { className: "ob-tb-btn", onClick: refazer, title: "Refazer" },
+                        React.createElement(Redo2, { size: 22, strokeWidth: 2 })),
+                    React.createElement("button", { className: "ob-tb-btn", onClick: () => envolver('[[', ']]', 'nota'), title: "Link para nota" },
+                        React.createElement(Brackets, { size: 22, strokeWidth: 2 })),
+                    React.createElement("button", { className: "ob-tb-btn", onClick: () => envolver('![[', ']]', 'arquivo'), title: "Embed" },
+                        React.createElement(File, { size: 22, strokeWidth: 2 })),
+                    React.createElement("button", { className: "ob-tb-btn", onClick: () => envolver('#', '', 'tag'), title: "Tag" },
+                        React.createElement(Tag, { size: 22, strokeWidth: 2 })),
+                    React.createElement("button", { className: "ob-tb-btn", onClick: () => envolver('`', '`', 'código'), title: "C\u00F3digo" },
+                        React.createElement(Paperclip, { size: 22, strokeWidth: 2 })),
+                    React.createElement("button", { className: menuTitulo || nivelTituloAtual > 0 ? 'ob-tb-btn ob-tb-btn-ativo' : 'ob-tb-btn', onClick: () => setMenuTitulo((v) => !v), title: "T\u00EDtulo" },
+                        React.createElement(Heading, { size: 22, strokeWidth: 2 })),
+                    React.createElement("button", { className: "ob-tb-btn", onClick: () => envolver('**', '**', 'negrito'), title: "Negrito" },
+                        React.createElement(Bold, { size: 22, strokeWidth: 2 })),
+                    React.createElement("button", { className: "ob-tb-btn", onClick: () => envolver('*', '*', 'itálico'), title: "It\u00E1lico" },
+                        React.createElement(Italic, { size: 22, strokeWidth: 2 }))),
+                React.createElement("button", { className: "ob-tb-kb", title: "Fechar teclado", onClick: () => textareaRef.current && textareaRef.current.blur() },
+                    React.createElement(Keyboard, { size: 22, strokeWidth: 2 }))))),
+        toast && React.createElement("div", { className: "ob-toast" }, toast)));
+}
+const CSS = `
+* { box-sizing: border-box; }
+.ob-root {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #ffffff;
+  color: #26262b;
+  overflow: hidden;
+}
+.ob-loading { align-items: center; justify-content: center; }
+.ob-spinner {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 3px solid #e4e4e8; border-top-color: #7c6af2;
+  animation: ob-spin 0.8s linear infinite;
+}
+@keyframes ob-spin { to { transform: rotate(360deg); } }
+
+.ob-sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: #f7f7f9;
+  border-right: 1px solid #e4e4e8;
+  display: flex;
+  flex-direction: column;
+  transition: margin-left 0.2s ease;
+}
+.ob-sidebar-collapsed { margin-left: -260px; }
+
+.ob-edge-zone {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.ob-edge-grip {
+  width: 4px;
+  height: 46px;
+  border-radius: 4px;
+  background: #cfc9ef;
+  margin-left: 4px;
+}
+.ob-edge-zone:hover .ob-edge-grip { background: #7c6af2; }
+
+.ob-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+@media (max-width: 700px) {
+  .ob-sidebar,
+  .ob-sidebar-collapsed {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+    margin-left: 0;
+    transition: transform 0.22s ease;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.14);
+  }
+  .ob-sidebar { transform: translateX(0); }
+  .ob-sidebar-collapsed { transform: translateX(-100%); box-shadow: none; }
+  .ob-backdrop { display: block; }
+}
+
+.ob-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 12px;
+  border-bottom: 1px solid #e4e4e8;
+}
+.ob-brand { font-weight: 600; font-size: 14px; color: #17171a; }
+
+.ob-icon-btn {
+  background: transparent;
+  border: none;
+  color: #74747c;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ob-icon-btn:hover { background: #ececf0; color: #17171a; }
+.ob-icon-btn:disabled { opacity: 0.35; cursor: default; }
+.ob-icon-btn:disabled:hover { background: transparent; color: #74747c; }
+
+.ob-search {
+  margin: 10px 12px;
+  display: flex;
+  align-items: center;
+  background: #ececf0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  gap: 6px;
+}
+.ob-search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #26262b;
+  font-size: 16px;
+  width: 100%;
+}
+.ob-search-icon { color: #9a9aa2; flex-shrink: 0; }
+
+.ob-note-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+.ob-empty {
+  color: #9a9aa2;
+  font-size: 12.5px;
+  padding: 20px 12px;
+  text-align: center;
+}
+.ob-note-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #4a4a52;
+  position: relative;
+}
+.ob-note-item:hover { background: #ececf0; }
+.ob-note-item-active { background: #ece8fd; color: #17171a; }
+.ob-note-item-icon { flex-shrink: 0; color: #9a9aa2; }
+.ob-note-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.ob-note-item-delete {
+  opacity: 0;
+  background: transparent;
+  border: none;
+  color: #9a9aa2;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+}
+.ob-note-item:hover .ob-note-item-delete { opacity: 1; }
+.ob-note-item-delete:hover { color: #d0433a; background: #fbe4e2; }
+
+.ob-sidebar-footer {
+  border-top: 1px solid #e4e4e8;
+  padding: 8px;
+  display: flex;
+  gap: 6px;
+}
+.ob-footer-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #ececf0;
+  border: none;
+  color: #4a4a52;
+  font-size: 11.5px;
+  padding: 7px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ob-footer-btn:hover { background: #e0e0e6; color: #17171a; }
+
+.ob-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+}
+.ob-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #e4e4e8;
+}
+
+.ob-contador-abas {
+  position: absolute;
+  right: 14px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 38;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1.6px solid #4a4a52;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #17171a;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.14);
+}
+.ob-contador-abas:active { background: #f0f0f3; }
+
+.ob-grade {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: #f2f2f5;
+}
+.ob-grade-lista {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 14px;
+  padding: 16px 14px 8px;
+  align-content: start;
+}
+.ob-grade-item { min-width: 0; }
+.ob-cartao {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+.ob-cartao-ativo { box-shadow: 0 0 0 2.5px #7c6af2, 0 2px 10px rgba(0, 0, 0, 0.12); }
+.ob-cartao-janela {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.ob-cartao-escala {
+  width: 220%;
+  padding: 16px 14px;
+  transform: scale(0.4545);
+  transform-origin: top left;
+  pointer-events: none;
+}
+.ob-cartao-x {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(236, 236, 240, 0.94);
+  color: #26262b;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+.ob-cartao-x:active { background: #dcdce2; }
+.ob-grade-rotulo {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 13.5px;
+  color: #26262b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ob-grade-rodape {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: #f2f2f5;
+  border-top: 1px solid #e4e4e8;
+  flex-wrap: wrap;
+}
+.ob-grade-mais {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #17171a;
+  cursor: pointer;
+}
+.ob-grade-mais:active { background: #e4e4e8; }
+.ob-grade-limpar {
+  border: none;
+  background: transparent;
+  color: #4a4a52;
+  font-size: 13.5px;
+  font-family: inherit;
+  padding: 8px 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ob-grade-limpar:active { opacity: 0.6; }
+.ob-grade-limpar:disabled { opacity: 0.32; cursor: default; }
+.ob-grade-destaque { color: #4b3ac2; font-weight: 700; }
+.ob-grade-destaque:disabled { color: #4a4a52; }
+.ob-grade-contagem {
+  font-size: 15px;
+  font-weight: 600;
+  color: #17171a;
+  margin-left: auto;
+}
+
+.ob-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e4e4e8;
+  background: #fafafb;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.ob-tabs::-webkit-scrollbar { display: none; }
+.ob-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 170px;
+  padding: 6px 6px 6px 10px;
+  border-radius: 8px;
+  background: #ececf0;
+  color: #4a4a52;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.ob-tab:hover { background: #e2e2e8; }
+.ob-tab-ativa {
+  background: #ece8fd;
+  color: #4b3ac2;
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px #d6ccfa;
+}
+.ob-tab-icone { flex-shrink: 0; opacity: 0.7; }
+.ob-tab-titulo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ob-tab-fechar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.ob-tab-fechar:hover { opacity: 1; background: rgba(0, 0, 0, 0.09); }
+.ob-tab-nova {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #74747c;
+  cursor: pointer;
+}
+.ob-tab-nova:hover { background: #ececf0; color: #17171a; }
+
+@media (max-width: 700px) {
+  .ob-tabs { display: none; }
+}
+@media (min-width: 701px) {
+  .ob-contador-abas { display: none; }
+}
+
+.ob-view-tabs {
+  display: flex;
+  background: #f7f7f9;
+  border: 1px solid #e4e4e8;
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+.ob-view-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  color: #74747c;
+  font-size: 12.5px;
+  padding: 6px 11px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.ob-view-tab:hover { color: #17171a; }
+.ob-view-tab-active { background: #e4e0fb; color: #4b3ac2; }
+
+.ob-mode-toggle-spacer { margin-left: auto; }
+.ob-mode-single {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #7c6af2;
+  color: #fff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ob-mode-single:hover { background: #6a58e0; }
+.ob-save-status {
+  font-size: 11.5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.ob-save-saving { color: #74747c; background: #f0f0f3; }
+.ob-save-saved { color: #1d7a3e; background: #e2f5e9; }
+.ob-save-error { color: #c0362c; background: #fbe4e2; font-weight: 600; }
+
+.ob-no-note {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #9a9aa2;
+}
+.ob-primary-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #7c6af2;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ob-primary-btn:hover { background: #6a58e0; }
+
+.ob-editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 20px 40px;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+}
+.ob-title-input {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 26px;
+  font-weight: 700;
+  color: #17171a;
+  margin-bottom: 14px;
+  font-family: inherit;
+}
+.ob-toolbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: transparent;
+  will-change: transform;
+  pointer-events: none;
+}
+.ob-tb-pill {
+  pointer-events: auto;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 7px 14px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.ob-tb-pill::-webkit-scrollbar { display: none; }
+.ob-tb-kb {
+  pointer-events: auto;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  color: #17171a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+}
+.ob-tb-kb:active { background: #f0f0f3; }
+.ob-tb-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: #17171a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ob-tb-btn:active { background: #f0f0f3; }
+.ob-tb-btn:hover { background: #f5f5f7; }
+.ob-tb-btn-ativo { background: #ece8fd; color: #4b3ac2; }
+
+.ob-tb-menu {
+  pointer-events: auto;
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 12px;
+  min-width: 210px;
+  max-height: 42vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
+}
+.ob-tb-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+  color: #17171a;
+  font-family: inherit;
+}
+.ob-tb-menu-item:active { background: #f0f0f3; }
+.ob-tb-menu-item:hover { background: #f5f5f7; }
+.ob-tb-menu-item-ativo { background: #ece8fd; }
+.ob-tb-menu-item-ativo .ob-tb-menu-rotulo { color: #4b3ac2; font-weight: 600; }
+.ob-tb-menu-amostra {
+  flex-shrink: 0;
+  width: 34px;
+  font-weight: 700;
+  color: #4a4a52;
+  font-size: 13px;
+}
+.ob-tb-menu-h1 { font-size: 20px; font-weight: 700; }
+.ob-tb-menu-h2 { font-size: 16px; font-weight: 700; }
+.ob-tb-menu-h3 { font-size: 13px; font-weight: 700; }
+.ob-tb-menu-rotulo { font-size: 14px; }
+.ob-preview { flex: 1 0 auto; padding-bottom: 20px; }
+.ob-liveeditor {
+  flex: 1 0 auto;
+  outline: none;
+  color: #2a2a30;
+  font-size: 16px;
+  line-height: 1.8;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 300px;
+  padding-bottom: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
+  caret-color: #4b3ac2;
+}
+.lp-b { font-weight: 700; color: #17171a; }
+.lp-m { display: none; }
+.lp-m-show { display: inline; color: #a9a3c9; font-weight: 400; font-style: normal; }
+.lp-i { font-style: italic; }
+.lp-code {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 0.9em;
+  background: #f0f0f3;
+  border-radius: 4px;
+  color: #b25e14;
+}
+.lp-link { color: #6a58e0; cursor: pointer; }
+.lp-embed { color: #2e8a5c; cursor: pointer; }
+.lp-h { font-weight: 700; color: #17171a; }
+.lp-h1 { font-size: 24px; }
+.lp-h2 { font-size: 20px; }
+.lp-h3 { font-size: 17px; }
+.lp-h4, .lp-h5, .lp-h6 { font-size: 15.5px; }
+.ob-h { color: #17171a; margin: 0.6em 0 0.3em; font-weight: 700; }
+.ob-h1 { font-size: 26px; } .ob-h2 { font-size: 21px; } .ob-h3 { font-size: 18px; }
+.ob-p { margin: 0.4em 0; line-height: 1.7; color: #2a2a30; font-size: 16px; }
+.ob-spacer { height: 8px; }
+.ob-list { margin: 0.3em 0 0.3em 1.2em; }
+.ob-list li { line-height: 1.7; font-size: 16px; color: #2a2a30; }
+.ob-code {
+  background: #f0f0f3;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: #b25e14;
+}
+.ob-wikilink {
+  background: transparent;
+  border: none;
+  color: #6a58e0;
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(106,88,224,0.4);
+}
+.ob-wikilink:hover { border-bottom-color: #6a58e0; }
+.ob-wikilink-broken { color: #c9432f; border-bottom-color: rgba(201,67,47,0.4); }
+
+.ob-backlinks {
+  flex-shrink: 0;
+  margin-top: 30px;
+  padding-top: 16px;
+  border-top: 1px solid #e4e4e8;
+}
+.ob-backlinks-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #74747c;
+  font-size: 12.5px;
+  margin-bottom: 8px;
+}
+.ob-backlink-item {
+  display: block;
+  background: #ececf0;
+  border: none;
+  color: #6a58e0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 4px;
+  text-align: left;
+  width: 100%;
+}
+.ob-backlink-item:hover { background: #e0e0e6; }
+
+.ob-scroll-runway {
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.ob-toast {
+  position: fixed;
+  z-index: 80;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #26262b;
+  color: #f4f4f6;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+}
+
+.ob-viz-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, #e2e2e8 1px, transparent 0) 0 0/22px 22px,
+    #ffffff;
+}
+.ob-viz-svg { width: 100%; height: 100%; display: block; }
+.ob-viz-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.9);
+  border: 1px solid #e4e4e8;
+  color: #74747c;
+  font-size: 11.5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.ob-sankey-link {
+  fill: none;
+  stroke: #7c6af2;
+  stroke-opacity: 0.3;
+  stroke-width: 2.4px;
+}
+.ob-sankey-node-group { cursor: pointer; }
+.ob-sankey-node { fill: #7c6af2; }
+.ob-sankey-node-active { fill: #4b3ac2; }
+.ob-sankey-label {
+  fill: #3a3a42;
+  font-size: 11.5px;
+  dominant-baseline: middle;
+}
+
+@media (max-width: 700px) {
+  .ob-editor-area { padding: 16px 16px; }
+  .ob-title-input { font-size: 23px; margin-bottom: 10px; }
+}
+`;
+function ObsidianClone() {
+    return (React.createElement(LimiteDeErro, null,
+        React.createElement(MegApp, null)));
+}
+// ---------- Montagem ----------
+const raiz = ReactDOM.createRoot(document.getElementById('root'));
+raiz.render(React.createElement(ObsidianClone, null));
+
+</script>
+</body>
+</html>
