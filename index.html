@@ -2,64 +2,64 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Minha Tela</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Minha Tela — Cherubion</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <style>
-  html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior: none; }
-  #root { height: 100%; }
+  html, body { margin: 0; padding: 0; }
+  #root { min-height: 100vh; }
 </style>
 </head>
 <body>
 <div id="root"></div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
-
 <script>
-// ---------- shim de window.storage (mesma assinatura get/set/delete/list) ----------
-// grava direto no localStorage real do navegador, sob o prefixo "mt-storage:"
-(function() {
-  var PREFIXO = 'mt-storage:';
-  window.storage = {
-    get: function(chave) {
-      return Promise.resolve().then(function() {
-        var v = window.localStorage.getItem(PREFIXO + chave);
-        if (v === null) return null;
-        return { key: chave, value: v };
-      });
-    },
-    set: function(chave, valor) {
-      return Promise.resolve().then(function() {
-        window.localStorage.setItem(PREFIXO + chave, valor);
-        return { key: chave, value: valor };
-      });
-    },
-    delete: function(chave) {
-      return Promise.resolve().then(function() {
-        window.localStorage.removeItem(PREFIXO + chave);
-        return { key: chave, deleted: true };
-      });
-    },
-    list: function(prefixo) {
-      prefixo = prefixo || '';
-      return Promise.resolve().then(function() {
-        var keys = [];
-        for (var i = 0; i < window.localStorage.length; i++) {
-          var k = window.localStorage.key(i);
-          if (k && k.indexOf(PREFIXO + prefixo) === 0) keys.push(k.slice(PREFIXO.length));
-        }
-        return { keys: keys };
-      });
-    },
-  };
-})();
-</script>
+const { useState, useEffect, useRef, useMemo } = React;
 
+// ---- Shim de window.storage sobre o localStorage real do navegador ----
+// Mesma assinatura usada dentro do Claude.ai: get/set/delete/list, todas assíncronas.
+window.storage = {
+  async get(key, shared) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw === null) return null;
+      return { key, value: raw, shared: !!shared };
+    } catch (e) {
+      return null;
+    }
+  },
+  async set(key, value, shared) {
+    try {
+      window.localStorage.setItem(key, value);
+      return { key, value, shared: !!shared };
+    } catch (e) {
+      return null;
+    }
+  },
+  async delete(key, shared) {
+    try {
+      window.localStorage.removeItem(key);
+      return { key, deleted: true, shared: !!shared };
+    } catch (e) {
+      return null;
+    }
+  },
+  async list(prefix, shared) {
+    try {
+      const keys = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (!prefix || (k && k.startsWith(prefix))) keys.push(k);
+      }
+      return { keys, prefix, shared: !!shared };
+    } catch (e) {
+      return null;
+    }
+  },
+};
+</script>
 <script>
 "use strict";
-// ---------- Versão standalone (sem bundler) ----------
-// React vem de <script> CDN no HTML e fica disponível como global.
-const { useState, useEffect, useRef, useMemo } = React;
 const STORAGE_KEY = 'minhas-tarefas-data';
 const CORES = ['#5B7C99', '#D96C4F', '#6E8C82', '#A85C4D', '#8E6BAE', '#C9A227'];
 const DURACOES = [5, 10, 15, 30, 60];
@@ -429,6 +429,13 @@ const dataDeISO = (iso) => {
     return new Date(a, m - 1, d);
 };
 const diasEntreISO = (isoA, isoB) => Math.round((dataDeISO(isoB) - dataDeISO(isoA)) / 86400000); // isoB - isoA, em dias
+// Pso: dias restantes do contador regressivo (nunca passa de 0 pra negativo — para de contar
+// quando chega em zero, momento em que o alerta 🚨 Pso 🚨 passa a ficar ativo).
+const diasRestantesPsoContador = (dias, inicioISO) => {
+    if (dias == null || !inicioISO)
+        return null;
+    return Math.max(0, dias - diasEntreISO(inicioISO, paraISO(new Date())));
+};
 // Quantos períodos de "freq" passaram entre duas chaves de período (isoA = mais antiga).
 // Serve para contar TODOS os períodos que passaram com o app fechado, e não só um.
 const periodosEntre = (freq, isoA, isoB) => {
@@ -801,6 +808,87 @@ const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsi
     }
     return { notes, novaListaCherubion, novaCanonica, mudouCherubion, mudouObsidian };
 };
+// ═══════════════════════════════════════════════════════════════════════
+// CLOUDFLARE R2: armazenamento de imagens e vídeos, compartilhado entre os
+// 3 apps do Cherubion (mesma origem do GitHub Pages = mesmo localStorage).
+// Fica FORA do backup em JSON de propósito — é credencial do dispositivo,
+// não dado do usuário — do mesmo jeito que o token do Gist dos Contatos.
+// ═══════════════════════════════════════════════════════════════════════
+const R2_URL_KEY = 'cherubion:r2workerurl';
+const R2_TOKEN_KEY = 'cherubion:r2token';
+const lerConfigR2 = () => {
+    try {
+        return {
+            url: (window.localStorage.getItem(R2_URL_KEY) || '').replace(/\/+$/, ''),
+            token: window.localStorage.getItem(R2_TOKEN_KEY) || '',
+        };
+    }
+    catch (e) {
+        return { url: '', token: '' };
+    }
+};
+const salvarConfigR2 = (url, token) => {
+    try {
+        window.localStorage.setItem(R2_URL_KEY, String(url || '').trim());
+        window.localStorage.setItem(R2_TOKEN_KEY, String(token || '').trim());
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+};
+// comprime uma imagem antes de subir (reduz para no máx. 1280px de largura, JPEG 75%) —
+// corta o tamanho típico de uma foto de celular em ~80-90%, sem perda visual perceptível
+// numa tela de celular. Vídeo NÃO passa por aqui (comprimir vídeo no navegador é inviável).
+const comprimirImagemParaUpload = (file) => new Promise((resolve, reject) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+        const MAX_LARGURA = 1280;
+        let { width, height } = img;
+        if (width > MAX_LARGURA) {
+            height = Math.round(height * (MAX_LARGURA / width));
+            width = MAX_LARGURA;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+            URL.revokeObjectURL(objUrl);
+            if (blob)
+                resolve(blob);
+            else
+                reject(new Error('falha ao comprimir a imagem'));
+        }, 'image/jpeg', 0.75);
+    };
+    img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error('falha ao carregar a imagem')); };
+    img.src = objUrl;
+});
+// sobe um arquivo (Blob ou File) pro Worker do Cloudflare R2 e devolve a URL pública dele.
+// Lança 'sem-config' se o Worker/token ainda não foram configurados nas Configurações gerais.
+const subirArquivoParaR2 = async (blob, nomeOriginal) => {
+    const { url, token } = lerConfigR2();
+    if (!url || !token)
+        throw new Error('sem-config');
+    const ext = (String(nomeOriginal || '').split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) || 'bin';
+    const nomeArquivo = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const resp = await fetch(`${url}/upload`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': blob.type || 'application/octet-stream',
+            'X-Filename': nomeArquivo,
+        },
+        body: blob,
+    });
+    if (!resp.ok)
+        throw new Error(`upload falhou (${resp.status})`);
+    const dados = await resp.json();
+    if (!dados || !dados.url)
+        throw new Error('resposta do Worker sem url');
+    return dados.url;
+};
 function App() {
     const [categorias, setCategorias] = useState([]);
     const [fixas, setFixas] = useState([]);
@@ -898,6 +986,22 @@ function App() {
     const [protocoloConfigAberto, setProtocoloConfigAberto] = useState(false);
     const [protocoloNovoTexto, setProtocoloNovoTexto] = useState('');
     const [protocoloExpandido, setProtocoloExpandido] = useState(false);
+    // ---- Pso: Testes — igual ao Protocolo, mas cada item pode ser editado depois de escrito ----
+    const [psoTestes, setPsoTestes] = useState([]); // [{id, texto}]
+    const [testeConfigAberto, setTesteConfigAberto] = useState(false);
+    const [testeNovoTexto, setTesteNovoTexto] = useState('');
+    const [testeExpandido, setTesteExpandido] = useState(false);
+    const [testeEditandoId, setTesteEditandoId] = useState(null); // id do item aberto para edição, ou null
+    const [testeEditTexto, setTesteEditTexto] = useState('');
+    // ---- Pso: Contador regressivo de dias — ao chegar em zero, dispara o alerta 🚨 Pso 🚨 na
+    // Janela de alertas (em destaque, primeiro ao abrir o app) até o Reset ser pressionado ----
+    const [psoContadorDias, setPsoContadorDias] = useState(null); // duração configurada (dias), ou null se nunca configurado
+    const [psoContadorInicioISO, setPsoContadorInicioISO] = useState(null); // data em que a contagem atual começou
+    const [psoContadorNovoValor, setPsoContadorNovoValor] = useState(''); // rascunho do input ao configurar
+    const [psoContadorConfigAberto, setPsoContadorConfigAberto] = useState(false);
+    // true depois que o Reset é pressionado: o contador congela em 0 (não reinicia sozinho) e
+    // o alerta 🚨 Pso 🚨 fica dispensado até uma nova contagem ser criada no ⚙️.
+    const [psoContadorZerado, setPsoContadorZerado] = useState(false);
     // ---- Ganhos: entradas de texto livre com data, agrupadas por ano (últimos 8 anos) — painel embutido na aba Atividades ----
     const [ganhosRegistro, setGanhosRegistro] = useState([]); // [{id, ano, texto, data, dataISO}]
     const [ganhosNovoTexto, setGanhosNovoTexto] = useState('');
@@ -1050,7 +1154,16 @@ function App() {
     const [novaAlertaTexto, setNovaAlertaTexto] = useState('');
     const [novaNota, setNovaNota] = useState('');
     const [novaNotaImagem, setNovaNotaImagem] = useState(null);
+    const [novaNotaVideo, setNovaNotaVideo] = useState(null);
     const imagemInputRef = useRef(null);
+    const videoInputRef = useRef(null);
+    const [uploadMidiaEmAndamento, setUploadMidiaEmAndamento] = useState(false);
+    const [msgUploadMidia, setMsgUploadMidia] = useState('');
+    // rascunhos do painel de Configurações gerais para o Cloudflare R2 (Worker URL + token) —
+    // já nascem preenchidos com o que estiver salvo, se o Worker já tiver sido configurado antes
+    const [r2UrlDraft, setR2UrlDraft] = useState(() => lerConfigR2().url);
+    const [r2TokenDraft, setR2TokenDraft] = useState(() => lerConfigR2().token);
+    const [r2ConfigMsg, setR2ConfigMsg] = useState('');
     const [livroAberto, setLivroAberto] = useState(false);
     const [medalhasExpandido, setMedalhasExpandido] = useState(false);
     const [medalhasEdicaoAtiva, setMedalhasEdicaoAtiva] = useState(false); // permite retirar ou trocar medalhas manualmente
@@ -1062,6 +1175,10 @@ function App() {
     // por padrão nenhuma aba do histórico fica marcada: todos os botões ficam brancos
     const [historicoAba, setHistoricoAba] = useState(null);
     const [historicoExpandido, setHistoricoExpandido] = useState(false);
+    // Histórico foi unificado dentro da janela "Tarefas fixas": este botão troca a lista de
+    // tarefas pelos botões de frequência (mensal/trimestral/semestral etc.) que abrem a tabela
+    // de histórico, em vez de uma janela própria separada.
+    const [historicoModoAtivo, setHistoricoModoAtivo] = useState(false);
     // ---- contador de aberturas do app por dia: { 'AAAA-MM-DD': quantidade } ----
     const [aberturasApp, setAberturasApp] = useState({});
     const aberturaContadaRef = useRef(false); // garante 1 contagem por abertura, não por render
@@ -1152,6 +1269,10 @@ function App() {
                 setPsoRegistro(Array.isArray(dados.psoRegistro) ? dados.psoRegistro : []);
                 setPsoTarefas(Array.isArray(dados.psoTarefas) ? dados.psoTarefas : []);
                 setPsoProtocolos(Array.isArray(dados.psoProtocolos) ? dados.psoProtocolos : []);
+                setPsoTestes(Array.isArray(dados.psoTestes) ? dados.psoTestes : []);
+                setPsoContadorDias(typeof dados.psoContadorDias === 'number' ? dados.psoContadorDias : null);
+                setPsoContadorInicioISO(typeof dados.psoContadorInicioISO === 'string' ? dados.psoContadorInicioISO : null);
+                setPsoContadorZerado(!!dados.psoContadorZerado);
                 setReservas(Array.isArray(dados.reservas) ? dados.reservas : []);
                 {
                     const chk = normalizarChecklists(dados);
@@ -1276,7 +1397,7 @@ function App() {
         }
         setStatus('Salvando…');
         try {
-            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (ok) {
                 setSujo(false);
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1289,7 +1410,7 @@ function App() {
         catch (e) {
             // window.storage falhou (comum no preview do Claude.ai). Grava no localStorage real:
             // os dados ficam salvos e não mostramos alarme falso.
-            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (salvouLocal) {
                 setSujo(false);
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1453,6 +1574,9 @@ function App() {
     // ---- pequenos toggles de "configurações" só para abrigar o botão de desfazer nas janelas
     // que ainda não tinham um painel de configurações próprio ----
     const [mostrarConfigLista, setMostrarConfigLista] = useState(false);
+    // Minha lista foi unificada dentro da aba Categorias (Livro Razão): este botão troca as
+    // categorias pela lista de tarefas sorteadas/aguardando, em vez de uma janela própria.
+    const [minhaListaModoAtivo, setMinhaListaModoAtivo] = useState(false);
     const [mostrarConfigLivroRazao, setMostrarConfigLivroRazao] = useState(false);
     const [mostrarConfigLivroMemorias, setMostrarConfigLivroMemorias] = useState(false);
     // ---- desfazer exclusões: um "registro" por janela (categorias, tarefasFixas, livroRazao,
@@ -1550,6 +1674,9 @@ function App() {
                 break;
             case 'protocolo':
                 restaurarEmLista(setPsoProtocolos, item.valor, item.idx);
+                break;
+            case 'teste':
+                restaurarEmLista(setPsoTestes, item.valor, item.idx);
                 break;
             case 'checklistItem': {
                 const { chkId, valor, idx } = item;
@@ -2801,6 +2928,73 @@ function App() {
         setPsoProtocolos((ps) => ps.filter((p) => p.id !== id));
         marcarSujo();
     };
+    // ---- Pso: Testes — igual ao Protocolo (itens numerados), mas cada um pode ser editado depois ----
+    const adicionarTeste = () => {
+        const texto = testeNovoTexto.trim();
+        if (!texto) {
+            setMsgPso('Digite o texto do teste.');
+            return;
+        }
+        setPsoTestes((ts) => [...ts, { id: genId(), texto }]);
+        setTesteNovoTexto('');
+        setMsgPso('');
+        marcarSujo();
+    };
+    const removerTeste = (id) => {
+        const idx = psoTestes.findIndex((t) => t.id === id);
+        if (idx !== -1)
+            registrarDesfazer('livroRazao', 'teste', { valor: psoTestes[idx], idx });
+        setPsoTestes((ts) => ts.filter((t) => t.id !== id));
+        if (testeEditandoId === id) {
+            setTesteEditandoId(null);
+            setTesteEditTexto('');
+        }
+        marcarSujo();
+    };
+    const iniciarEdicaoTeste = (t) => {
+        setTesteEditandoId(t.id);
+        setTesteEditTexto(t.texto);
+    };
+    const cancelarEdicaoTeste = () => {
+        setTesteEditandoId(null);
+        setTesteEditTexto('');
+    };
+    const salvarEdicaoTeste = () => {
+        const texto = testeEditTexto.trim();
+        if (!texto || !testeEditandoId) {
+            cancelarEdicaoTeste();
+            return;
+        }
+        setPsoTestes((ts) => ts.map((t) => (t.id === testeEditandoId ? { ...t, texto } : t)));
+        setTesteEditandoId(null);
+        setTesteEditTexto('');
+        marcarSujo();
+    };
+    // ---- Pso: Contador regressivo de dias ----
+    const definirPsoContador = () => {
+        const dias = parseInt(psoContadorNovoValor, 10);
+        if (!Number.isFinite(dias) || dias <= 0)
+            return;
+        setPsoContadorDias(dias);
+        setPsoContadorInicioISO(paraISO(new Date()));
+        setPsoContadorZerado(false); // nova contagem começa "rodando", não zerada
+        setPsoContadorNovoValor('');
+        marcarSujo();
+    };
+    // Congela o contador em 0 (não reinicia a contagem) e dispensa o alerta 🚨 Pso 🚨 até que
+    // um novo contador seja criado no ⚙️.
+    const resetarPsoContador = () => {
+        if (psoContadorDias == null)
+            return;
+        setPsoContadorZerado(true);
+        marcarSujo();
+    };
+    const apagarPsoContador = () => {
+        setPsoContadorDias(null);
+        setPsoContadorInicioISO(null);
+        setPsoContadorZerado(false);
+        marcarSujo();
+    };
     // alterna a marcação de um botão — não grava nada ainda, só muda de cor
     const alternarPsoSelecionado = (id) => {
         setPsoSelecionados((sel) => sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
@@ -3943,16 +4137,20 @@ function App() {
         })
             .filter(Boolean)
             .sort((x, y) => x.diasRestantes - y.diasRestantes);
-        const notas = alertasNotas.map((a) => ({ tipo: 'nota', id: a.id, texto: a.texto, imagem: a.imagem }));
+        const notas = alertasNotas.map((a) => ({ tipo: 'nota', id: a.id, texto: a.texto, imagem: a.imagem, video: a.video }));
         // segue a mesma ordem de prioridade configurada para os grupos de tarefas fixas
         // (inclusive listas próprias/custom), refletindo a ordem em que aparecem na janela de Tarefas fixas
         const ordemGrupos = normalizarOrdemGruposFixas(fixasGruposOrdem, gruposCustom);
         const pendentes = ordemGrupos.flatMap((freq) => fixas.filter((t) => t.freq === freq && !tarefaFeitaHoje(t)).map((t) => ({ tipo: 'fixa', id: t.id, texto: t.texto, freq })));
-        // ordem solicitada: 1) notas escritas na janela de alertas, 2) tarefas pendentes na ordem de prioridade
-        // configurada (Configurações das tarefas fixas), 3) itens da agenda com data
-        return [...notas, ...pendentes, ...semanais];
+        // alerta do contador do Pso: entra na FRENTE de tudo, só enquanto o contador tiver chegado
+        // em zero E ainda não tiver sido resetado (o Reset dispensa o alerta e congela em 0)
+        const psoZerado = psoContadorDias != null && !psoContadorZerado && diasRestantesPsoContador(psoContadorDias, psoContadorInicioISO) === 0;
+        const psoAlerta = psoZerado ? [{ tipo: 'psoAlerta', id: '__psoAlerta', texto: '🚨 Pso 🚨' }] : [];
+        // ordem solicitada: 0) alerta do Pso quando ativo, 1) notas escritas na janela de alertas,
+        // 2) tarefas pendentes na ordem de prioridade configurada, 3) itens da agenda com data
+        return [...psoAlerta, ...notas, ...pendentes, ...semanais];
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [alertasSemana, alertasNotas, fixas, fixasGruposOrdem, gruposCustom]);
+    }, [alertasSemana, alertasNotas, fixas, fixasGruposOrdem, gruposCustom, psoContadorDias, psoContadorInicioISO, psoContadorZerado]);
     const alertaCurrent = alertaPool[alertaIdx] || null;
     const trocarAlerta = (dir) => {
         if (!alertaPool.length)
@@ -3993,11 +4191,12 @@ function App() {
     };
     const adicionarNota = () => {
         const texto = novaNota.trim();
-        if (!texto && !novaNotaImagem)
+        if (!texto && !novaNotaImagem && !novaNotaVideo)
             return;
-        setAlertasNotas((ns) => [...ns, { id: genId(), texto, imagem: novaNotaImagem }]);
+        setAlertasNotas((ns) => [...ns, { id: genId(), texto, imagem: novaNotaImagem, video: novaNotaVideo }]);
         setNovaNota('');
         setNovaNotaImagem(null);
+        setNovaNotaVideo(null);
         marcarSujo();
     };
     const removerNota = (id) => {
@@ -4249,7 +4448,7 @@ function App() {
         const textoFinal = dentroDeCmee
             ? `${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} — ${texto}`
             : texto;
-        setNotasRapidas((ns) => [...ns, { id: genId(), texto: textoFinal, pastaId: destino }]);
+        setNotasRapidas((ns) => [{ id: genId(), texto: textoFinal, pastaId: destino }, ...ns]);
         registrarUsoPasta(caminho);
         setNovoTextoRapido('');
         setNotaCaminhoSel(['geral']); // depois de salvar, a seleção sempre volta para a Geral
@@ -4278,14 +4477,64 @@ function App() {
             mostrar('erro');
         }
     };
-    const handleImagemInput = (e) => {
+    // Anexo de imagem na Nota do alerta: se o Cloudflare R2 já estiver configurado (Configurações
+    // gerais), comprime e sobe a foto, guardando só a URL. Sem configuração ainda, cai no
+    // comportamento antigo (base64 direto no localStorage) pra nunca travar o fluxo.
+    const handleImagemInput = async (e) => {
         const file = e.target.files && e.target.files[0];
+        e.target.value = '';
         if (!file)
             return;
-        const reader = new FileReader();
-        reader.onload = (ev) => setNovaNotaImagem(ev.target.result);
-        reader.readAsDataURL(file);
+        const { url, token } = lerConfigR2();
+        if (!url || !token) {
+            const reader = new FileReader();
+            reader.onload = (ev) => setNovaNotaImagem(ev.target.result);
+            reader.readAsDataURL(file);
+            return;
+        }
+        setMsgUploadMidia('');
+        setUploadMidiaEmAndamento(true);
+        try {
+            const comprimida = await comprimirImagemParaUpload(file);
+            const urlFinal = await subirArquivoParaR2(comprimida, file.name || 'foto.jpg');
+            setNovaNotaImagem(urlFinal);
+        }
+        catch (err) {
+            setMsgUploadMidia('Não consegui subir a imagem. Confira a configuração do Cloudflare em ⚙️ Configurações gerais.');
+        }
+        finally {
+            setUploadMidiaEmAndamento(false);
+        }
+    };
+    // Anexo de vídeo na Nota do alerta: exige o Cloudflare R2 configurado (vídeo é grande demais
+    // pra guardar em base64 no localStorage). Sem compressão — vídeo sobe do jeito que veio.
+    const handleVideoInput = async (e) => {
+        const file = e.target.files && e.target.files[0];
         e.target.value = '';
+        if (!file)
+            return;
+        const { url, token } = lerConfigR2();
+        if (!url || !token) {
+            setMsgUploadMidia('Configure o Cloudflare R2 em ⚙️ Configurações gerais antes de anexar vídeos.');
+            return;
+        }
+        setMsgUploadMidia('');
+        setUploadMidiaEmAndamento(true);
+        try {
+            const urlFinal = await subirArquivoParaR2(file, file.name || 'video.mp4');
+            setNovaNotaVideo(urlFinal);
+        }
+        catch (err) {
+            setMsgUploadMidia('Não consegui subir o vídeo. Confira a configuração do Cloudflare em ⚙️ Configurações gerais.');
+        }
+        finally {
+            setUploadMidiaEmAndamento(false);
+        }
+    };
+    const salvarConfigR2Click = () => {
+        const ok = salvarConfigR2(r2UrlDraft, r2TokenDraft);
+        setR2ConfigMsg(ok ? 'Salvo!' : 'Não consegui salvar — tente de novo.');
+        setTimeout(() => setR2ConfigMsg(''), 2000);
     };
     // ---- nota do dia ----
     const NOTA_CATS = ['aleatorio', 'motivacional', 'prosperidade', 'espiritual', 'funny', 'edu', 'memoria'];
@@ -4391,13 +4640,15 @@ function App() {
     useEffect(() => { sortearFraseRef.current = sortearFrase; });
     const trocarAlertaRef = useRef(trocarAlerta);
     useEffect(() => { trocarAlertaRef.current = trocarAlerta; });
-    // ao abrir o app, escolhe um alerta ALEATÓRIO em vez de mostrar sempre o primeiro (índice 0).
+    // ao abrir o app, escolhe um alerta ALEATÓRIO em vez de mostrar sempre o primeiro (índice 0) —
+    // EXCETO quando o alerta 🚨 Pso 🚨 está ativo: nesse caso ele sempre vem primeiro, em destaque.
     // roda só uma vez, assim que o pool de alertas fica disponível.
     const alertaInicializadoRef = useRef(false);
     useEffect(() => {
         if (!alertaInicializadoRef.current && alertaPool.length > 0) {
             alertaInicializadoRef.current = true;
-            setAlertaIdx(Math.floor(Math.random() * alertaPool.length));
+            const psoIdx = alertaPool.findIndex((a) => a.tipo === 'psoAlerta');
+            setAlertaIdx(psoIdx !== -1 ? psoIdx : Math.floor(Math.random() * alertaPool.length));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [alertaPool]);
@@ -4548,13 +4799,17 @@ function App() {
     // ---- configurações gerais + reorganizar posição das janelas ----
     // 'categorias' saiu da lista: deixou de ser janela própria e virou a aba 🗂️ Categorias do Livro Razão
     // 'premiacao' também saiu da lista: virou a aba 🏆 Premiação do Livro Razão
-    const ORDEM_JANELAS_PADRAO = ['nota', 'alertas', 'tarefasFixas', 'livroRazao', 'medalhas', 'historico', 'lista'];
+    // 'historico' saiu da lista: deixou de ser janela própria e virou o botão 📊 dentro de 'tarefasFixas'
+    // 'lista' saiu da lista: deixou de ser janela própria e virou o botão 📝 dentro da aba Categorias
+    const ORDEM_JANELAS_PADRAO = ['nota', 'alertas', 'tarefasFixas', 'livroRazao', 'medalhas'];
     // v2: o Livro Razão passou a ficar logo acima do Histórico. A migração roda UMA vez sobre
     // a ordem já salva; depois disso a janela volta a ser livre para arrastar para onde eu quiser.
     // v3: troquei de posição o Livro Razão com o Quadro de Medalhas — agora o Quadro de Medalhas
     // fica logo abaixo do Livro Razão (antes ficava mais pra baixo, depois do Histórico e da Lista).
     // v4: Premiação deixou de ser janela própria e virou aba do Livro Razão.
-    const ORDEM_JANELAS_VERSAO = 4;
+    // v5: Histórico deixou de ser janela própria e virou o botão 📊 dentro de Tarefas fixas.
+    // v6: Minha lista deixou de ser janela própria e virou o botão 📝 dentro da aba Categorias.
+    const ORDEM_JANELAS_VERSAO = 6;
     const [ordemJanelasVersao, setOrdemJanelasVersao] = useState(ORDEM_JANELAS_VERSAO);
     const [mostrarConfiguracoes, setMostrarConfiguracoes] = useState(false);
     const [modoReorganizarJanelas, setModoReorganizarJanelas] = useState(false);
@@ -4712,7 +4967,7 @@ function App() {
         catch (e) { /* localStorage indisponível: backup segue só com os dados do Minha Tela */ }
         return dados;
     };
-    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
+    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
     const copiarBackup = () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -4834,6 +5089,10 @@ function App() {
             setPsoRegistro(Array.isArray(dados.psoRegistro) ? dados.psoRegistro : []);
             setPsoTarefas(Array.isArray(dados.psoTarefas) ? dados.psoTarefas : []);
             setPsoProtocolos(Array.isArray(dados.psoProtocolos) ? dados.psoProtocolos : []);
+            setPsoTestes(Array.isArray(dados.psoTestes) ? dados.psoTestes : []);
+            setPsoContadorDias(typeof dados.psoContadorDias === 'number' ? dados.psoContadorDias : null);
+            setPsoContadorInicioISO(typeof dados.psoContadorInicioISO === 'string' ? dados.psoContadorInicioISO : null);
+            setPsoContadorZerado(!!dados.psoContadorZerado);
             setReservas(Array.isArray(dados.reservas) ? dados.reservas : []);
             {
                 const chk = normalizarChecklists(dados);
@@ -5434,8 +5693,10 @@ function App() {
                                     color: DESTAQUE_AGENDA_INFO[alertaCurrent.nivel].cor,
                                     background: DESTAQUE_AGENDA_INFO[alertaCurrent.nivel].bg,
                                 } }, DESTAQUE_AGENDA_INFO[alertaCurrent.nivel].label)),
-                            React.createElement("p", { className: `mt-alerta-texto ${alertaSwipe}` }, alertaCurrent.texto),
-                            alertaCurrent.imagem && React.createElement("img", { src: alertaCurrent.imagem, className: "mt-alerta-imagem", alt: "" }))) : (React.createElement("p", { className: "mt-alerta-vazio" }, "Adicione alertas semanais, notas ou deixe tarefas pendentes \u2014 elas aparecer\u00E3o aqui."))),
+                            React.createElement("p", { className: `mt-alerta-texto ${alertaSwipe}`, style: alertaCurrent.tipo === 'psoAlerta' ? { color: '#C0492E', fontWeight: 800 } : undefined }, alertaCurrent.texto),
+                            alertaCurrent.imagem && React.createElement("img", { src: alertaCurrent.imagem, className: "mt-alerta-imagem", alt: "" }),
+                            alertaCurrent.video && (React.createElement("video", { src: alertaCurrent.video, className: "mt-alerta-imagem", controls: true, playsInline: true, style: { background: '#000' } })),
+                            alertaCurrent.tipo === 'psoAlerta' && (React.createElement("button", { className: "mt-btn-sm", style: { marginTop: 10, borderColor: '#C0492E', color: '#C0492E' }, onClick: (e) => { e.stopPropagation(); resetarPsoContador(); } }, "Reset")))) : (React.createElement("p", { className: "mt-alerta-vazio" }, "Adicione alertas semanais, notas ou deixe tarefas pendentes \u2014 elas aparecer\u00E3o aqui."))),
                         React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 } },
                             React.createElement("div", null),
                             React.createElement("button", { className: "mt-alerta-editar-btn", onClick: () => setAlertaEditando((v) => !v), title: alertaEditando ? 'Fechar' : 'Editar' }, alertaEditando ? '×' : '+')),
@@ -5471,15 +5732,25 @@ function App() {
                                     })))),
                             alertaAba === 'notas' && (React.createElement(React.Fragment, null,
                                 React.createElement("input", { className: "mt-alerta-input-dark", placeholder: "Texto da nota\u2026", value: novaNota, onChange: (e) => setNovaNota(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarNota() }),
-                                novaNotaImagem && React.createElement("img", { src: novaNotaImagem, style: { maxWidth: '100%', maxHeight: 100, borderRadius: 8, marginBottom: 8, objectFit: 'cover' }, alt: "" }),
+                                novaNotaImagem && (React.createElement("div", { style: { position: 'relative', marginBottom: 8 } },
+                                    React.createElement("img", { src: novaNotaImagem, style: { maxWidth: '100%', maxHeight: 100, borderRadius: 8, objectFit: 'cover', display: 'block' }, alt: "" }),
+                                    React.createElement("button", { className: "mt-del", style: { position: 'absolute', top: 4, right: 4 }, onClick: () => setNovaNotaImagem(null) }, "\u00D7"))),
+                                novaNotaVideo && (React.createElement("div", { style: { position: 'relative', marginBottom: 8 } },
+                                    React.createElement("video", { src: novaNotaVideo, controls: true, playsInline: true, style: { maxWidth: '100%', maxHeight: 140, borderRadius: 8, display: 'block', background: '#000' } }),
+                                    React.createElement("button", { className: "mt-del", style: { position: 'absolute', top: 4, right: 4 }, onClick: () => setNovaNotaVideo(null) }, "\u00D7"))),
+                                uploadMidiaEmAndamento && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12, margin: '0 0 8px' } }, "Enviando\u2026"),
+                                msgUploadMidia && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12, margin: '0 0 8px', color: '#C0492E' } }, msgUploadMidia),
                                 React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 12 } },
                                     React.createElement("button", { className: "mt-create-btn", style: { flex: 1 }, onClick: adicionarNota }, "+ Adicionar nota"),
-                                    React.createElement("button", { className: "mt-btn-sm", onClick: () => imagemInputRef.current && imagemInputRef.current.click() }, "\uD83D\uDDBC Imagem"),
-                                    React.createElement("input", { ref: imagemInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleImagemInput })),
+                                    React.createElement("button", { className: "mt-btn-sm", disabled: uploadMidiaEmAndamento, onClick: () => imagemInputRef.current && imagemInputRef.current.click() }, "\uD83D\uDDBC Imagem"),
+                                    React.createElement("button", { className: "mt-btn-sm", disabled: uploadMidiaEmAndamento, onClick: () => videoInputRef.current && videoInputRef.current.click() }, "\uD83C\uDFA5 V\u00EDdeo"),
+                                    React.createElement("input", { ref: imagemInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleImagemInput }),
+                                    React.createElement("input", { ref: videoInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleVideoInput })),
                                 React.createElement("div", { style: { maxHeight: 140, overflowY: 'auto' } },
                                     alertasNotas.length === 0 && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12 } }, "Nenhuma nota ainda."),
                                     alertasNotas.map((n) => (React.createElement("div", { className: "mt-alerta-item", key: n.id },
                                         n.imagem && React.createElement("img", { src: n.imagem, className: "mt-alerta-img-preview", alt: "" }),
+                                        n.video && React.createElement("video", { src: n.video, className: "mt-alerta-img-preview", muted: true }),
                                         React.createElement("span", { style: { flex: 1 } }, n.texto),
                                         React.createElement("button", { className: "mt-del", onClick: () => removerNota(n.id) }, "\u00D7"))))))))))),
                 React.createElement("div", { className: "mt-notas-rapidas-wrap", style: { order: ordemJanelas.indexOf('alertas') } },
@@ -5561,6 +5832,7 @@ function App() {
                     renderJanelaHandle('tarefasFixas'),
                     React.createElement("h2", { className: "mt-section-title" }, "Tarefas fixas"),
                     (() => {
+                        var _a;
                         const ordemCompleta = normalizarOrdemGruposFixas(fixasGruposOrdem, gruposCustom);
                         const todosGrupos = ordemCompleta.map((id) => ({
                             freq: id,
@@ -5573,6 +5845,45 @@ function App() {
                         const gruposAba = gruposVisiveis.filter((g) => !fixasGruposComoCard.includes(g.freq));
                         // sem fallback para gruposAba[0]: se nada foi tocado, nenhum grupo fica selecionado
                         const atual = gruposAba.find((o) => o.freq === fixaOutrasAba) || null;
+                        // ---- Histórico unificado: mesmas opções de frequência que existiam na janela própria,
+                        // agora vivendo dentro da janela de Tarefas fixas (troca de lugar com o botão 📊) ----
+                        const opcoesHist = [
+                            { freq: 'diaria', label: 'Diário', cols: DIAS_SEMANA, items: diarias },
+                            { freq: 'semanal', label: 'Semanal', cols: SEMANAS_MES, items: semanais },
+                            { freq: 'mensal', label: 'Mensal', cols: MESES, items: mensais },
+                            { freq: 'trimestral', label: 'Trimestral', cols: TRIMESTRES, items: fixas.filter((t) => t.freq === 'trimestral') },
+                            { freq: 'semestral', label: 'Semestral', cols: SEMESTRES, items: fixas.filter((t) => t.freq === 'semestral') },
+                            { freq: 'anual', label: 'Anual', cols: [new Date().getFullYear().toString()], items: fixas.filter((t) => t.freq === 'anual') },
+                            ...gruposCustom.map((g) => ({
+                                freq: g.id, label: g.nome, cols: ['Registro'], items: fixas.filter((t) => t.freq === g.id),
+                            })),
+                        ];
+                        // sem fallback para opcoesHist[0]: se nada foi tocado, nenhum botão fica preto
+                        const atualHist = opcoesHist.find((o) => o.freq === historicoAba) || null;
+                        const { freq: freqHist, label: labelHist, cols: colsHist, items: itemsHist } = atualHist || { freq: null, label: '', cols: [], items: [] };
+                        const editandoHist = freqHist ? !!historicoEditando[freqHist] : false;
+                        const colunasOcultasHist = (freqHist && historicoColunasOcultas[freqHist]) || [];
+                        const colsVisiveisHist = colsHist.map((c, i) => ({ col: c, idx: i, oculta: colunasOcultasHist.includes(i) }));
+                        // cálculo de porcentagem até a data corrente (sem contar datas futuras)
+                        const hoje2Hist = new Date();
+                        const maxIdxHojeHist = (_a = {
+                            diaria: hoje2Hist.getDay(),
+                            semanal: Math.min(Math.floor((hoje2Hist.getDate() - 1) / 7), 4),
+                            mensal: hoje2Hist.getMonth(),
+                            trimestral: Math.floor(hoje2Hist.getMonth() / 3),
+                            semestral: hoje2Hist.getMonth() < 6 ? 0 : 1,
+                            anual: 0,
+                        }[freqHist]) !== null && _a !== void 0 ? _a : (colsHist.length - 1);
+                        const colsElegiveisHist = colsVisiveisHist.filter((c) => !c.oculta && c.idx <= maxIdxHojeHist);
+                        let totalFeitasHist = 0, totalPossivelHist = 0;
+                        itemsHist.forEach((t) => {
+                            colsElegiveisHist.forEach(({ idx }) => {
+                                totalPossivelHist++;
+                                if (t.historico && t.historico[idx])
+                                    totalFeitasHist++;
+                            });
+                        });
+                        const pctHist = totalPossivelHist > 0 ? Math.round((totalFeitasHist / totalPossivelHist) * 100) : 0;
                         const renderItemFixa = (t, freq) => {
                             const feita = tarefaFeitaHoje(t);
                             const dias = diasRestantes(t);
@@ -5786,7 +6097,7 @@ function App() {
                                     renderMetaDoDia(freq)));
                             }),
                             React.createElement("div", { className: "mt-card", "data-fixas-unica": "1" },
-                                gruposAba.length > 0 && (React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 } }, gruposAba.map((o) => (React.createElement("button", { key: o.freq, onClick: () => {
+                                !historicoModoAtivo && gruposAba.length > 0 && (React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 } }, gruposAba.map((o) => (React.createElement("button", { key: o.freq, onClick: () => {
                                         // tocar num botão já preto fecha a janela e devolve todos ao branco
                                         const fechando = fixaOutrasAba === o.freq;
                                         setFixaOutrasAba(fechando ? null : o.freq);
@@ -5801,32 +6112,160 @@ function App() {
                                         color: fixaOutrasAba === o.freq ? '#fff' : '#777',
                                         borderColor: fixaOutrasAba === o.freq ? '#232323' : '#ddd8c9',
                                     } }, o.label))))),
+                                historicoModoAtivo && (React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 } }, opcoesHist.map((o) => (React.createElement("button", { key: o.freq, onClick: () => {
+                                        // tocar num botão já preto fecha a tabela e devolve todos ao branco
+                                        const fechando = historicoAba === o.freq;
+                                        setHistoricoAba(fechando ? null : o.freq);
+                                        setHistoricoExpandido(!fechando);
+                                    }, style: {
+                                        fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20,
+                                        border: '1.5px solid', cursor: 'pointer',
+                                        background: historicoAba === o.freq ? '#232323' : '#fff',
+                                        color: historicoAba === o.freq ? '#fff' : '#777',
+                                        borderColor: historicoAba === o.freq ? '#232323' : '#ddd8c9',
+                                    } }, o.label))))),
                                 React.createElement("div", { className: "mt-fixa-grupo-head" },
                                     React.createElement("div", { style: { display: 'flex', gap: 10, alignItems: 'center' } },
-                                        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0 } }, atual ? atual.label : (gruposAba.length > 0 ? 'TOQUE NUMA LISTA' : 'NENHUMA ABA VISÍVEL'))),
+                                        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0 } }, historicoModoAtivo
+                                            ? (atualHist ? `📊 ${labelHist}` : '📊 HISTÓRICO')
+                                            : (atual ? atual.label : (gruposAba.length > 0 ? 'TOQUE NUMA LISTA' : 'NENHUMA ABA VISÍVEL')))),
                                     React.createElement("div", { style: { display: 'flex', gap: 6, alignItems: 'center' } },
-                                        atual && atual.custom && fixasEdicaoAtiva && (React.createElement("button", { className: "mt-del", onClick: () => removerGrupoCustom(atual.freq), title: "Excluir lista" }, "\u00D7")),
+                                        !historicoModoAtivo && atual && atual.custom && fixasEdicaoAtiva && (React.createElement("button", { className: "mt-del", onClick: () => removerGrupoCustom(atual.freq), title: "Excluir lista" }, "\u00D7")),
+                                        !historicoModoAtivo && (React.createElement(React.Fragment, null,
+                                            React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
+                                                    const abrindo = !mostrarAdicionarFixa;
+                                                    setMostrarAdicionarFixa(abrindo);
+                                                    // ‼️ ao abrir o painel, expande a janela junto — senão o + parecia não fazer nada
+                                                    if (abrindo)
+                                                        setFixasUnicaExpandida(true);
+                                                    if (atual)
+                                                        setFixasCardAberto((m) => ({ ...m, [atual.freq]: !m[atual.freq] }));
+                                                }, title: mostrarAdicionarFixa ? 'Fechar' : 'Adicionar ou remover tarefas' }, mostrarAdicionarFixa ? '×' : '+'),
+                                            React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
+                                                    const abrindo = !mostrarConfigFixas;
+                                                    setMostrarConfigFixas(abrindo);
+                                                    if (abrindo)
+                                                        setFixasUnicaExpandida(true);
+                                                    // fechando o ⚙ sem nenhuma lista marcada, a janela volta a encolher
+                                                    else if (!fixaOutrasAba) {
+                                                        setFixasUnicaExpandida(false);
+                                                        setMostrarAdicionarFixa(false);
+                                                    }
+                                                }, title: mostrarConfigFixas ? 'Fechar configurações' : 'Configurações' }, "\u2699\uFE0F"))),
                                         React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
-                                                const abrindo = !mostrarAdicionarFixa;
-                                                setMostrarAdicionarFixa(abrindo);
-                                                // ‼️ ao abrir o painel, expande a janela junto — senão o + parecia não fazer nada
-                                                if (abrindo)
-                                                    setFixasUnicaExpandida(true);
-                                                if (atual)
-                                                    setFixasCardAberto((m) => ({ ...m, [atual.freq]: !m[atual.freq] }));
-                                            }, title: mostrarAdicionarFixa ? 'Fechar' : 'Adicionar ou remover tarefas' }, mostrarAdicionarFixa ? '×' : '+'),
-                                        React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
-                                                const abrindo = !mostrarConfigFixas;
-                                                setMostrarConfigFixas(abrindo);
-                                                if (abrindo)
-                                                    setFixasUnicaExpandida(true);
-                                                // fechando o ⚙ sem nenhuma lista marcada, a janela volta a encolher
-                                                else if (!fixaOutrasAba) {
-                                                    setFixasUnicaExpandida(false);
+                                                const ligando = !historicoModoAtivo;
+                                                setHistoricoModoAtivo(ligando);
+                                                if (ligando) {
                                                     setMostrarAdicionarFixa(false);
+                                                    setMostrarConfigFixas(false);
                                                 }
-                                            }, title: mostrarConfigFixas ? 'Fechar configurações' : 'Configurações' }, "\u2699\uFE0F"))),
-                                fixasUnicaExpandida && (React.createElement(React.Fragment, null,
+                                                else {
+                                                    setHistoricoAba(null);
+                                                    setHistoricoExpandido(false);
+                                                }
+                                            }, title: historicoModoAtivo ? 'Voltar às tarefas fixas' : 'Ver histórico' }, historicoModoAtivo ? '📋' : '📊'))),
+                                historicoModoAtivo && historicoExpandido && atualHist && (React.createElement(React.Fragment, null,
+                                    (() => {
+                                        const dias = [];
+                                        for (let i = 6; i >= 0; i--) {
+                                            const d = new Date();
+                                            d.setDate(d.getDate() - i);
+                                            const chave = d.toLocaleDateString('en-CA');
+                                            dias.push({
+                                                chave,
+                                                rotulo: d.toLocaleDateString('en-US', { weekday: 'long' }),
+                                                qtd: aberturasApp[chave] || 0,
+                                                hojeMesmo: i === 0,
+                                            });
+                                        }
+                                        const maior = Math.max(1, ...dias.map((d) => d.qtd));
+                                        const total7 = dias.reduce((s, d) => s + d.qtd, 0);
+                                        return (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
+                                            React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 } }, "\uD83D\uDCF1 Aberturas do app"),
+                                            React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 } },
+                                                React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: '#232323' } }, aberturasApp[hoje()] || 0),
+                                                React.createElement("span", { style: { fontSize: 12, color: '#999' } },
+                                                    "hoje \u00B7 ",
+                                                    total7,
+                                                    " nos \u00FAltimos 7 dias")),
+                                            React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6, height: 46 } }, dias.map((d) => (React.createElement("div", { key: d.chave, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 } },
+                                                React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: d.hojeMesmo ? '#232323' : '#a8a293' } }, d.qtd),
+                                                React.createElement("div", { style: {
+                                                        width: '100%',
+                                                        height: Math.max(3, Math.round((d.qtd / maior) * 24)),
+                                                        background: d.hojeMesmo ? '#5B7C99' : '#ddd8c9',
+                                                        borderRadius: 3,
+                                                    } }),
+                                                React.createElement("span", { style: { fontSize: 9.5, color: '#a8a293' } }, d.rotulo)))))));
+                                    })(),
+                                    React.createElement("div", { className: "mt-fixa-grupo-head", style: { marginBottom: 10 } },
+                                        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0, textTransform: 'uppercase' } }, labelHist),
+                                        React.createElement("div", { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+                                            React.createElement("button", { className: "mt-gear-btn", title: editandoHist ? 'Sair da edição' : 'Editar', onClick: () => setHistoricoEditando((h) => ({ ...h, [freqHist]: !h[freqHist] })) }, editandoHist ? '×' : '+'),
+                                            React.createElement("button", { className: "mt-recarregar-btn", onClick: () => arquivarTabela(freqHist), title: "Recarregar" }, "\uD83D\uDD04"))),
+                                    itemsHist.length > 0 && (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
+                                        React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 } }, "Rela\u00E7\u00E3o de tarefas completas"),
+                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                                            React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: '#232323' } },
+                                                totalFeitasHist,
+                                                "/",
+                                                totalPossivelHist),
+                                            React.createElement("span", { style: { fontSize: 15, color: corPct(pctHist), fontWeight: 700 } },
+                                                pctHist,
+                                                "%"),
+                                            React.createElement("div", { style: { flex: 1, height: 6, background: '#e7e5df', borderRadius: 3, overflow: 'hidden' } },
+                                                React.createElement("div", { style: { width: `${pctHist}%`, height: '100%', background: corPct(pctHist), borderRadius: 3, transition: 'width 0.4s' } }))))),
+                                    itemsHist.length === 0 ? (React.createElement("p", { className: "mt-empty" },
+                                        "Nenhuma tarefa ",
+                                        labelHist.toLowerCase(),
+                                        " ainda.")) : (React.createElement("div", { className: "mt-tabela-wrap" },
+                                        React.createElement("table", { className: "mt-tabela-historico" },
+                                            React.createElement("thead", null,
+                                                React.createElement("tr", null,
+                                                    React.createElement("th", null),
+                                                    colsVisiveisHist.map(({ col, idx, oculta }) => (!oculta || editandoHist) && (React.createElement("th", { key: idx }, editandoHist ? (React.createElement("button", { onClick: () => toggleColunaOculta(freqHist, idx), style: { background: oculta ? '#f0ede6' : 'transparent', border: oculta ? '1px solid #ddd' : 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: oculta ? '#aaa' : 'inherit', padding: '2px 4px', textDecoration: oculta ? 'line-through' : 'none' }, title: oculta ? 'Mostrar' : 'Ocultar' }, col)) : col))))),
+                                            React.createElement("tbody", null, itemsHist.map((t) => (React.createElement("tr", { key: t.id },
+                                                React.createElement("td", { className: "mt-tabela-nome" }, t.texto),
+                                                colsVisiveisHist.map(({ idx, oculta }) => (!oculta || editandoHist) && (React.createElement("td", { key: idx, style: oculta ? { opacity: 0.3 } : {} }, editandoHist ? ((t.historico && t.historico[idx])
+                                                    ? React.createElement("span", { className: "mt-tabela-marcada-edit", onClick: () => toggleHistoricoCell(t.id, idx) }, "\u2713")
+                                                    : React.createElement("span", { className: "mt-tabela-vazia", onClick: () => toggleHistoricoCell(t.id, idx) })) : ((t.historico && t.historico[idx]) ? React.createElement("span", { className: "mt-tabela-marca" }, "\u2713") : null))))))))))),
+                                    (() => {
+                                        const comsFreq = comentariosFixas.filter((c) => c.freq === freqHist);
+                                        return (React.createElement("div", { style: { marginTop: 16, paddingTop: 14, borderTop: '1px solid #f0efe9' } },
+                                            React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '0 0 6px', textTransform: 'uppercase' } }, "\uD83D\uDCAC Coment\u00E1rios"),
+                                            comsFreq.length === 0 ? (React.createElement("p", { className: "mt-empty", style: { margin: 0 } }, "Nenhum coment\u00E1rio registrado neste per\u00EDodo.")) : comsFreq.map((c) => (React.createElement("div", { className: "mt-fixa-item", key: c.id },
+                                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                                    React.createElement("span", { style: { display: 'block', fontSize: 13, color: '#232323', whiteSpace: 'pre-wrap' } }, c.texto),
+                                                    c.solucao && (React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#6E8C82', whiteSpace: 'pre-wrap', marginTop: 2 } },
+                                                        "\uD83D\uDCA1 Solu\u00E7\u00E3o: ",
+                                                        c.solucao)),
+                                                    React.createElement("span", { style: { fontSize: 11.5, color: '#999' } },
+                                                        rotuloPeriodo(freqHist, c.chave),
+                                                        " \u00B7 ",
+                                                        c.data)),
+                                                React.createElement("button", { className: "mt-del", onClick: () => removerComentario(c.id) }, "\u00D7"))))));
+                                    })(),
+                                    React.createElement("div", { style: { marginTop: 20, paddingTop: 16, borderTop: '1px solid #e7e5df' } },
+                                        React.createElement("h2", { className: "mt-section-title" }, "\uD83D\uDCD6 Livro das mem\u00F3rias"),
+                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                                            React.createElement("button", { className: "mt-backup-toggle", style: { marginTop: 0 }, onClick: () => { setMsgLivro(''); setLivroAberto((v) => !v); } }, livroAberto ? '▲ Esconder' : `▼ Ver registros (${livro.length})`),
+                                            React.createElement("button", { className: "mt-config-fixas-btn", onClick: () => setMostrarConfigLivroMemorias((v) => !v), title: mostrarConfigLivroMemorias ? 'Fechar configurações' : 'Configurações do livro das memórias' }, mostrarConfigLivroMemorias ? '×' : '⚙️')),
+                                        mostrarConfigLivroMemorias && (React.createElement("div", { style: { margin: '10px 0' } },
+                                            React.createElement(BotaoDesfazer, { janela: "livro" }))),
+                                        livroAberto && (React.createElement(React.Fragment, null,
+                                            React.createElement("div", { className: "mt-livro-lista" },
+                                                livro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nada registrado ainda. Toque em \"Recarregar\" nas tabelas acima pra arquivar a semana aqui."),
+                                                livro.map((r) => (React.createElement("div", { className: "mt-livro-item", key: r.id },
+                                                    React.createElement("span", { className: "mt-livro-texto" }, r.tarefa),
+                                                    React.createElement("span", { className: "mt-tempo-badge" },
+                                                        r.dia,
+                                                        " \u00B7 ",
+                                                        r.data))))),
+                                            React.createElement("div", { className: "mt-backup-actions", style: { marginTop: 12 } },
+                                                React.createElement("button", { className: "mt-btn-sm primary", onClick: copiarLivro }, "Copiar"),
+                                                confirmApagarLivro ? (React.createElement("button", { className: "mt-btn-sm", style: { borderColor: '#E8633D', color: '#E8633D' }, onClick: apagarLivro }, "Confirmar apagar?")) : (React.createElement("button", { className: "mt-btn-sm", onClick: () => setConfirmApagarLivro(true) }, "Apagar"))),
+                                            React.createElement("p", { className: "mt-backup-msg" }, msgLivro)))))),
+                                !historicoModoAtivo && fixasUnicaExpandida && (React.createElement(React.Fragment, null,
                                     atual ? (() => {
                                         const items = atual.items;
                                         const feitas = items.filter((t) => tarefaFeitaHoje(t)).length;
@@ -5923,199 +6362,8 @@ function App() {
                                                 isCustom && fixasEdicaoAtiva && (React.createElement("button", { className: "mt-del", onClick: () => removerGrupoCustom(id), title: "Apagar esta lista" }, "\uD83D\uDDD1\uFE0F"))));
                                         }),
                                         atual && renderComentarioGrupo(atual.freq))))),
-                                atual && renderMetaDoDia(atual.freq))));
+                                !historicoModoAtivo && atual && renderMetaDoDia(atual.freq))));
                     })()),
-                React.createElement("div", { className: `mt-janela-wrap ${draggingJanelaId === 'historico' ? 'dragging' : ''} ${dragOverJanelaId === 'historico' && draggingJanelaId !== 'historico' ? 'drag-over' : ''}`, "data-janela-id": "historico", style: { order: ordemJanelas.indexOf('historico') } },
-                    renderJanelaHandle('historico'),
-                    React.createElement("h2", { className: "mt-section-title" }, "Hist\u00F3rico"),
-                    (() => {
-                        var _a;
-                        const opcoes = [
-                            { freq: 'diaria', label: 'Diário', cols: DIAS_SEMANA, items: diarias },
-                            { freq: 'semanal', label: 'Semanal', cols: SEMANAS_MES, items: semanais },
-                            { freq: 'mensal', label: 'Mensal', cols: MESES, items: mensais },
-                            { freq: 'trimestral', label: 'Trimestral', cols: TRIMESTRES, items: fixas.filter((t) => t.freq === 'trimestral') },
-                            { freq: 'semestral', label: 'Semestral', cols: SEMESTRES, items: fixas.filter((t) => t.freq === 'semestral') },
-                            { freq: 'anual', label: 'Anual', cols: [new Date().getFullYear().toString()], items: fixas.filter((t) => t.freq === 'anual') },
-                            ...gruposCustom.map((g) => ({
-                                freq: g.id, label: g.nome, cols: ['Registro'], items: fixas.filter((t) => t.freq === g.id),
-                            })),
-                        ];
-                        // sem fallback para opcoes[0]: se nada foi tocado, nenhum botão fica preto
-                        const atual = opcoes.find((o) => o.freq === historicoAba) || null;
-                        const { freq, label, cols, items } = atual || { freq: null, label: '', cols: [], items: [] };
-                        const editando = freq ? !!historicoEditando[freq] : false;
-                        const colunasOcultas = (freq && historicoColunasOcultas[freq]) || [];
-                        const colsVisiveis = cols.map((c, i) => ({ col: c, idx: i, oculta: colunasOcultas.includes(i) }));
-                        // cálculo de porcentagem até a data corrente (sem contar datas futuras)
-                        const hoje2 = new Date();
-                        const maxIdxHoje = (_a = {
-                            diaria: hoje2.getDay(),
-                            semanal: Math.min(Math.floor((hoje2.getDate() - 1) / 7), 4),
-                            mensal: hoje2.getMonth(),
-                            trimestral: Math.floor(hoje2.getMonth() / 3),
-                            semestral: hoje2.getMonth() < 6 ? 0 : 1,
-                            anual: 0,
-                        }[freq]) !== null && _a !== void 0 ? _a : (cols.length - 1);
-                        const colsElegiveis = colsVisiveis.filter((c) => !c.oculta && c.idx <= maxIdxHoje);
-                        let totalFeitas = 0, totalPossivel = 0;
-                        items.forEach((t) => {
-                            colsElegiveis.forEach(({ idx }) => {
-                                totalPossivel++;
-                                if (t.historico && t.historico[idx])
-                                    totalFeitas++;
-                            });
-                        });
-                        const pct = totalPossivel > 0 ? Math.round((totalFeitas / totalPossivel) * 100) : 0;
-                        return (React.createElement("div", { className: "mt-card" },
-                            React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: historicoExpandido ? 14 : 4 } }, opcoes.map((o) => (React.createElement("button", { key: o.freq, onClick: () => {
-                                    // tocar num botão já preto fecha a janela e devolve todos ao branco
-                                    const fechando = historicoAba === o.freq;
-                                    setHistoricoAba(fechando ? null : o.freq);
-                                    setHistoricoExpandido(!fechando);
-                                }, style: {
-                                    fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20,
-                                    border: '1.5px solid', cursor: 'pointer',
-                                    background: historicoAba === o.freq ? '#232323' : '#fff',
-                                    color: historicoAba === o.freq ? '#fff' : '#777',
-                                    borderColor: historicoAba === o.freq ? '#232323' : '#ddd8c9',
-                                } }, o.label)))),
-                            atual && (React.createElement("button", { onClick: () => {
-                                    if (historicoExpandido) {
-                                        setHistoricoExpandido(false);
-                                        setHistoricoAba(null);
-                                    }
-                                    else
-                                        setHistoricoExpandido(true);
-                                }, "aria-label": historicoExpandido ? 'Recolher histórico' : 'Expandir histórico', title: historicoExpandido ? 'Recolher' : 'Expandir', style: {
-                                    width: '100%', background: 'transparent', border: 'none', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    padding: '4px 0', color: '#bbb', fontSize: 18, lineHeight: 1,
-                                } }, historicoExpandido ? '▲' : '▼')),
-                            historicoExpandido && atual && (React.createElement(React.Fragment, null,
-                                (() => {
-                                    const dias = [];
-                                    for (let i = 6; i >= 0; i--) {
-                                        const d = new Date();
-                                        d.setDate(d.getDate() - i);
-                                        const chave = d.toLocaleDateString('en-CA');
-                                        dias.push({
-                                            chave,
-                                            rotulo: d.toLocaleDateString('en-US', { weekday: 'long' }),
-                                            qtd: aberturasApp[chave] || 0,
-                                            hojeMesmo: i === 0,
-                                        });
-                                    }
-                                    const maior = Math.max(1, ...dias.map((d) => d.qtd));
-                                    const total7 = dias.reduce((s, d) => s + d.qtd, 0);
-                                    return (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
-                                        React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 } }, "\uD83D\uDCF1 Aberturas do app"),
-                                        React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 } },
-                                            React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: '#232323' } }, aberturasApp[hoje()] || 0),
-                                            React.createElement("span", { style: { fontSize: 12, color: '#999' } },
-                                                "hoje \u00B7 ",
-                                                total7,
-                                                " nos \u00FAltimos 7 dias")),
-                                        React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6, height: 46 } }, dias.map((d) => (React.createElement("div", { key: d.chave, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 } },
-                                            React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: d.hojeMesmo ? '#232323' : '#a8a293' } }, d.qtd),
-                                            React.createElement("div", { style: {
-                                                    width: '100%',
-                                                    height: Math.max(3, Math.round((d.qtd / maior) * 24)),
-                                                    background: d.hojeMesmo ? '#5B7C99' : '#ddd8c9',
-                                                    borderRadius: 3,
-                                                } }),
-                                            React.createElement("span", { style: { fontSize: 9.5, color: '#a8a293' } }, d.rotulo)))))));
-                                })(),
-                                React.createElement("div", { className: "mt-fixa-grupo-head", style: { marginBottom: 10 } },
-                                    React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0, textTransform: 'uppercase' } }, label),
-                                    React.createElement("div", { style: { display: 'flex', gap: 6, alignItems: 'center' } },
-                                        React.createElement("button", { className: "mt-gear-btn", title: editando ? 'Sair da edição' : 'Editar', onClick: () => setHistoricoEditando((h) => ({ ...h, [freq]: !h[freq] })) }, editando ? '×' : '+'),
-                                        React.createElement("button", { className: "mt-recarregar-btn", onClick: () => arquivarTabela(freq), title: "Recarregar" }, "\uD83D\uDD04"))),
-                                items.length > 0 && (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
-                                    React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 } }, "Rela\u00E7\u00E3o de tarefas completas"),
-                                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
-                                        React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: '#232323' } },
-                                            totalFeitas,
-                                            "/",
-                                            totalPossivel),
-                                        React.createElement("span", { style: { fontSize: 15, color: corPct(pct), fontWeight: 700 } },
-                                            pct,
-                                            "%"),
-                                        React.createElement("div", { style: { flex: 1, height: 6, background: '#e7e5df', borderRadius: 3, overflow: 'hidden' } },
-                                            React.createElement("div", { style: { width: `${pct}%`, height: '100%', background: corPct(pct), borderRadius: 3, transition: 'width 0.4s' } }))))),
-                                items.length === 0 ? (React.createElement("p", { className: "mt-empty" },
-                                    "Nenhuma tarefa ",
-                                    label.toLowerCase(),
-                                    " ainda.")) : (React.createElement("div", { className: "mt-tabela-wrap" },
-                                    React.createElement("table", { className: "mt-tabela-historico" },
-                                        React.createElement("thead", null,
-                                            React.createElement("tr", null,
-                                                React.createElement("th", null),
-                                                colsVisiveis.map(({ col, idx, oculta }) => (!oculta || editando) && (React.createElement("th", { key: idx }, editando ? (React.createElement("button", { onClick: () => toggleColunaOculta(freq, idx), style: { background: oculta ? '#f0ede6' : 'transparent', border: oculta ? '1px solid #ddd' : 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: oculta ? '#aaa' : 'inherit', padding: '2px 4px', textDecoration: oculta ? 'line-through' : 'none' }, title: oculta ? 'Mostrar' : 'Ocultar' }, col)) : col))))),
-                                        React.createElement("tbody", null, items.map((t) => (React.createElement("tr", { key: t.id },
-                                            React.createElement("td", { className: "mt-tabela-nome" }, t.texto),
-                                            colsVisiveis.map(({ idx, oculta }) => (!oculta || editando) && (React.createElement("td", { key: idx, style: oculta ? { opacity: 0.3 } : {} }, editando ? ((t.historico && t.historico[idx])
-                                                ? React.createElement("span", { className: "mt-tabela-marcada-edit", onClick: () => toggleHistoricoCell(t.id, idx) }, "\u2713")
-                                                : React.createElement("span", { className: "mt-tabela-vazia", onClick: () => toggleHistoricoCell(t.id, idx) })) : ((t.historico && t.historico[idx]) ? React.createElement("span", { className: "mt-tabela-marca" }, "\u2713") : null))))))))))),
-                                (() => {
-                                    const comsFreq = comentariosFixas.filter((c) => c.freq === freq);
-                                    return (React.createElement("div", { style: { marginTop: 16, paddingTop: 14, borderTop: '1px solid #f0efe9' } },
-                                        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '0 0 6px', textTransform: 'uppercase' } }, "\uD83D\uDCAC Coment\u00E1rios"),
-                                        comsFreq.length === 0 ? (React.createElement("p", { className: "mt-empty", style: { margin: 0 } }, "Nenhum coment\u00E1rio registrado neste per\u00EDodo.")) : comsFreq.map((c) => (React.createElement("div", { className: "mt-fixa-item", key: c.id },
-                                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                                React.createElement("span", { style: { display: 'block', fontSize: 13, color: '#232323', whiteSpace: 'pre-wrap' } }, c.texto),
-                                                c.solucao && (React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#6E8C82', whiteSpace: 'pre-wrap', marginTop: 2 } },
-                                                    "\uD83D\uDCA1 Solu\u00E7\u00E3o: ",
-                                                    c.solucao)),
-                                                React.createElement("span", { style: { fontSize: 11.5, color: '#999' } },
-                                                    rotuloPeriodo(freq, c.chave),
-                                                    " \u00B7 ",
-                                                    c.data)),
-                                            React.createElement("button", { className: "mt-del", onClick: () => removerComentario(c.id) }, "\u00D7"))))));
-                                })(),
-                                React.createElement("div", { style: { marginTop: 20, paddingTop: 16, borderTop: '1px solid #e7e5df' } },
-                                    React.createElement("h2", { className: "mt-section-title" }, "\uD83D\uDCD6 Livro das mem\u00F3rias"),
-                                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                                        React.createElement("button", { className: "mt-backup-toggle", style: { marginTop: 0 }, onClick: () => { setMsgLivro(''); setLivroAberto((v) => !v); } }, livroAberto ? '▲ Esconder' : `▼ Ver registros (${livro.length})`),
-                                        React.createElement("button", { className: "mt-config-fixas-btn", onClick: () => setMostrarConfigLivroMemorias((v) => !v), title: mostrarConfigLivroMemorias ? 'Fechar configurações' : 'Configurações do livro das memórias' }, mostrarConfigLivroMemorias ? '×' : '⚙️')),
-                                    mostrarConfigLivroMemorias && (React.createElement("div", { style: { margin: '10px 0' } },
-                                        React.createElement(BotaoDesfazer, { janela: "livro" }))),
-                                    livroAberto && (React.createElement(React.Fragment, null,
-                                        React.createElement("div", { className: "mt-livro-lista" },
-                                            livro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nada registrado ainda. Toque em \"Recarregar\" nas tabelas acima pra arquivar a semana aqui."),
-                                            livro.map((r) => (React.createElement("div", { className: "mt-livro-item", key: r.id },
-                                                React.createElement("span", { className: "mt-livro-texto" }, r.tarefa),
-                                                React.createElement("span", { className: "mt-tempo-badge" },
-                                                    r.dia,
-                                                    " \u00B7 ",
-                                                    r.data))))),
-                                        React.createElement("div", { className: "mt-backup-actions", style: { marginTop: 12 } },
-                                            React.createElement("button", { className: "mt-btn-sm primary", onClick: copiarLivro }, "Copiar"),
-                                            confirmApagarLivro ? (React.createElement("button", { className: "mt-btn-sm", style: { borderColor: '#E8633D', color: '#E8633D' }, onClick: apagarLivro }, "Confirmar apagar?")) : (React.createElement("button", { className: "mt-btn-sm", onClick: () => setConfirmApagarLivro(true) }, "Apagar"))),
-                                        React.createElement("p", { className: "mt-backup-msg" }, msgLivro))))))));
-                    })()),
-                React.createElement("div", { className: `mt-janela-wrap ${draggingJanelaId === 'lista' ? 'dragging' : ''} ${dragOverJanelaId === 'lista' && draggingJanelaId !== 'lista' ? 'drag-over' : ''}`, "data-janela-id": "lista", style: { order: ordemJanelas.indexOf('lista') } },
-                    renderJanelaHandle('lista'),
-                    React.createElement("h2", { className: "mt-section-title" }, "Minha lista"),
-                    React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end' } },
-                        React.createElement("button", { className: "mt-config-fixas-btn", onClick: () => setMostrarConfigLista((v) => !v), title: mostrarConfigLista ? 'Fechar configurações' : 'Configurações da lista' }, mostrarConfigLista ? '×' : '⚙️')),
-                    mostrarConfigLista && (React.createElement("div", { style: { marginBottom: 10 } },
-                        React.createElement(BotaoDesfazer, { janela: "lista" }))),
-                    React.createElement("div", { className: "mt-card" },
-                        lista.length === 0 && React.createElement("p", { className: "mt-empty" }, "Sorteie uma tarefa e toque em \"Vou fazer\" pra ela aparecer aqui."),
-                        React.createElement("div", { className: "mt-lista-scroll" }, [...lista]
-                            .sort((a, b) => (a.status === 'aguardando' && b.status !== 'aguardando' ? -1 : a.status !== 'aguardando' && b.status === 'aguardando' ? 1 : 0))
-                            .map((item) => (React.createElement("div", { className: "mt-lista-item", key: item.id },
-                            React.createElement("span", { className: `mt-lista-texto ${item.status === 'feito' ? 'feito' : ''}` }, item.texto),
-                            item.premiacao > 0 && (React.createElement("span", { style: { fontSize: 12, flexShrink: 0 } }, [1, 2, 3].map((n) => n <= item.premiacao ? '⭐️' : '').join(''))),
-                            item.tempoGasto != null && (React.createElement("span", { className: "mt-tempo-badge", style: { '--cor': item.cor } },
-                                "\u23F1 ",
-                                formatTempo(item.tempoGasto))),
-                            React.createElement("button", { className: `mt-lista-status ${item.status}`, onClick: () => (item.status === 'aguardando' && item.tempoGasto != null ? retomarContador(item) : alternarStatusLista(item.id)) }, item.status === 'feito'
-                                ? `Feito · ${new Date(item.feitoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
-                                : 'Aguardando'),
-                            React.createElement("button", { className: "mt-premio-btn", onClick: () => confirmarPremiacao(item), title: "Converter em tempo (Premia\u00E7\u00E3o)", "aria-label": "Premiar" }, "\uD83C\uDFC6"),
-                            React.createElement("button", { className: "mt-del", onClick: () => removerDaLista(item.id) }, "\u00D7"))))))),
                 React.createElement("div", { className: `mt-janela-wrap ${draggingJanelaId === 'livroRazao' ? 'dragging' : ''} ${dragOverJanelaId === 'livroRazao' && draggingJanelaId !== 'livroRazao' ? 'drag-over' : ''}`, "data-janela-id": "livroRazao", style: { order: ordemJanelas.indexOf('livroRazao') } },
                     renderJanelaHandle('livroRazao'),
                     React.createElement("h2", { className: "mt-section-title" }, "Livro Raz\u00E3o"),
@@ -6295,6 +6543,58 @@ function App() {
                                                 ". ",
                                                 p.texto)),
                                         protocoloConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerProtocolo(p.id) }, "\u00D7")))))))),
+                            React.createElement("div", { className: "mt-premio-secao", style: { marginTop: 10 } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                                    React.createElement("p", { className: "mt-premio-secao-titulo", style: { margin: 0 } }, "\uD83E\uDDEA Testes"),
+                                    React.createElement("button", { className: "mt-discreto-btn", onClick: () => setTesteConfigAberto((v) => !v), title: testeConfigAberto ? 'Fechar configurações' : 'Configurações (adicionar teste)' }, testeConfigAberto ? '×' : '⚙️')),
+                                testeConfigAberto && (React.createElement("div", { style: { marginTop: 8, paddingTop: 10, borderTop: '1px solid #f0efe9' } },
+                                    React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 6 } }, "Adicione um teste. Eles entram numerados na lista abaixo, na ordem em que forem criados. Com este painel aberto, cada teste ganha um \u270E para editar o texto j\u00E1 escrito, al\u00E9m do \u00D7 para apagar."),
+                                    React.createElement("div", { className: "mt-premio-saque-row" },
+                                        React.createElement("input", { className: "mt-nota-input", placeholder: "Texto do teste\u2026", value: testeNovoTexto, onChange: (e) => setTesteNovoTexto(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarTeste() }),
+                                        React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarTeste }, "Adicionar")))),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: testeConfigAberto ? 10 : 0 } },
+                                    React.createElement("button", { className: "mt-discreto-btn", onClick: () => setTesteExpandido((v) => !v), title: testeExpandido ? 'Ocultar testes' : 'Ver testes' }, testeExpandido ? '▲' : '▼'),
+                                    React.createElement("span", { style: { fontSize: 12, color: '#999' } },
+                                        "Testes",
+                                        psoTestes.length > 0 ? ` (${psoTestes.length})` : '')),
+                                testeExpandido && (React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
+                                    psoTestes.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum teste criado. Toque no \u2699\uFE0F para adicionar."),
+                                    psoTestes.map((t, i) => (React.createElement("div", { key: t.id, className: "mt-fixa-item", style: testeEditandoId === t.id ? { alignItems: 'flex-start' } : undefined }, testeEditandoId === t.id ? (React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                        React.createElement("textarea", { className: "mt-nota-input", value: testeEditTexto, onChange: (e) => setTesteEditTexto(e.target.value), rows: 3, style: { width: '100%', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }, autoFocus: true }),
+                                        React.createElement("div", { style: { display: 'flex', gap: 6, marginTop: 6 } },
+                                            React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarEdicaoTeste }, "\u2713 Salvar"),
+                                            React.createElement("button", { className: "mt-btn-sm", onClick: cancelarEdicaoTeste }, "Cancelar")))) : (React.createElement(React.Fragment, null,
+                                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                            React.createElement("span", { style: { fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } },
+                                                i + 1,
+                                                ". ",
+                                                t.texto)),
+                                        testeConfigAberto && (React.createElement("div", { style: { display: 'flex', gap: 4, flexShrink: 0 } },
+                                            React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoTeste(t), title: "Editar" }, "\u270E"),
+                                            React.createElement("button", { className: "mt-del", onClick: () => removerTeste(t.id) }, "\u00D7"))))))))))),
+                            React.createElement("div", { className: "mt-premio-secao", style: { marginTop: 10 } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                                    React.createElement("p", { className: "mt-premio-secao-titulo", style: { margin: 0 } }, "\u23F3 Contador Pso"),
+                                    React.createElement("button", { className: "mt-discreto-btn", onClick: () => setPsoContadorConfigAberto((v) => !v), title: psoContadorConfigAberto ? 'Fechar configurações' : 'Configurações do contador' }, psoContadorConfigAberto ? '×' : '⚙️')),
+                                (() => {
+                                    const diasRestantesNatural = diasRestantesPsoContador(psoContadorDias, psoContadorInicioISO);
+                                    const alertaAtivo = psoContadorDias != null && !psoContadorZerado && diasRestantesNatural === 0;
+                                    const diasExibidos = psoContadorZerado ? 0 : diasRestantesNatural;
+                                    return (React.createElement(React.Fragment, null,
+                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 8 } }, psoContadorDias == null ? (React.createElement("span", { style: { fontSize: 13, color: '#999' } }, "Nenhum contador configurado. Toque no \u2699\uFE0F para criar.")) : (React.createElement(React.Fragment, null,
+                                            React.createElement("span", { style: { fontSize: 32, fontWeight: 800, color: (alertaAtivo || psoContadorZerado) ? '#C0492E' : '#232323' } }, diasExibidos),
+                                            React.createElement("span", { style: { fontSize: 12, color: '#999' } }, diasExibidos === 1 ? 'dia restante' : 'dias restantes')))),
+                                        psoContadorDias != null && !psoContadorZerado && (React.createElement("div", { style: { display: 'flex', justifyContent: 'center', marginTop: 10 } },
+                                            React.createElement("button", { className: "mt-btn-sm primary", onClick: resetarPsoContador }, "\uD83D\uDD04 Reset"))),
+                                        alertaAtivo && (React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: '#C0492E', fontWeight: 700, marginTop: 8 } }, "\uD83D\uDEA8 Chegou no zero \u2014 alerta ativo na Janela de alertas at\u00E9 o Reset.")),
+                                        psoContadorZerado && (React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: '#999', marginTop: 8 } }, "Contador zerado. Toque no \u2699\uFE0F para criar uma nova contagem."))));
+                                })(),
+                                psoContadorConfigAberto && (React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: '1px solid #f0efe9' } },
+                                    React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 6 } }, "Defina em quantos dias o contador chega em zero. Ao chegar, o alerta \uD83D\uDEA8 Pso \uD83D\uDEA8 aparece em destaque, primeiro, na Janela de alertas, toda vez que o app for aberto \u2014 at\u00E9 voc\u00EA tocar em Reset. O Reset congela o contador em 0 (n\u00E3o reinicia sozinho); para contar de novo, defina uma nova quantidade de dias aqui."),
+                                    React.createElement("div", { className: "mt-premio-saque-row" },
+                                        React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "numeric", placeholder: "Dias (ex: 14)\u2026", value: psoContadorNovoValor, onChange: (e) => setPsoContadorNovoValor(e.target.value.replace(/\D/g, '')), onKeyDown: (e) => e.key === 'Enter' && definirPsoContador() }),
+                                        React.createElement("button", { className: "mt-btn-sm primary", onClick: definirPsoContador }, psoContadorDias != null ? 'Redefinir' : 'Criar')),
+                                    psoContadorDias != null && (React.createElement("button", { className: "mt-btn-sm", style: { marginTop: 8 }, onClick: apagarPsoContador }, "\uD83D\uDDD1\uFE0F Apagar contador"))))),
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
                                 React.createElement("button", { className: "mt-discreto-btn", onClick: () => setPsoExpandido((v) => !v), title: psoExpandido ? 'Ocultar registro' : 'Ver registro do Pso' }, psoExpandido ? '▲' : '▼'),
                                 React.createElement("span", { style: { fontSize: 12, color: '#999' } }, "Registro do Pso")),
@@ -6496,9 +6796,30 @@ function App() {
                                 React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: '1px solid #e7e5df' } },
                                     cats.length > 0 ? (React.createElement(React.Fragment, null,
                                         React.createElement("div", { className: "mt-cat-tabs" },
-                                            React.createElement("button", { className: `mt-cat-tab-btn ${listaMistaAberta ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, disabled: cats.reduce((acc, c) => acc + c.tarefas.length, 0) === 0, onClick: abrirListaMista, title: "Abre todos os itens de todas as categorias, misturados" }, "\uD83C\uDFB2 Aleat\u00F3rio"),
-                                            cats.map((c) => (React.createElement("button", { key: c.id, className: `mt-cat-tab-btn ${tabId === c.id ? 'ativo' : ''}`, style: { '--cor': c.cor }, onClick: () => { setCatTabSelecionada(c.id); setListaMistaAberta(false); } }, c.nome)))),
-                                        listaMistaAberta ? (React.createElement("div", { style: { marginTop: 12 } },
+                                            React.createElement("button", { className: `mt-cat-tab-btn ${listaMistaAberta ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, disabled: cats.reduce((acc, c) => acc + c.tarefas.length, 0) === 0, onClick: () => { abrirListaMista(); setMinhaListaModoAtivo(false); }, title: "Abre todos os itens de todas as categorias, misturados" }, "\uD83C\uDFB2 Aleat\u00F3rio"),
+                                            React.createElement("button", { className: `mt-cat-tab-btn ${minhaListaModoAtivo ? 'ativo' : ''}`, style: { '--cor': '#5B7C99' }, onClick: () => { setMinhaListaModoAtivo(true); setListaMistaAberta(false); }, title: "Tarefas sorteadas, aguardando ou j\u00E1 feitas" },
+                                                "\uD83D\uDCDD Minha lista",
+                                                lista.length > 0 ? ` (${lista.length})` : ''),
+                                            cats.map((c) => (React.createElement("button", { key: c.id, className: `mt-cat-tab-btn ${tabId === c.id ? 'ativo' : ''}`, style: { '--cor': c.cor }, onClick: () => { setCatTabSelecionada(c.id); setListaMistaAberta(false); setMinhaListaModoAtivo(false); } }, c.nome)))),
+                                        minhaListaModoAtivo ? (React.createElement("div", { style: { marginTop: 12 } },
+                                            React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end' } },
+                                                React.createElement("button", { className: "mt-config-fixas-btn", onClick: () => setMostrarConfigLista((v) => !v), title: mostrarConfigLista ? 'Fechar configurações' : 'Configurações da lista' }, mostrarConfigLista ? '×' : '⚙️')),
+                                            mostrarConfigLista && (React.createElement("div", { style: { margin: '10px 0' } },
+                                                React.createElement(BotaoDesfazer, { janela: "lista" }))),
+                                            lista.length === 0 && React.createElement("p", { className: "mt-empty" }, "Sorteie uma tarefa e toque em \"Vou fazer\" pra ela aparecer aqui."),
+                                            React.createElement("div", { className: "mt-lista-scroll" }, [...lista]
+                                                .sort((a, b) => (a.status === 'aguardando' && b.status !== 'aguardando' ? -1 : a.status !== 'aguardando' && b.status === 'aguardando' ? 1 : 0))
+                                                .map((item) => (React.createElement("div", { className: "mt-lista-item", key: item.id },
+                                                React.createElement("span", { className: `mt-lista-texto ${item.status === 'feito' ? 'feito' : ''}` }, item.texto),
+                                                item.premiacao > 0 && (React.createElement("span", { style: { fontSize: 12, flexShrink: 0 } }, [1, 2, 3].map((n) => n <= item.premiacao ? '⭐️' : '').join(''))),
+                                                item.tempoGasto != null && (React.createElement("span", { className: "mt-tempo-badge", style: { '--cor': item.cor } },
+                                                    "\u23F1 ",
+                                                    formatTempo(item.tempoGasto))),
+                                                React.createElement("button", { className: `mt-lista-status ${item.status}`, onClick: () => (item.status === 'aguardando' && item.tempoGasto != null ? retomarContador(item) : alternarStatusLista(item.id)) }, item.status === 'feito'
+                                                    ? `Feito · ${new Date(item.feitoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
+                                                    : 'Aguardando'),
+                                                React.createElement("button", { className: "mt-premio-btn", onClick: () => confirmarPremiacao(item), title: "Converter em tempo (Premia\u00E7\u00E3o)", "aria-label": "Premiar" }, "\uD83C\uDFC6"),
+                                                React.createElement("button", { className: "mt-del", onClick: () => removerDaLista(item.id) }, "\u00D7"))))))) : listaMistaAberta ? (React.createElement("div", { style: { marginTop: 12 } },
                                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 } },
                                                 React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0, color: '#8E6BAE' } },
                                                     "Misturado \u00B7 ",
@@ -6671,7 +6992,15 @@ function App() {
                                         position: 'absolute', top: 3, left: modoReorganizarJanelas ? 23 : 3,
                                         width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
                                         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                                    } }))))))))),
+                                    } }))),
+                        React.createElement("div", { style: { padding: '4px 0 0' } },
+                            React.createElement("p", { className: "mt-config-item-label", style: { marginBottom: 2 } }, "\u2601\uFE0F Armazenamento de m\u00EDdia (Cloudflare R2)"),
+                            React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 8 } }, "Endere\u00E7o e senha do Worker que guarda fotos e v\u00EDdeos. \u00C9 o mesmo Worker usado pelo Cofre de Notas e pelo Baralho de Contatos \u2014 configure uma vez aqui e os tr\u00EAs apps j\u00E1 enxergam (mesmo localStorage, mesma origem do GitHub Pages)."),
+                            React.createElement("input", { className: "mt-input", placeholder: "URL do Worker (ex: https://cherubion-media.SEUUSUARIO.workers.dev)", value: r2UrlDraft, onChange: (e) => setR2UrlDraft(e.target.value), style: { marginBottom: 6 } }),
+                            React.createElement("input", { className: "mt-input", type: "password", placeholder: "Token de upload", value: r2TokenDraft, onChange: (e) => setR2TokenDraft(e.target.value), style: { marginBottom: 6 } }),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                                React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarConfigR2Click }, "Salvar"),
+                                r2ConfigMsg && React.createElement("span", { style: { fontSize: 12, color: '#3E8E5A', fontWeight: 700 } }, r2ConfigMsg))))))))),
         programaAberto && (React.createElement("div", { className: "mt-backdrop", onClick: fecharPrograma },
             React.createElement("div", { className: "mt-programa-card", onClick: (e) => e.stopPropagation() },
                 React.createElement("button", { className: "mt-reveal-close", onClick: fecharPrograma, "aria-label": "fechar" }, "\u00D7"),
@@ -6717,10 +7046,9 @@ function App() {
                 transform: `rotate(${p.rotacao}deg)`,
             } })))))));
 }
-// ---------- Montagem ----------
-const raiz = ReactDOM.createRoot(document.getElementById('root'));
-raiz.render(React.createElement(App));
 
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
 </script>
 </body>
 </html>
