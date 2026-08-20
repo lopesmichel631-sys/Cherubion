@@ -17328,6 +17328,72 @@ const VARS = ["nome", "raca", "idade", "local", "distancia", "distanciakm"];
 const CHAVE_GH_TOKEN = "meg:ghtoken";
 const CHAVE_GH_GIST = "meg:ghgist";
 const GIST_ARQUIVO = "perfis-meg.json";
+/* ── upload de mídia (Cloudflare R2, Worker compartilhado com o resto do conjunto Cherubion) ── */
+const CHAVE_R2_URL = "cherubion:r2workerurl";
+const CHAVE_R2_TOKEN = "cherubion:r2token";
+const lerConfigR2 = () => {
+    try {
+        return {
+            url: (window.localStorage.getItem(CHAVE_R2_URL) || "").replace(/\/+$/, ""),
+            token: window.localStorage.getItem(CHAVE_R2_TOKEN) || "",
+        };
+    }
+    catch (e) {
+        return { url: "", token: "" };
+    }
+};
+/* só para imagens — reduz para no máx. 1280px de largura, JPEG 75% antes de subir pro R2 */
+const comprimirImagemParaUpload = (file) => new Promise((resolve, reject) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+        const MAX_LARGURA = 1280;
+        let { width, height } = img;
+        if (width > MAX_LARGURA) {
+            height = Math.round(height * (MAX_LARGURA / width));
+            width = MAX_LARGURA;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+            URL.revokeObjectURL(objUrl);
+            if (blob)
+                resolve(blob);
+            else
+                reject(new Error("falha ao comprimir a imagem"));
+        }, "image/jpeg", 0.75);
+    };
+    img.onerror = () => {
+        URL.revokeObjectURL(objUrl);
+        reject(new Error("falha ao carregar a imagem"));
+    };
+    img.src = objUrl;
+});
+const subirArquivoParaR2 = async (blob, nomeOriginal) => {
+    const { url, token } = lerConfigR2();
+    if (!url || !token)
+        throw new Error("sem-config");
+    const ext = (String(nomeOriginal || "").split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) ||
+        "bin";
+    const nomeArquivo = Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + ext;
+    const resp = await fetch(url + "/upload", {
+        method: "POST",
+        headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": blob.type || "application/octet-stream",
+            "X-Filename": nomeArquivo,
+        },
+        body: blob,
+    });
+    if (!resp.ok)
+        throw new Error("upload falhou (" + resp.status + ")");
+    const dados = await resp.json();
+    if (!dados || !dados.url)
+        throw new Error("resposta do Worker sem url");
+    return dados.url;
+};
 const buscarGist = async (token, gistId) => {
     const r = await fetch("https://api.github.com/gists/" + gistId, {
         headers: { Authorization: "token " + token, Accept: "application/vnd.github+json" },
@@ -17384,6 +17450,7 @@ const blankCard = () => ({
     criadoEm: Date.now(),
     farol: "",
     foto: "",
+    video: "",
     nome: "",
     raca: "",
     idade: "",
@@ -19357,7 +19424,10 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
     const [novaTag, setNovaTag] = (0, react_1.useState)("");
     const [verFoto, setVerFoto] = (0, react_1.useState)(false);
     const [fotoErro, setFotoErro] = (0, react_1.useState)("");
+    const [videoErro, setVideoErro] = (0, react_1.useState)("");
+    const [subindoVideo, setSubindoVideo] = (0, react_1.useState)(false);
     const fotoRef = (0, react_1.useRef)(null);
+    const videoRef = (0, react_1.useRef)(null);
     const trocarFoto = async (e) => {
         const arquivo = e.target.files && e.target.files[0];
         e.target.value = "";
@@ -19365,11 +19435,42 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
             return;
         try {
             setFotoErro("");
-            const dataUrl = await comprimirFoto(arquivo);
-            onPatch("foto", dataUrl);
+            const { url, token } = lerConfigR2();
+            if (url && token) {
+                const blob = await comprimirImagemParaUpload(arquivo);
+                const urlSubida = await subirArquivoParaR2(blob, arquivo.name);
+                onPatch("foto", urlSubida);
+            }
+            else {
+                const dataUrl = await comprimirFoto(arquivo);
+                onPatch("foto", dataUrl);
+            }
         }
         catch (err) {
             setFotoErro((err && err.message) || "não consegui usar essa foto");
+        }
+    };
+    const trocarVideo = async (e) => {
+        const arquivo = e.target.files && e.target.files[0];
+        e.target.value = "";
+        if (!arquivo)
+            return;
+        setVideoErro("");
+        const { url, token } = lerConfigR2();
+        if (!url || !token) {
+            setVideoErro("configure o armazenamento de mídia (Minha Tela) antes de anexar vídeo");
+            return;
+        }
+        try {
+            setSubindoVideo(true);
+            const urlSubida = await subirArquivoParaR2(arquivo, arquivo.name);
+            onPatch("video", urlSubida);
+        }
+        catch (err) {
+            setVideoErro((err && err.message) || "não consegui subir esse vídeo");
+        }
+        finally {
+            setSubindoVideo(false);
         }
     };
     const temDating = CAMPOS_DATING.some(([k]) => ((carta.dating || {})[k] || "").trim());
@@ -19427,6 +19528,14 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                         carta.foto && (react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatch("foto", "") }, "remover"))),
                     fotoErro && react_1.default.createElement("p", { className: "bc-ocrstatus bc-ocrstatus-erro" }, fotoErro),
                     react_1.default.createElement("input", { ref: fotoRef, type: "file", accept: "image/*", className: "bc-file", onChange: trocarFoto, "aria-label": "Escolher foto do perfil" })),
+                react_1.default.createElement("div", { className: "bc-video-wrap" },
+                    carta.video ? (react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("video", { className: "bc-video-player", src: carta.video, controls: true, playsInline: true }),
+                        react_1.default.createElement("div", { className: "bc-foto-acoes" },
+                            react_1.default.createElement("button", { className: "bc-link", onClick: () => videoRef.current && videoRef.current.click() }, "trocar v\u00EDdeo"),
+                            react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatch("video", "") }, "remover")))) : (react_1.default.createElement("button", { type: "button", className: "bc-link", onClick: () => videoRef.current && videoRef.current.click(), disabled: subindoVideo }, subindoVideo ? "enviando vídeo…" : "+ vídeo")),
+                    videoErro && react_1.default.createElement("p", { className: "bc-ocrstatus bc-ocrstatus-erro" }, videoErro),
+                    react_1.default.createElement("input", { ref: videoRef, type: "file", accept: "video/*", className: "bc-file", onChange: trocarVideo, "aria-label": "Escolher v\u00EDdeo do contato" })),
                 react_1.default.createElement("label", { className: "bc-nome-wrap" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Nome"),
                     react_1.default.createElement("input", { className: "bc-nome", value: carta.nome, onChange: (e) => onPatch("nome", e.target.value) })),
@@ -20460,6 +20569,9 @@ const CSS = `
 .bc-foto-img{width:100%;height:100%;object-fit:cover;display:block;}
 .bc-foto-placeholder{font-size:10px;letter-spacing:.08em;color:var(--soft);}
 .bc-foto-acoes{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
+.bc-video-wrap{margin-top:10px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
+.bc-video-player{width:100%;max-width:280px;border-radius:6px;border:1px solid var(--rule);background:#000;}
+
 .bc-fotoview{position:fixed;inset:0;z-index:80;background:rgba(8,6,5,.92);display:flex;
   align-items:center;justify-content:center;padding:24px;cursor:zoom-out;}
 .bc-fotoview img{max-width:100%;max-height:100%;border-radius:6px;cursor:default;
