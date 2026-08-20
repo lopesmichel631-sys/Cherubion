@@ -18513,6 +18513,7 @@ function BaralhoDeContatos() {
     const [erro, setErro] = (0, react_1.useState)(false);
     const [novaId, setNovaId] = (0, react_1.useState)(null);
     const [exportadoEm, setExportadoEm] = (0, react_1.useState)(null);
+    const [r2Check, setR2Check] = (0, react_1.useState)(0);
     const timer = (0, react_1.useRef)(null);
     const fileRef = (0, react_1.useRef)(null);
     const dadosRef = (0, react_1.useRef)({ cards: [], sources: BASE_SOURCES, msgs: [], minhaCidade: "" });
@@ -18931,7 +18932,16 @@ function BaralhoDeContatos() {
                             nuvemStatus ? " · " + nuvemStatus : ""),
                         react_1.default.createElement("button", { className: "bc-backupbtn", onClick: exportar }, exportadoEm ? "✓ backup salvo" : "⬇ Salvar backup"),
                         react_1.default.createElement("button", { className: "bc-link", onClick: () => fileRef.current && fileRef.current.click() }, "Importar backup"),
-                        react_1.default.createElement("input", { ref: fileRef, type: "file", accept: "application/json", className: "bc-file", onChange: importar, "aria-label": "Importar backup" }))))),
+                        react_1.default.createElement("input", { ref: fileRef, type: "file", accept: "application/json", className: "bc-file", onChange: importar, "aria-label": "Importar backup" })),
+                    react_1.default.createElement("div", { className: "bc-r2status" },
+                        (() => {
+                            const cfg = lerConfigR2();
+                            const ok = !!(cfg.url && cfg.token);
+                            return (react_1.default.createElement("span", { className: ok ? "bc-r2ok" : "bc-r2off" }, ok
+                                ? "☁ mídia: R2 configurado (" + cfg.url.replace(/^https?:\/\//, "").slice(0, 28) + ")"
+                                : "☁ mídia: não configurado — fotos ficam salvas localmente"));
+                        })(),
+                        react_1.default.createElement("button", { className: "bc-link", onClick: () => setR2Check((n) => n + 1) }, "verificar de novo"))))),
         nuvemAberta && (react_1.default.createElement(ModalNuvem, { status: nuvemStatus, onVerificar: () => sincronizarNuvem(true), onFechar: () => setNuvemAberta(false) })),
         !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio }))));
 }
@@ -20239,6 +20249,10 @@ const CSS = `
 .bc-backupbtn:hover{filter:brightness(1.08);}
 .bc-backupbtn:active{transform:translateY(1px);}
 .bc-file{display:none;}
+.bc-r2status{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:2px;}
+.bc-r2status .bc-link{font-size:9px;color:rgba(251,247,238,.35);}
+.bc-r2ok{font-size:9px;letter-spacing:.04em;color:#8FCB9B;}
+.bc-r2off{font-size:9px;letter-spacing:.04em;color:rgba(251,247,238,.45);}
 
 /* minha cidade */
 .bc-homecity{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:14px;}
