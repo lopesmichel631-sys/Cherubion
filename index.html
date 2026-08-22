@@ -695,17 +695,23 @@ const criarSubarvoreNoObsidian = (notesEntrada, pastaCherubion) => {
     }
     return notes;
 };
-// apaga (recursivamente) a nota de uma pasta e todas as notas das subpastas dela no Obsidian
-const apagarSubarvoreDoObsidian = (notesEntrada, id) => {
+// apaga (recursivamente) a nota de uma pasta e todas as notas das subpastas dela no Obsidian.
+// "visitados" corta ciclos: se duas notas se linkam mutuamente (A -> B -> A), sem isso a
+// recursão nunca para e estoura a pilha de chamadas (RangeError: Maximum call stack size exceeded).
+const apagarSubarvoreDoObsidian = (notesEntrada, id, visitados) => {
     let notes = notesEntrada;
     const nota = notes[id];
     if (!nota)
         return notes;
+    const vistos = visitados || new Set();
+    if (vistos.has(id))
+        return notes;
+    vistos.add(id);
     const porTitulo = obsidianPorTitulo(notes);
     linksUnicosDoTexto(nota.content).forEach((titulo) => {
         const alvo = porTitulo[titulo.toLowerCase()];
-        if (alvo)
-            notes = apagarSubarvoreDoObsidian(notes, alvo.id);
+        if (alvo && !vistos.has(alvo.id))
+            notes = apagarSubarvoreDoObsidian(notes, alvo.id, vistos);
     });
     const resto = { ...notes };
     delete resto[id];
