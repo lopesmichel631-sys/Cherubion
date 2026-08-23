@@ -17296,6 +17296,16 @@ const C = {
     red: "#B3122B",
 };
 const GLYPHS = ["♠", "♥", "♦", "♣", "★", "✚", "◆", "❋"];
+const NAIPE_LEGENDA = [
+    ["♠", "FC high chance"],
+    ["♥", "Já FC"],
+    ["♦", "Raridade Invista"],
+    ["♣", "Ver se vale a pena"],
+    ["★", "Longe"],
+    ["✚", "Just Message Test"],
+    ["◆", "Raridade Far"],
+    ["❋", "Indefinido ainda"],
+];
 const glyphFor = (i) => GLYPHS[i % GLYPHS.length];
 const glyphIsRed = (i) => ["♥", "♦"].includes(glyphFor(i));
 /* símbolo de uma fonte: usa a escolha manual (sourceGlyphs) se existir, senão cai no automático por posição */
@@ -17451,6 +17461,7 @@ const blankCard = () => ({
     farol: "",
     foto: "",
     video: "",
+    album: [],
     nome: "",
     raca: "",
     idade: "",
@@ -18641,6 +18652,7 @@ function BaralhoDeContatos() {
     /* ── perfis (com foto) chegando pela nuvem: Extrator do Android -> Gist -> Meg ── */
     const [nuvemStatus, setNuvemStatus] = (0, react_1.useState)("");
     const [nuvemAberta, setNuvemAberta] = (0, react_1.useState)(false);
+    const [configAberta, setConfigAberta] = (0, react_1.useState)(false);
     const sincronizarNuvem = async (manual) => {
         let token = "", gistId = "";
         try {
@@ -18869,6 +18881,9 @@ function BaralhoDeContatos() {
         ? { ...c, fcskill: [{ ...entrada, id: uid(), data: Date.now() }, ...(c.fcskill || [])] }
         : c));
     const removerFC = (cardId, fcId) => setCards((cs) => cs.map((c) => c.id === cardId ? { ...c, fcskill: (c.fcskill || []).filter((f) => f.id !== fcId) } : c));
+    const editarFC = (cardId, fcId, patch) => setCards((cs) => cs.map((c) => c.id === cardId
+        ? { ...c, fcskill: (c.fcskill || []).map((f) => (f.id === fcId ? { ...f, ...patch } : f)) }
+        : c));
     const lancar = (cardId, tipo, qtd, comentario) => setCards((cs) => cs.map((c) => c.id === cardId
         ? {
             ...c,
@@ -18895,13 +18910,8 @@ function BaralhoDeContatos() {
         react_1.default.createElement("datalist", { id: "bc-cidades" }, listaCidades.map((nome) => (react_1.default.createElement("option", { key: nome, value: nome })))),
         react_1.default.createElement("header", { className: "bc-head" },
             react_1.default.createElement("div", null,
-                react_1.default.createElement("p", { className: "bc-eyebrow" }, "Gerenciador de contatos \u00B7 sul da Calif\u00F3rnia"),
-                react_1.default.createElement("h1", { className: "bc-title" }, "Baralho"),
-                react_1.default.createElement("div", { className: "bc-homecity" },
-                    react_1.default.createElement("label", { className: "bc-homefield" },
-                        react_1.default.createElement("span", { className: "bc-lbl bc-lbl-dark" }, "Minha cidade"),
-                        react_1.default.createElement("input", { className: "bc-homeinput", value: minhaCidade, list: "bc-cidades", onChange: (e) => setMinhaCidade(e.target.value), placeholder: "Sua cidade", "aria-label": "Minha cidade" })),
-                    react_1.default.createElement("span", { className: temCidade && !chaveMinha ? "bc-homestatus bc-homestatus-erro" : "bc-homestatus" }, statusOrigem))),
+                react_1.default.createElement("p", { className: "bc-eyebrow" }, "Gerenciador de contatos"),
+                react_1.default.createElement("h1", { className: "bc-title" }, "Baralho")),
             react_1.default.createElement("div", { className: "bc-head-right" },
                 react_1.default.createElement("nav", { className: "bc-tabs" },
                     react_1.default.createElement("button", { className: tela === "baralho" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("baralho") },
@@ -18917,40 +18927,43 @@ function BaralhoDeContatos() {
                     react_1.default.createElement("button", { className: tela === "razao" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("razao") },
                         "Raz\u00E3o ",
                         react_1.default.createElement("em", null, cards.reduce((n, c) => n + (c.fcskill || []).length, 0)))),
-                react_1.default.createElement("div", { className: "bc-saveblock" },
-                    react_1.default.createElement("span", { className: erro ? "bc-status bc-status-erro" : "bc-status" }, erro
-                        ? "não foi possível salvar"
-                        : !saved
-                            ? "salvando…"
-                            : salvoEm
-                                ? "salvo às " +
-                                    new Date(salvoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-                                : "salvo"),
-                    react_1.default.createElement("div", { className: "bc-backup" },
-                        react_1.default.createElement("button", { className: "bc-link", onClick: () => setNuvemAberta(true) },
-                            "\u2601 Nuvem",
-                            nuvemStatus ? " · " + nuvemStatus : ""),
-                        react_1.default.createElement("button", { className: "bc-backupbtn", onClick: exportar }, exportadoEm ? "✓ backup salvo" : "⬇ Salvar backup"),
-                        react_1.default.createElement("button", { className: "bc-link", onClick: () => fileRef.current && fileRef.current.click() }, "Importar backup"),
-                        react_1.default.createElement("input", { ref: fileRef, type: "file", accept: "application/json", className: "bc-file", onChange: importar, "aria-label": "Importar backup" })),
-                    react_1.default.createElement("div", { className: "bc-r2status" },
-                        (() => {
-                            const cfg = lerConfigR2();
-                            const ok = !!(cfg.url && cfg.token);
-                            return (react_1.default.createElement("span", { className: ok ? "bc-r2ok" : "bc-r2off" }, ok
-                                ? "☁ mídia: R2 configurado (" + cfg.url.replace(/^https?:\/\//, "").slice(0, 28) + ")"
-                                : "☁ mídia: não configurado — fotos ficam salvas localmente"));
-                        })(),
-                        react_1.default.createElement("button", { className: "bc-link", onClick: () => setR2Check((n) => n + 1) }, "verificar de novo"))))),
+                react_1.default.createElement("button", { className: "bc-configbtn", onClick: () => setConfigAberta(true), "aria-label": "Configura\u00E7\u00F5es" }, "\u2699 Configura\u00E7\u00F5es"))),
         nuvemAberta && (react_1.default.createElement(ModalNuvem, { status: nuvemStatus, onVerificar: () => sincronizarNuvem(true), onFechar: () => setNuvemAberta(false) })),
-        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio }))));
+        configAberta && (react_1.default.createElement(ModalConfig, { minhaCidade: minhaCidade, onMudarCidade: setMinhaCidade, temCidade: temCidade, chaveMinha: chaveMinha, statusOrigem: statusOrigem, onFechar: () => setConfigAberta(false) })),
+        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
+        react_1.default.createElement("footer", { className: "bc-footer" },
+            react_1.default.createElement("span", { className: erro ? "bc-status bc-status-erro" : "bc-status" }, erro
+                ? "não foi possível salvar"
+                : !saved
+                    ? "salvando…"
+                    : salvoEm
+                        ? "salvo às " +
+                            new Date(salvoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+                        : "salvo"),
+            react_1.default.createElement("div", { className: "bc-backup" },
+                react_1.default.createElement("button", { className: "bc-link", onClick: () => setNuvemAberta(true) },
+                    "\u2601 Nuvem",
+                    nuvemStatus ? " · " + nuvemStatus : ""),
+                react_1.default.createElement("button", { className: "bc-backupbtn", onClick: exportar }, exportadoEm ? "✓ backup salvo" : "⬇ Salvar backup"),
+                react_1.default.createElement("button", { className: "bc-link", onClick: () => fileRef.current && fileRef.current.click() }, "Importar backup"),
+                react_1.default.createElement("input", { ref: fileRef, type: "file", accept: "application/json", className: "bc-file", onChange: importar, "aria-label": "Importar backup" })),
+            react_1.default.createElement("div", { className: "bc-r2status" },
+                (() => {
+                    const cfg = lerConfigR2();
+                    const ok = !!(cfg.url && cfg.token);
+                    return (react_1.default.createElement("span", { className: ok ? "bc-r2ok" : "bc-r2off" }, ok
+                        ? "☁ mídia: R2 configurado (" + cfg.url.replace(/^https?:\/\//, "").slice(0, 28) + ")"
+                        : "☁ mídia: não configurado — fotos ficam salvas localmente"));
+                })(),
+                react_1.default.createElement("button", { className: "bc-link", onClick: () => setR2Check((n) => n + 1) }, "verificar de novo")))));
 }
 /* ── tela 1: baralho ───────────────────────────────────── */
 const valorOrdem = (m) => (m.estado === "mesma" ? 0 : m.estado === "ok" ? m.mi : Infinity);
-function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, novaId, medir, onNova, onImportarPerfil, onPatch, onPatchDating, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
+function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, novaId, medir, onNova, onImportarPerfil, onPatch, onPatchDating, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, onEditarFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
     const [busca, setBusca] = (0, react_1.useState)("");
     const [aberta, setAberta] = (0, react_1.useState)(novaId || null);
     const [lendo, setLendo] = (0, react_1.useState)(false);
+    const [pesquisaAberta, setPesquisaAberta] = (0, react_1.useState)(false);
     (0, react_1.useEffect)(() => {
         if (novaId)
             setAberta(novaId);
@@ -19004,39 +19017,42 @@ function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGl
         return lista;
     }, [cards, busca, filtro, filtroRaca, filtroFarol, ordem, raio, medir]);
     return (react_1.default.createElement(react_1.default.Fragment, null,
-        react_1.default.createElement("div", { className: "bc-tools" },
-            react_1.default.createElement("input", { className: "bc-search", value: busca, onChange: (e) => setBusca(e.target.value), placeholder: "Buscar por nome, idade, ra\u00E7a, local ou notas", "aria-label": "Buscar cartas" }),
-            react_1.default.createElement("div", { className: "bc-filters" },
-                react_1.default.createElement(Chip, { ativo: filtro === "todas", onClick: () => setFiltro("todas") }, "Todas"),
-                sources.map((s, i) => {
-                    const g = glyphDaFonte(s, i, sourceGlyphs);
-                    return (react_1.default.createElement(Chip, { key: s, ativo: filtro === s, onClick: () => setFiltro(s) },
-                        react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-g bc-g-red" : "bc-g" }, g),
-                        s));
-                })),
+        react_1.default.createElement("div", { className: "bc-tools bc-tools-topo" },
             react_1.default.createElement("button", { className: "bc-new", onClick: onNova }, "Nova carta"),
-            react_1.default.createElement("button", { className: "bc-new bc-new-alt", onClick: () => setLendo(true) }, "Ler perfil")),
-        react_1.default.createElement("div", { className: "bc-tools bc-tools2" },
-            react_1.default.createElement("div", { className: "bc-filters" },
-                react_1.default.createElement(Chip, { ativo: filtroRaca === "todas", onClick: () => setFiltroRaca("todas") }, "Todas ra\u00E7as"),
-                RACAS.map((r) => (react_1.default.createElement(Chip, { key: r, ativo: filtroRaca === r, onClick: () => setFiltroRaca(filtroRaca === r ? "todas" : r) }, r))),
-                react_1.default.createElement(Chip, { ativo: filtroRaca === "outros", onClick: () => setFiltroRaca(filtroRaca === "outros" ? "todas" : "outros") }, "Outros")),
-            react_1.default.createElement("div", { className: "bc-filters" },
-                react_1.default.createElement(Chip, { ativo: filtroFarol === "todos", onClick: () => setFiltroFarol("todos") }, "Todas cores"),
-                FAROIS.map(([chave, rotulo, cor, dica]) => (react_1.default.createElement(Chip, { key: chave, ativo: filtroFarol === chave, onClick: () => setFiltroFarol(filtroFarol === chave ? "todos" : chave) },
-                    react_1.default.createElement("span", { className: "bc-chipluz", style: { background: cor }, title: dica }),
-                    rotulo)))),
-            react_1.default.createElement("div", { className: "bc-filters" },
-                react_1.default.createElement(Chip, { ativo: ordem === "recentes", onClick: () => setOrdem(ordem === "recentes" ? "nenhuma" : "recentes") }, "Recentes"),
-                react_1.default.createElement(Chip, { ativo: ordem === "antigos", onClick: () => setOrdem(ordem === "antigos" ? "nenhuma" : "antigos") }, "Antigos"),
-                react_1.default.createElement(Chip, { ativo: ordem === "proximos", onClick: () => setOrdem(ordem === "proximos" ? "nenhuma" : "proximos") }, "Mais pr\u00F3ximos"),
-                react_1.default.createElement("label", { className: "bc-raio" },
-                    "at\u00E9",
-                    react_1.default.createElement("input", { className: "bc-raioinput", value: raio, inputMode: "numeric", onChange: (e) => setRaio(e.target.value.replace(/[^\d]/g, "").slice(0, 4)), placeholder: "\u2014", "aria-label": "Raio m\u00E1ximo em milhas" }),
-                    "mi"))),
+            react_1.default.createElement("button", { className: "bc-new bc-new-alt", onClick: () => setLendo(true) }, "Ler perfil"),
+            react_1.default.createElement("button", { className: pesquisaAberta ? "bc-new bc-new-alt bc-pesquisabtn-on" : "bc-new bc-new-alt", onClick: () => setPesquisaAberta((v) => !v), "aria-expanded": pesquisaAberta }, pesquisaAberta ? "Pesquisa ▲" : "Pesquisa")),
+        pesquisaAberta && (react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("div", { className: "bc-tools" },
+                react_1.default.createElement("input", { className: "bc-search", value: busca, onChange: (e) => setBusca(e.target.value), placeholder: "Buscar por nome, idade, ra\u00E7a, local ou notas", "aria-label": "Buscar cartas" }),
+                react_1.default.createElement("div", { className: "bc-filters" },
+                    react_1.default.createElement(Chip, { ativo: filtro === "todas", onClick: () => setFiltro("todas") }, "Todas"),
+                    sources.map((s, i) => {
+                        const g = glyphDaFonte(s, i, sourceGlyphs);
+                        return (react_1.default.createElement(Chip, { key: s, ativo: filtro === s, onClick: () => setFiltro(s) },
+                            react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-g bc-g-red" : "bc-g" }, g),
+                            s));
+                    }))),
+            react_1.default.createElement("div", { className: "bc-tools bc-tools2" },
+                react_1.default.createElement("div", { className: "bc-filters" },
+                    react_1.default.createElement(Chip, { ativo: filtroRaca === "todas", onClick: () => setFiltroRaca("todas") }, "Todas ra\u00E7as"),
+                    RACAS.map((r) => (react_1.default.createElement(Chip, { key: r, ativo: filtroRaca === r, onClick: () => setFiltroRaca(filtroRaca === r ? "todas" : r) }, r))),
+                    react_1.default.createElement(Chip, { ativo: filtroRaca === "outros", onClick: () => setFiltroRaca(filtroRaca === "outros" ? "todas" : "outros") }, "Outros")),
+                react_1.default.createElement("div", { className: "bc-filters" },
+                    react_1.default.createElement(Chip, { ativo: filtroFarol === "todos", onClick: () => setFiltroFarol("todos") }, "Todas cores"),
+                    FAROIS.map(([chave, rotulo, cor, dica]) => (react_1.default.createElement(Chip, { key: chave, ativo: filtroFarol === chave, onClick: () => setFiltroFarol(filtroFarol === chave ? "todos" : chave) },
+                        react_1.default.createElement("span", { className: "bc-chipluz", style: { background: cor }, title: dica }),
+                        rotulo)))),
+                react_1.default.createElement("div", { className: "bc-filters" },
+                    react_1.default.createElement(Chip, { ativo: ordem === "recentes", onClick: () => setOrdem(ordem === "recentes" ? "nenhuma" : "recentes") }, "Recentes"),
+                    react_1.default.createElement(Chip, { ativo: ordem === "antigos", onClick: () => setOrdem(ordem === "antigos" ? "nenhuma" : "antigos") }, "Antigos"),
+                    react_1.default.createElement(Chip, { ativo: ordem === "proximos", onClick: () => setOrdem(ordem === "proximos" ? "nenhuma" : "proximos") }, "Mais pr\u00F3ximos"),
+                    react_1.default.createElement("label", { className: "bc-raio" },
+                        "at\u00E9",
+                        react_1.default.createElement("input", { className: "bc-raioinput", value: raio, inputMode: "numeric", onChange: (e) => setRaio(e.target.value.replace(/[^\d]/g, "").slice(0, 4)), placeholder: "\u2014", "aria-label": "Raio m\u00E1ximo em milhas" }),
+                        "mi"))))),
         visiveis.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty" }, cards.length === 0
             ? "O baralho está vazio. Crie a primeira carta para começar a preencher."
-            : "Nenhuma carta corresponde aos filtros.")) : (react_1.default.createElement("div", { className: "bc-lista" }, visiveis.map((c) => aberta === c.id ? (react_1.default.createElement(Carta, { key: c.id, carta: c, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: onCiclarGlyph, onEscolherGlyph: onEscolherGlyph, nova: c.id === novaId, medida: medir(c.local), onFechar: () => setAberta(null), onPatch: (campo, v) => onPatch(c.id, campo, v), onPatchDating: (campo, v) => onPatchDating(c.id, campo, v), onRemove: () => onRemove(c.id), onLancar: (tipo, qtd, com) => onLancar(c.id, tipo, qtd, com), onRemoverLancamento: (lid) => onRemoverLancamento(c.id, lid), onRegistrarDating: () => onRegistrarDating(c.id), onRegistrarFC: (entrada) => onRegistrarFC(c.id, entrada), onRemoverFC: (fid) => onRemoverFC(c.id, fid), acoes: acoes, onCriarAcao: onCriarAcao, onRemoverAcao: onRemoverAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: onValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: onCriarBotaoInvest, onRemoverBotaoInvest: onRemoverBotaoInvest, onCriarCategoria: onCriarCategoria, onRemoverCategoria: onRemoverCategoria })) : (react_1.default.createElement(Linha, { key: c.id, carta: c, sources: sources, sourceGlyphs: sourceGlyphs, onAbrir: () => setAberta(c.id) }))))),
+            : "Nenhuma carta corresponde aos filtros.")) : (react_1.default.createElement("div", { className: "bc-lista" }, visiveis.map((c) => aberta === c.id ? (react_1.default.createElement(Carta, { key: c.id, carta: c, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: onCiclarGlyph, onEscolherGlyph: onEscolherGlyph, nova: c.id === novaId, medida: medir(c.local), onFechar: () => setAberta(null), onPatch: (campo, v) => onPatch(c.id, campo, v), onPatchDating: (campo, v) => onPatchDating(c.id, campo, v), onRemove: () => onRemove(c.id), onLancar: (tipo, qtd, com) => onLancar(c.id, tipo, qtd, com), onRemoverLancamento: (lid) => onRemoverLancamento(c.id, lid), onRegistrarDating: () => onRegistrarDating(c.id), onRegistrarFC: (entrada) => onRegistrarFC(c.id, entrada), onRemoverFC: (fid) => onRemoverFC(c.id, fid), onEditarFC: (fid, patch) => onEditarFC(c.id, fid, patch), acoes: acoes, onCriarAcao: onCriarAcao, onRemoverAcao: onRemoverAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: onValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: onCriarBotaoInvest, onRemoverBotaoInvest: onRemoverBotaoInvest, onCriarCategoria: onCriarCategoria, onRemoverCategoria: onRemoverCategoria })) : (react_1.default.createElement(Linha, { key: c.id, carta: c, sources: sources, sourceGlyphs: sourceGlyphs, onAbrir: () => setAberta(c.id) }))))),
         lendo && (react_1.default.createElement(LeitorPerfil, { onFechar: () => setLendo(false), onCriar: (dados) => {
                 onImportarPerfil(dados);
                 setLendo(false);
@@ -19232,6 +19248,22 @@ function LeitorPerfil({ onFechar, onCriar }) {
                 react_1.default.createElement("button", { className: "bc-link", onClick: onFechar }, "Cancelar")))));
 }
 /* ── nuvem: liga o Meg a um Gist privado onde o Extrator do Android deixa os perfis ── */
+function ModalConfig({ minhaCidade, onMudarCidade, temCidade, chaveMinha, statusOrigem, onFechar }) {
+    return (react_1.default.createElement("div", { className: "bc-modal", role: "dialog", "aria-label": "Configura\u00E7\u00F5es" },
+        react_1.default.createElement("div", { className: "bc-modalbox" },
+            react_1.default.createElement("div", { className: "bc-modalhead" },
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("p", { className: "bc-modaleyebrow" }, "Configura\u00E7\u00F5es"),
+                    react_1.default.createElement("h3", { className: "bc-modaltitulo" }, "Geral")),
+                react_1.default.createElement("button", { className: "bc-modalx", onClick: onFechar, "aria-label": "Fechar" }, "\u00D7")),
+            react_1.default.createElement("div", { className: "bc-modalbody" },
+                react_1.default.createElement("section", { className: "bc-nextbloco" },
+                    react_1.default.createElement("label", { className: "campo" },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "Minha cidade"),
+                        react_1.default.createElement("input", { className: "bc-msgtext", style: { marginTop: 4 }, value: minhaCidade, list: "bc-cidades", onChange: (e) => onMudarCidade(e.target.value), placeholder: "Sua cidade", "aria-label": "Minha cidade" })),
+                    react_1.default.createElement("p", { className: temCidade && !chaveMinha ? "bc-mini bc-homestatus-erro" : "bc-mini" }, statusOrigem),
+                    react_1.default.createElement("p", { className: "bc-mini bc-leitordica" }, "Usada como ponto de partida para calcular dist\u00E2ncia at\u00E9 os contatos."))))));
+}
 function ModalNuvem({ status, onVerificar, onFechar }) {
     const [token, setToken] = (0, react_1.useState)("");
     const [gistId, setGistId] = (0, react_1.useState)("");
@@ -19289,11 +19321,9 @@ function Semaforo({ valor, onEscolher }) {
 }
 /* ── linha compacta da tela inicial ────────────────────── */
 function Linha({ carta, sources, sourceGlyphs, onAbrir }) {
-    const g = naipeDaCarta(carta, sources, sourceGlyphs);
     return (react_1.default.createElement("button", { className: "bc-linhacarta", onClick: onAbrir },
         react_1.default.createElement("span", { className: "bc-lc-topo" },
             carta.foto && react_1.default.createElement("img", { className: "bc-lc-foto", src: carta.foto, alt: "" }),
-            react_1.default.createElement("span", { className: g !== "·" && glyphDaFonteRed(g) ? "bc-lc-naipe bc-g-red" : "bc-lc-naipe" }, g),
             react_1.default.createElement("span", { className: "bc-lc-nome" }, carta.nome.trim() || "sem nome"),
             farolDe(carta.farol) && (react_1.default.createElement("span", { className: "bc-lc-farol", style: { background: farolDe(carta.farol)[2] }, title: farolDe(carta.farol)[3] }))),
         react_1.default.createElement("span", { className: "bc-lc-linha" },
@@ -19421,23 +19451,25 @@ function Banco({ tipo, titulo, unidade, exemplo, saldo, lancamentos, valorHora, 
                 l.comentario && react_1.default.createElement("span", { className: "bc-linhacom" }, l.comentario)),
             react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemoverLancamento(l.id), "aria-label": "Estornar lan\u00E7amento" }, "\u00D7")))))))));
 }
-function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, nova, medida, onFechar, onPatch, onPatchDating, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
+function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, nova, medida, onFechar, onPatch, onPatchDating, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, onEditarFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
     const [confirma, setConfirma] = (0, react_1.useState)(false);
-    const [gerindo, setGerindo] = (0, react_1.useState)(false);
-    const [novaCat, setNovaCat] = (0, react_1.useState)("");
-    const [glyphAberto, setGlyphAberto] = (0, react_1.useState)(null);
-    const [topoGlyphAberto, setTopoGlyphAberto] = (0, react_1.useState)(false);
     const [fcAberto, setFcAberto] = (0, react_1.useState)(false);
     const [nextAberto, setNextAberto] = (0, react_1.useState)(false);
     const [datingSalvo, setDatingSalvo] = (0, react_1.useState)(false);
+    const [investAberto, setInvestAberto] = (0, react_1.useState)(false);
+    const [datingAberto, setDatingAberto] = (0, react_1.useState)(false);
     const [outraRaca, setOutraRaca] = (0, react_1.useState)(false);
     const [novaTag, setNovaTag] = (0, react_1.useState)("");
     const [verFoto, setVerFoto] = (0, react_1.useState)(false);
     const [fotoErro, setFotoErro] = (0, react_1.useState)("");
     const [videoErro, setVideoErro] = (0, react_1.useState)("");
     const [subindoVideo, setSubindoVideo] = (0, react_1.useState)(false);
+    const [albumErro, setAlbumErro] = (0, react_1.useState)("");
+    const [subindoAlbum, setSubindoAlbum] = (0, react_1.useState)(false);
+    const [verAlbumItem, setVerAlbumItem] = (0, react_1.useState)(null);
     const fotoRef = (0, react_1.useRef)(null);
     const videoRef = (0, react_1.useRef)(null);
+    const albumRef = (0, react_1.useRef)(null);
     const trocarFoto = async (e) => {
         const arquivo = e.target.files && e.target.files[0];
         e.target.value = "";
@@ -19483,6 +19515,51 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
             setSubindoVideo(false);
         }
     };
+    const adicionarAlbum = async (e) => {
+        const arquivos = Array.from(e.target.files || []);
+        e.target.value = "";
+        if (!arquivos.length)
+            return;
+        setAlbumErro("");
+        setSubindoAlbum(true);
+        const { url, token } = lerConfigR2();
+        const novos = [];
+        try {
+            for (const arquivo of arquivos) {
+                try {
+                    if (arquivo.type.startsWith("video/")) {
+                        if (!url || !token) {
+                            throw new Error("configure o armazenamento de mídia (Minha Tela) antes de anexar vídeo");
+                        }
+                        const urlSubida = await subirArquivoParaR2(arquivo, arquivo.name);
+                        novos.push({ id: uid(), tipo: "video", url: urlSubida });
+                    }
+                    else if (arquivo.type.startsWith("image/")) {
+                        if (url && token) {
+                            const blob = await comprimirImagemParaUpload(arquivo);
+                            const urlSubida = await subirArquivoParaR2(blob, arquivo.name);
+                            novos.push({ id: uid(), tipo: "foto", url: urlSubida });
+                        }
+                        else {
+                            const dataUrl = await comprimirFoto(arquivo);
+                            novos.push({ id: uid(), tipo: "foto", url: dataUrl });
+                        }
+                    }
+                }
+                catch (err) {
+                    setAlbumErro((err && err.message) || "não consegui adicionar um dos arquivos");
+                }
+            }
+            if (novos.length)
+                onPatch("album", [...(carta.album || []), ...novos]);
+        }
+        finally {
+            setSubindoAlbum(false);
+        }
+    };
+    const removerDoAlbum = (id) => {
+        onPatch("album", (carta.album || []).filter((it) => it.id !== id));
+    };
     const temDating = CAMPOS_DATING.some(([k]) => ((carta.dating || {})[k] || "").trim());
     const registrarDating = () => {
         if (!temDating)
@@ -19491,10 +19568,7 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
         setDatingSalvo(true);
         setTimeout(() => setDatingSalvo(false), 1600);
     };
-    const idx = sources.indexOf(carta.fonte);
     const inicial = (carta.nome.trim()[0] || "?").toUpperCase();
-    const naipe = naipeDaCarta(carta, sources, sourceGlyphs);
-    const naipeRed = naipe !== "·" && glyphDaFonteRed(naipe);
     const ultima = carta.historico?.[0];
     const lancamentos = carta.lancamentos || [];
     const lancHoras = lancamentos.filter((l) => l.tipo === "horas");
@@ -19502,18 +19576,7 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
     const saldoHoras = saldoDe(lancamentos, "horas");
     const saldoValor = saldoDe(lancamentos, "valor");
     const Index = ({ virado }) => (react_1.default.createElement("div", { className: virado ? "bc-index bc-index-baixo" : "bc-index" },
-        react_1.default.createElement("span", { className: "bc-index-letra", "aria-hidden": "true" }, inicial),
-        virado ? (react_1.default.createElement("span", { className: naipeRed ? "bc-index-naipe bc-g-red" : "bc-index-naipe", "aria-hidden": "true" }, naipe)) : (react_1.default.createElement("button", { type: "button", className: naipeRed ? "bc-index-naipe bc-index-naipebtn bc-g-red" : "bc-index-naipe bc-index-naipebtn", title: "Toque para escolher o s\u00EDmbolo desta carta", "aria-label": "Escolher s\u00EDmbolo desta carta", "aria-expanded": topoGlyphAberto, onClick: () => setTopoGlyphAberto((v) => !v) }, naipe)),
-        !virado && topoGlyphAberto && (react_1.default.createElement("span", { className: "bc-gmenu bc-gmenu-topo" },
-            GLYPHS.map((op) => (react_1.default.createElement("button", { key: op, type: "button", className: (op === naipe ? "bc-gopt bc-gopt-on " : "bc-gopt ") + (glyphDaFonteRed(op) ? "bc-g-red" : ""), onClick: () => {
-                    onPatch("naipe", op);
-                    setTopoGlyphAberto(false);
-                } }, op))),
-            carta.naipe && (react_1.default.createElement("button", { type: "button", className: "bc-goptauto", title: "Voltar a usar o s\u00EDmbolo autom\u00E1tico da fonte", onClick: () => {
-                    onPatch("naipe", "");
-                    setTopoGlyphAberto(false);
-                } }, "autom\u00E1tico"))))));
-    const submitCat = () => { onCriarCategoria(novaCat); setNovaCat(""); };
+        react_1.default.createElement("span", { className: "bc-index-letra", "aria-hidden": "true" }, inicial)));
     const addTag = () => {
         const t = novaTag.trim();
         if (!t)
@@ -19546,6 +19609,16 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                             react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatch("video", "") }, "remover")))) : (react_1.default.createElement("button", { type: "button", className: "bc-link", onClick: () => videoRef.current && videoRef.current.click(), disabled: subindoVideo }, subindoVideo ? "enviando vídeo…" : "+ vídeo")),
                     videoErro && react_1.default.createElement("p", { className: "bc-ocrstatus bc-ocrstatus-erro" }, videoErro),
                     react_1.default.createElement("input", { ref: videoRef, type: "file", accept: "video/*", className: "bc-file", onChange: trocarVideo, "aria-label": "Escolher v\u00EDdeo do contato" })),
+                react_1.default.createElement("div", { className: "bc-album-wrap" },
+                    react_1.default.createElement("span", { className: "bc-lbl" }, "\u00C1lbum de fotos"),
+                    (carta.album || []).length > 0 && (react_1.default.createElement("div", { className: "bc-album-grade" }, (carta.album || []).map((item) => (react_1.default.createElement("div", { key: item.id, className: "bc-album-item" },
+                        react_1.default.createElement("button", { type: "button", className: "bc-album-thumb", onClick: () => setVerAlbumItem(item), "aria-label": item.tipo === "video" ? "Ver vídeo do álbum" : "Ver foto do álbum" }, item.tipo === "video" ? (react_1.default.createElement(react_1.default.Fragment, null,
+                            react_1.default.createElement("video", { className: "bc-album-img", src: item.url, muted: true, playsInline: true }),
+                            react_1.default.createElement("span", { className: "bc-album-play" }, "\u25B6"))) : (react_1.default.createElement("img", { className: "bc-album-img", src: item.url, alt: "" }))),
+                        react_1.default.createElement("button", { type: "button", className: "bc-album-x", onClick: () => removerDoAlbum(item.id), "aria-label": "Remover do \u00E1lbum" }, "\u00D7")))))),
+                    react_1.default.createElement("button", { type: "button", className: "bc-link", onClick: () => albumRef.current && albumRef.current.click(), disabled: subindoAlbum }, subindoAlbum ? "enviando…" : "+ adicionar fotos/vídeos"),
+                    albumErro && react_1.default.createElement("p", { className: "bc-ocrstatus bc-ocrstatus-erro" }, albumErro),
+                    react_1.default.createElement("input", { ref: albumRef, type: "file", accept: "image/*,video/*", multiple: true, className: "bc-file", onChange: adicionarAlbum, "aria-label": "Adicionar fotos ou v\u00EDdeos ao \u00E1lbum" })),
                 react_1.default.createElement("label", { className: "bc-nome-wrap" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Nome"),
                     react_1.default.createElement("input", { className: "bc-nome", value: carta.nome, onChange: (e) => onPatch("nome", e.target.value) })),
@@ -19593,44 +19666,36 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                     react_1.default.createElement("div", { className: "bc-opts" }, IDIOMAS.map((l) => (react_1.default.createElement(Pill, { key: l, ativo: carta.idioma === l, onClick: () => onPatch("idioma", carta.idioma === l ? "" : l) }, l))))),
                 react_1.default.createElement("div", { className: "bc-group" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Fonte"),
-                    react_1.default.createElement("p", { className: "bc-mini" }, "Toque no s\u00EDmbolo para escolher o naipe dessa fonte."),
-                    react_1.default.createElement("div", { className: "bc-opts" },
-                        sources.map((s, i) => {
-                            const g = glyphDaFonte(s, i, sourceGlyphs);
-                            const aberto = glyphAberto === s;
-                            return (react_1.default.createElement("span", { className: "bc-fontelinha", key: s },
-                                react_1.default.createElement("button", { type: "button", className: aberto ? "bc-gbtn bc-gbtn-on" : "bc-gbtn", title: "Toque para escolher o s\u00EDmbolo", "aria-label": "Escolher símbolo de " + s, "aria-expanded": aberto, onClick: () => setGlyphAberto(aberto ? null : s) },
-                                    react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-g bc-g-red" : "bc-g" }, g)),
-                                react_1.default.createElement(Pill, { ativo: carta.fonte === s, onClick: () => onPatch("fonte", carta.fonte === s ? "" : s) }, s),
-                                gerindo && !BASE_SOURCES.includes(s) && (react_1.default.createElement("span", { className: "bc-x", role: "button", tabIndex: 0, "aria-label": "Excluir categoria " + s, onClick: () => onRemoverCategoria(s) }, "\u00D7")),
-                                aberto && (react_1.default.createElement("span", { className: "bc-gmenu" }, GLYPHS.map((op) => (react_1.default.createElement("button", { key: op, type: "button", className: (op === g ? "bc-gopt bc-gopt-on " : "bc-gopt ") +
-                                        (glyphDaFonteRed(op) ? "bc-g-red" : ""), onClick: () => {
-                                        onEscolherGlyph(s, op);
-                                        setGlyphAberto(null);
-                                    } }, op)))))));
-                        }),
-                        react_1.default.createElement("button", { className: "bc-add", onClick: () => setGerindo((g) => !g) }, gerindo ? "concluir" : "+ categoria")),
-                    gerindo && (react_1.default.createElement("div", { className: "bc-catrow" },
-                        react_1.default.createElement("input", { className: "bc-catinput", value: novaCat, onChange: (e) => setNovaCat(e.target.value), onKeyDown: (e) => e.key === "Enter" && submitCat(), placeholder: "Nome da categoria", "aria-label": "Nome da nova categoria" }),
-                        react_1.default.createElement("button", { className: "bc-catbtn", onClick: submitCat }, "Adicionar")))),
-                react_1.default.createElement("hr", { className: "bc-hr" }),
-                react_1.default.createElement(Banco, { tipo: "horas", titulo: "Banco de horas", unidade: "h", exemplo: "1,5", saldo: saldoHoras, lancamentos: lancHoras, valorHora: carta.valorHoraFixo ? valorHoraPadrao : carta.valorHora, onValorHora: (v) => onPatch("valorHora", v), fixo: carta.valorHoraFixo, onFixo: (v) => {
-                        if (v && (carta.valorHora || "").trim())
-                            onValorHoraPadrao(carta.valorHora);
-                        onPatch("valorHoraFixo", v);
-                    }, onLancar: onLancar, onRemoverLancamento: onRemoverLancamento }),
-                react_1.default.createElement(Banco, { tipo: "valor", titulo: "Investimento", unidade: "$", exemplo: "25,00", saldo: saldoValor, lancamentos: lancValor, botoes: botoesInvest, onCriarBotao: onCriarBotaoInvest, onRemoverBotao: onRemoverBotaoInvest, onLancar: onLancar, onRemoverLancamento: onRemoverLancamento }),
+                    react_1.default.createElement("div", { className: "bc-opts" }, BASE_SOURCES.map((s) => (react_1.default.createElement(Pill, { key: s, ativo: carta.fonte === s, onClick: () => onPatch("fonte", carta.fonte === s ? "" : s) }, s))))),
+                react_1.default.createElement("div", { className: "bc-group" },
+                    react_1.default.createElement("span", { className: "bc-lbl" }, "Naipe"),
+                    react_1.default.createElement("div", { className: "bc-gmenu bc-gmenu-carta" }, GLYPHS.map((g) => (react_1.default.createElement("button", { key: g, type: "button", className: (carta.naipe === g ? "bc-gopt bc-gopt-on " : "bc-gopt ") +
+                            (glyphDaFonteRed(g) ? "bc-g-red" : ""), onClick: () => onPatch("naipe", carta.naipe === g ? "" : g), "aria-pressed": carta.naipe === g, "aria-label": "Escolher naipe " + g }, g)))),
+                    react_1.default.createElement("ul", { className: "bc-naipelegenda" }, NAIPE_LEGENDA.map(([g, rotulo]) => (react_1.default.createElement("li", { key: g },
+                        react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-g bc-g-red" : "bc-g" }, g),
+                        rotulo))))),
                 react_1.default.createElement("hr", { className: "bc-hr" }),
                 react_1.default.createElement("div", { className: "bc-group" },
-                    react_1.default.createElement("span", { className: "bc-lbl" }, "Dating"),
-                    react_1.default.createElement("div", { className: "bc-dating" }, CAMPOS_DATING.map(([campo, rotulo]) => (react_1.default.createElement("label", { className: "bc-datingbox", key: campo },
-                        react_1.default.createElement("span", { className: "bc-datinglbl" }, rotulo),
-                        react_1.default.createElement("textarea", { className: "bc-datingtexto", rows: 2, value: (carta.dating || {})[campo] || "", onChange: (e) => onPatchDating(campo, e.target.value) }))))),
-                    react_1.default.createElement("div", { className: "bc-bancoacoes" },
-                        react_1.default.createElement("button", { className: "bc-feito", onClick: registrarDating, disabled: !temDating }, datingSalvo ? "Registrado" : "Feito"),
-                        react_1.default.createElement("span", { className: "bc-mini" },
-                            (carta.datingLog || []).length,
-                            " no hist\u00F3rico"))),
+                    react_1.default.createElement("button", { className: "bc-acaoadd bc-verfc", onClick: () => setInvestAberto((v) => !v), "aria-expanded": investAberto }, investAberto ? "ocultar Investimento" : "Investimento"),
+                    investAberto && (react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement(Banco, { tipo: "horas", titulo: "Banco de horas", unidade: "h", exemplo: "1,5", saldo: saldoHoras, lancamentos: lancHoras, valorHora: carta.valorHoraFixo ? valorHoraPadrao : carta.valorHora, onValorHora: (v) => onPatch("valorHora", v), fixo: carta.valorHoraFixo, onFixo: (v) => {
+                                if (v && (carta.valorHora || "").trim())
+                                    onValorHoraPadrao(carta.valorHora);
+                                onPatch("valorHoraFixo", v);
+                            }, onLancar: onLancar, onRemoverLancamento: onRemoverLancamento }),
+                        react_1.default.createElement(Banco, { tipo: "valor", titulo: "Investimento", unidade: "$", exemplo: "25,00", saldo: saldoValor, lancamentos: lancValor, botoes: botoesInvest, onCriarBotao: onCriarBotaoInvest, onRemoverBotao: onRemoverBotaoInvest, onLancar: onLancar, onRemoverLancamento: onRemoverLancamento })))),
+                react_1.default.createElement("hr", { className: "bc-hr" }),
+                react_1.default.createElement("div", { className: "bc-group" },
+                    react_1.default.createElement("button", { className: "bc-acaoadd bc-verfc", onClick: () => setDatingAberto((v) => !v), "aria-expanded": datingAberto }, datingAberto ? "ocultar Dating" : "Dating"),
+                    datingAberto && (react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("div", { className: "bc-dating" }, CAMPOS_DATING.map(([campo, rotulo]) => (react_1.default.createElement("label", { className: "bc-datingbox", key: campo },
+                            react_1.default.createElement("span", { className: "bc-datinglbl" }, rotulo),
+                            react_1.default.createElement("textarea", { className: "bc-datingtexto", rows: 2, value: (carta.dating || {})[campo] || "", onChange: (e) => onPatchDating(campo, e.target.value) }))))),
+                        react_1.default.createElement("div", { className: "bc-bancoacoes" },
+                            react_1.default.createElement("button", { className: "bc-feito", onClick: registrarDating, disabled: !temDating }, datingSalvo ? "Registrado" : "Feito"),
+                            react_1.default.createElement("span", { className: "bc-mini" },
+                                (carta.datingLog || []).length,
+                                " no hist\u00F3rico"))))),
                 react_1.default.createElement("label", { className: "bc-group" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Personalidade"),
                     react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: carta.personalidade || "", onChange: (e) => onPatch("personalidade", e.target.value) })),
@@ -19653,11 +19718,14 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                         "criada em ",
                         carta.criadoEm ? fmtData(carta.criadoEm) : "—"),
                     react_1.default.createElement("button", { className: confirma ? "bc-remover bc-remover-on" : "bc-remover", onClick: () => (confirma ? onRemove() : setConfirma(true)), onBlur: () => setConfirma(false) }, confirma ? "confirmar remoção" : "remover carta")))),
-        fcAberto && (react_1.default.createElement(PainelFC, { carta: carta, acoes: acoes, onCriarAcao: onCriarAcao, onRemoverAcao: onRemoverAcao, onFechar: () => setFcAberto(false), onRegistrar: onRegistrarFC, onRemover: onRemoverFC })),
+        fcAberto && (react_1.default.createElement(PainelFC, { carta: carta, acoes: acoes, onCriarAcao: onCriarAcao, onRemoverAcao: onRemoverAcao, onFechar: () => setFcAberto(false), onRegistrar: onRegistrarFC, onRemover: onRemoverFC, onEditar: onEditarFC })),
         nextAberto && (react_1.default.createElement(PainelNext, { carta: carta, acoes: acoes, onPatch: onPatch, onFechar: () => setNextAberto(false) })),
         verFoto && carta.foto && (react_1.default.createElement("div", { className: "bc-fotoview", role: "dialog", "aria-label": "Foto", onClick: () => setVerFoto(false) },
             react_1.default.createElement("img", { src: carta.foto, alt: "", onClick: (e) => e.stopPropagation() }),
-            react_1.default.createElement("button", { className: "bc-modalx bc-fotoview-x", onClick: () => setVerFoto(false), "aria-label": "Fechar" }, "\u00D7")))));
+            react_1.default.createElement("button", { className: "bc-modalx bc-fotoview-x", onClick: () => setVerFoto(false), "aria-label": "Fechar" }, "\u00D7"))),
+        verAlbumItem && (react_1.default.createElement("div", { className: "bc-fotoview", role: "dialog", "aria-label": verAlbumItem.tipo === "video" ? "Vídeo do álbum" : "Foto do álbum", onClick: () => setVerAlbumItem(null) },
+            verAlbumItem.tipo === "video" ? (react_1.default.createElement("video", { src: verAlbumItem.url, controls: true, playsInline: true, autoPlay: true, onClick: (e) => e.stopPropagation() })) : (react_1.default.createElement("img", { src: verAlbumItem.url, alt: "", onClick: (e) => e.stopPropagation() })),
+            react_1.default.createElement("button", { className: "bc-modalx bc-fotoview-x", onClick: () => setVerAlbumItem(null), "aria-label": "Fechar" }, "\u00D7")))));
 }
 /* ── painel Next Date ──────────────────────────────────── */
 function PainelNext({ carta, acoes = [], onPatch, onFechar }) {
@@ -19726,7 +19794,7 @@ function PainelNext({ carta, acoes = [], onPatch, onFechar }) {
                     (registros.length === 0 ? (react_1.default.createElement("p", { className: "bc-mini" }, "Nenhum registro de FC Skill neste contato ainda.")) : (react_1.default.createElement("div", { className: "bc-fclista" }, registros.map((r) => (react_1.default.createElement(RegistroFC, { key: r.id, registro: r }))))))))));
 }
 /* ── painel FC Skill ───────────────────────────────────── */
-function PainelFC({ carta, acoes = [], onCriarAcao, onRemoverAcao, onFechar, onRegistrar, onRemover }) {
+function PainelFC({ carta, acoes = [], onCriarAcao, onRemoverAcao, onFechar, onRegistrar, onRemover, onEditar }) {
     const vazio = { experience: "", novidades: "", pros: "", contras: "", proxima: "", reactions: "", sskill: 0, sentimentos: 0 };
     const [campos, setCampos] = (0, react_1.useState)(vazio);
     const [salvo, setSalvo] = (0, react_1.useState)(false);
@@ -19820,10 +19888,59 @@ function PainelFC({ carta, acoes = [], onCriarAcao, onRemoverAcao, onFechar, onR
                     react_1.default.createElement("span", { className: "bc-mini" },
                         registros.length,
                         " no livro raz\u00E3o")),
-                registros.length > 0 && (react_1.default.createElement("div", { className: "bc-fclista" }, registros.map((r) => (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, onRemover: () => onRemover(r.id) })))))))));
+                registros.length > 0 && (react_1.default.createElement("div", { className: "bc-fclista" }, registros.map((r) => (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, onRemover: () => onRemover(r.id), onEditar: onEditar ? (patch) => onEditar(r.id, patch) : undefined })))))))));
 }
-function RegistroFC({ registro, onRemover, nomeContato }) {
+function RegistroFC({ registro, onRemover, onEditar, nomeContato }) {
     const [confirma, setConfirma] = (0, react_1.useState)(false);
+    const [editando, setEditando] = (0, react_1.useState)(false);
+    const [campos, setCampos] = (0, react_1.useState)(null);
+    const iniciarEdicao = () => {
+        setCampos({
+            experience: registro.experience || "",
+            novidades: registro.novidades || "",
+            pros: registro.pros || "",
+            contras: registro.contras || "",
+            proxima: registro.proxima || "",
+            reactions: registro.reactions || "",
+            sskill: typeof registro.sskill === "number" ? registro.sskill : 0,
+            sentimentos: typeof registro.sentimentos === "number" ? registro.sentimentos : 0,
+        });
+        setEditando(true);
+    };
+    const salvarEdicao = () => {
+        onEditar(campos);
+        setEditando(false);
+        setCampos(null);
+    };
+    const cancelarEdicao = () => {
+        setEditando(false);
+        setCampos(null);
+    };
+    if (editando && campos) {
+        return (react_1.default.createElement("article", { className: "bc-fcreg bc-fcreg-editando" },
+            react_1.default.createElement("div", { className: "bc-fcregtop" },
+                react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(registro.data)),
+                nomeContato && react_1.default.createElement("strong", { className: "bc-fcnome" }, nomeContato)),
+            react_1.default.createElement("div", { className: "bc-fcedit-sliders" },
+                react_1.default.createElement("label", { className: "bc-fcedit-slider" },
+                    react_1.default.createElement("span", { className: "bc-lbl" }, "S.Skill"),
+                    react_1.default.createElement("input", { className: "bc-slider", type: "range", min: -10, max: 10, step: 1, value: campos.sskill, onChange: (e) => setCampos((c) => ({ ...c, sskill: Number(e.target.value) })), "aria-label": "Editar S.Skill" }),
+                    react_1.default.createElement("span", { className: "bc-mini" },
+                        campos.sskill > 0 ? "+" : "",
+                        campos.sskill)),
+                react_1.default.createElement("label", { className: "bc-fcedit-slider" },
+                    react_1.default.createElement("span", { className: "bc-lbl" }, "Sentimentos"),
+                    react_1.default.createElement("input", { className: "bc-slider", type: "range", min: -10, max: 10, step: 1, value: campos.sentimentos, onChange: (e) => setCampos((c) => ({ ...c, sentimentos: Number(e.target.value) })), "aria-label": "Editar sentimentos gerais" }),
+                    react_1.default.createElement("span", { className: "bc-mini" },
+                        campos.sentimentos > 0 ? "+" : "",
+                        campos.sentimentos))),
+            CAMPOS_FC.map(([campo, rotulo, dica]) => (react_1.default.createElement("label", { className: "bc-group", key: campo },
+                react_1.default.createElement("span", { className: "bc-lbl" }, rotulo),
+                react_1.default.createElement("textarea", { className: "bc-msgtext", rows: campo === "experience" ? 5 : 3, value: campos[campo], onChange: (e) => setCampos((c) => ({ ...c, [campo]: e.target.value })), placeholder: dica })))),
+            react_1.default.createElement("div", { className: "bc-bancoacoes" },
+                react_1.default.createElement("button", { className: "bc-feito", onClick: salvarEdicao }, "Salvar"),
+                react_1.default.createElement("button", { className: "bc-link", onClick: cancelarEdicao }, "cancelar"))));
+    }
     return (react_1.default.createElement("article", { className: "bc-fcreg" },
         react_1.default.createElement("div", { className: "bc-fcregtop" },
             react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(registro.data)),
@@ -19836,6 +19953,7 @@ function RegistroFC({ registro, onRemover, nomeContato }) {
                 "Sentimentos ",
                 registro.sentimentos > 0 ? "+" : "",
                 registro.sentimentos)),
+            onEditar && (react_1.default.createElement("button", { className: "bc-linhax bc-fcedit-btn", onClick: iniciarEdicao, "aria-label": "Editar registro" }, "\u270E")),
             onRemover && (react_1.default.createElement("button", { className: "bc-linhax", onClick: () => (confirma ? onRemover() : setConfirma(true)), onBlur: () => setConfirma(false), "aria-label": "Excluir registro" }, confirma ? "excluir?" : "×"))),
         registro.feitos && registro.feitos.length > 0 && (react_1.default.createElement("div", { className: "bc-fcfeitos" },
             react_1.default.createElement("span", { className: "bc-fclbl" }, "Feito"),
@@ -19884,7 +20002,7 @@ function TelaObjetivos({ objetivos, onAdd, onMarcar, onRemover }) {
                 react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemover(o.id), "aria-label": "Excluir tarefa" }, "\u00D7")))))))));
 }
 /* ── tela: FC Skill ────────────────────────────────────── */
-function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloqueios, conhecimento, onAddDesbloqueio, onMarcarDesbloqueio, onRemoverDesbloqueio, onAddConhecimento, onRemoverConhecimento, onRemoverFC, }) {
+function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloqueios, conhecimento, onAddDesbloqueio, onMarcarDesbloqueio, onRemoverDesbloqueio, onAddConhecimento, onRemoverConhecimento, onRemoverFC, onEditarFC, }) {
     const [novoItem, setNovoItem] = (0, react_1.useState)("");
     const [texto, setTexto] = (0, react_1.useState)("");
     const [salvo, setSalvo] = (0, react_1.useState)(false);
@@ -19947,7 +20065,7 @@ function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloquei
                             " \u00B7 ",
                             fmtData(c.fcskill[0].data).split(" · ")[0]),
                         react_1.default.createElement("span", { className: "bc-fcgrupo-seta" }, on ? "▲" : "▼")),
-                    on && (react_1.default.createElement("div", { className: "bc-fclista" }, c.fcskill.map((r) => (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, onRemover: () => onRemoverFC(c.id, r.id) })))))));
+                    on && (react_1.default.createElement("div", { className: "bc-fclista" }, c.fcskill.map((r) => (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, onRemover: () => onRemoverFC(c.id, r.id), onEditar: (patch) => onEditarFC(c.id, r.id, patch) })))))));
             })))),
         react_1.default.createElement("section", { className: "bc-col" },
             react_1.default.createElement("div", { className: "bc-colhead" },
@@ -20001,7 +20119,7 @@ function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloquei
                 react_1.default.createElement("p", { className: "bc-fccampo" }, c.texto)))))))));
 }
 /* ── tela 3: livro razão ───────────────────────────────── */
-function TelaRazao({ cards, conhecimento = [], desbloqueios = [], onRemoverFC }) {
+function TelaRazao({ cards, conhecimento = [], desbloqueios = [], onRemoverFC, onEditarFC }) {
     const [filtro, setFiltro] = (0, react_1.useState)("todos");
     const tudo = (0, react_1.useMemo)(() => {
         const out = [];
@@ -20033,7 +20151,7 @@ function TelaRazao({ cards, conhecimento = [], desbloqueios = [], onRemoverFC })
             comRegistros.map((c) => (react_1.default.createElement(Chip, { key: c.id, ativo: filtro === c.id, onClick: () => setFiltro(c.id) }, c.nome.trim() || "sem nome"))),
             conhecimento.length > 0 && (react_1.default.createElement(Chip, { ativo: filtro === "saber", onClick: () => setFiltro("saber") }, "Conhecimento")),
             desbloqueios.some((d) => d.feito) && (react_1.default.createElement(Chip, { ativo: filtro === "desb", onClick: () => setFiltro("desb") }, "Desbloqueios"))),
-        lista.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty" }, "Nada registrado ainda. Abra uma carta, toque em FC Skill e registre o primeiro encontro.")) : (react_1.default.createElement("div", { className: "bc-fclista bc-fclista-razao" }, lista.map((r) => r.kind === "fc" ? (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, nomeContato: r.nome, onRemover: () => onRemoverFC(r.cardId, r.id) })) : (react_1.default.createElement("article", { className: "bc-fcreg", key: r.id },
+        lista.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty" }, "Nada registrado ainda. Abra uma carta, toque em FC Skill e registre o primeiro encontro.")) : (react_1.default.createElement("div", { className: "bc-fclista bc-fclista-razao" }, lista.map((r) => r.kind === "fc" ? (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, nomeContato: r.nome, onRemover: () => onRemoverFC(r.cardId, r.id), onEditar: (patch) => onEditarFC(r.cardId, r.id, patch) })) : (react_1.default.createElement("article", { className: "bc-fcreg", key: r.id },
             react_1.default.createElement("div", { className: "bc-fcregtop" },
                 react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(r.data)),
                 react_1.default.createElement("strong", { className: "bc-fcnome" }, r.kind === "saber" ? "Conhecimento popular" : "Desbloqueado")),
@@ -20115,7 +20233,40 @@ function TelaMensagens({ cards, sources, sourceGlyphs, msgs, setMsgs, medir, onR
 }
 function Mensagem({ msg, sources, sourceGlyphs, aberta, onAbrir, onPatch, onPatchTexto, onRemove }) {
     const [confirma, setConfirma] = (0, react_1.useState)(false);
+    const [traduzindo, setTraduzindo] = (0, react_1.useState)(false);
+    const [traducaoAuto, setTraducaoAuto] = (0, react_1.useState)("");
+    const [traduzErro, setTraduzErro] = (0, react_1.useState)("");
     const toggleFonte = (s) => onPatch("fontes", msg.fontes.includes(s) ? msg.fontes.filter((f) => f !== s) : [...msg.fontes, s]);
+    const textoIngles = (msg.textos["Inglês"] || "").trim();
+    (0, react_1.useEffect)(() => {
+        if (!textoIngles) {
+            setTraducaoAuto("");
+            setTraduzErro("");
+            setTraduzindo(false);
+            return;
+        }
+        setTraduzindo(true);
+        setTraduzErro("");
+        const espera = setTimeout(async () => {
+            try {
+                const resp = await fetch("https://api.mymemory.translated.net/get?q=" +
+                    encodeURIComponent(textoIngles) +
+                    "&langpair=en|es");
+                if (!resp.ok)
+                    throw new Error("falha ao traduzir");
+                const dados = await resp.json();
+                const traduzido = (dados && dados.responseData && dados.responseData.translatedText) || "";
+                setTraducaoAuto(traduzido);
+            }
+            catch (err) {
+                setTraduzErro("não consegui traduzir agora");
+            }
+            finally {
+                setTraduzindo(false);
+            }
+        }, 700);
+        return () => clearTimeout(espera);
+    }, [textoIngles]);
     return (react_1.default.createElement("article", { className: aberta ? "bc-msgcard bc-msgcard-open" : "bc-msgcard" },
         react_1.default.createElement("div", { className: "bc-msgtop" },
             react_1.default.createElement("button", { className: "bc-msgtitle", onClick: onAbrir }, msg.titulo.trim() || "Sem título"),
@@ -20136,7 +20287,12 @@ function Mensagem({ msg, sources, sourceGlyphs, aberta, onAbrir, onPatch, onPatc
                 msg.fontes.length === 0 && react_1.default.createElement("p", { className: "bc-mini" }, "Sem fonte marcada, serve para qualquer contato.")),
             IDIOMAS.map((l) => (react_1.default.createElement("label", { className: "bc-group", key: l },
                 react_1.default.createElement("span", { className: "bc-lbl" }, l),
-                react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 4, value: msg.textos[l] || "", onChange: (e) => onPatchTexto(l, e.target.value), placeholder: l === "Inglês" ? "Hi {nome}, ..." : "Hola {nome}, ..." }))))))));
+                react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 4, value: msg.textos[l] || "", onChange: (e) => onPatchTexto(l, e.target.value), placeholder: l === "Inglês" ? "Hi {nome}, ..." : "Hola {nome}, ..." })))),
+            react_1.default.createElement("div", { className: "bc-group bc-traducaoauto" },
+                react_1.default.createElement("span", { className: "bc-lbl" }, "Tradu\u00E7\u00E3o autom\u00E1tica \u00B7 Espanhol"),
+                traduzindo ? (react_1.default.createElement("p", { className: "bc-mini" }, "traduzindo\u2026")) : traduzErro ? (react_1.default.createElement("p", { className: "bc-mini bc-ocrstatus-erro" }, traduzErro)) : traducaoAuto ? (react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("p", { className: "bc-traducaotexto" }, traducaoAuto),
+                    react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatchTexto("Espanhol", traducaoAuto) }, "usar no campo Espanhol"))) : (react_1.default.createElement("p", { className: "bc-mini" }, "Escreva a vers\u00E3o em Ingl\u00EAs para ver a tradu\u00E7\u00E3o aqui.")))))));
 }
 function Previas({ msg, selecionados, sources, sourceGlyphs, medir, onRegistrarEnvio, combina }) {
     const [copiado, setCopiado] = (0, react_1.useState)(null);
@@ -20238,6 +20394,12 @@ const CSS = `
   cursor:pointer;border-radius:2px;color:rgba(251,247,238,.6);background:transparent;border:1px solid rgba(251,247,238,.18);}
 .bc-tab em{font-style:normal;opacity:.55;margin-left:5px;}
 .bc-tab-on{background:${C.card};color:${C.ink};border-color:${C.card};}
+.bc-configbtn{font-family:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  padding:9px 15px;cursor:pointer;border-radius:2px;color:rgba(251,247,238,.6);background:transparent;
+  border:1px solid rgba(251,247,238,.18);}
+.bc-configbtn:hover{color:${C.card};border-color:rgba(251,247,238,.4);}
+.bc-footer{max-width:1200px;margin:40px auto 0;padding-top:18px;
+  border-top:1px solid rgba(251,247,238,.16);display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
 .bc-saveblock{display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
 .bc-status{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:rgba(251,247,238,.35);}
 .bc-status-erro{color:#E86A7C;}
@@ -20381,6 +20543,8 @@ const CSS = `
 .bc-new-alt{font-size:10px;padding:7px 13px;letter-spacing:.1em;background:transparent;
   color:rgba(251,247,238,.72);border:1px solid rgba(251,247,238,.28);}
 .bc-new-alt:hover{background:rgba(251,247,238,.08);color:rgba(251,247,238,.95);filter:none;}
+.bc-pesquisabtn-on{background:${C.card};color:${C.ink};border-color:${C.card};}
+.bc-tools-topo{margin-bottom:8px;}
 .bc-ocrstatus{font-size:11px;line-height:1.5;color:var(--soft);margin:6px 0 0;}
 .bc-ocrstatus-erro{color:var(--red);}
 .bc-ocrbotoes{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;}
@@ -20395,7 +20559,7 @@ const CSS = `
 .bc-leitortexto p{margin:0;font-size:13px;line-height:1.55;white-space:pre-wrap;}
 .bc-tagsbox{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
 .bc-tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:4px 9px;border-radius:2px;
-  background:rgba(21,16,15,.06);border:1px solid var(--rule);}
+  background:rgba(21,16,15,.06);border:1px solid var(--rule);color:var(--ink);}
 .bc-tagx{cursor:pointer;color:rgba(21,16,15,.4);font-size:13px;line-height:1;}
 .bc-tagx:hover{color:var(--red);}
 
@@ -20409,9 +20573,16 @@ const CSS = `
 .bc-fcnome{flex:1 1 auto;min-width:0;font-family:'Bodoni Moda',serif;font-size:15px;font-weight:600;
   overflow-wrap:anywhere;}
 .bc-fcreg .bc-linhax{margin-left:auto;flex-shrink:0;}
+.bc-fcreg .bc-linhax + .bc-linhax{margin-left:0;}
+.bc-fcedit-btn{font-size:13px;}
 .bc-fccampo{margin:0 0 7px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;}
 .bc-fccampo:last-child{margin-bottom:0;}
 .bc-fclbl{display:block;font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--soft);margin-bottom:1px;}
+
+.bc-fcreg-editando{display:flex;flex-direction:column;gap:10px;}
+.bc-fcedit-sliders{display:flex;flex-direction:column;gap:10px;}
+.bc-fcedit-slider{display:flex;flex-direction:column;gap:3px;}
+.bc-fcedit-slider .bc-mini{align-self:flex-end;}
 
 /* tela FC Skill */
 .bc-fctela{max-width:820px;margin:26px auto 0;display:flex;flex-direction:column;gap:22px;}
@@ -20586,9 +20757,22 @@ const CSS = `
 .bc-video-wrap{margin-top:10px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
 .bc-video-player{width:100%;max-width:280px;border-radius:6px;border:1px solid var(--rule);background:#000;}
 
+.bc-album-wrap{margin-top:10px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
+.bc-album-grade{display:flex;flex-wrap:wrap;gap:8px;width:100%;}
+.bc-album-item{position:relative;flex:0 0 auto;}
+.bc-album-thumb{width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--rule);
+  background:#000;padding:0;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;}
+.bc-album-img{width:100%;height:100%;object-fit:cover;display:block;}
+.bc-album-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:${C.card};font-size:16px;text-shadow:0 1px 4px rgba(0,0,0,.6);pointer-events:none;}
+.bc-album-x{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;
+  background:var(--red);color:${C.card};border:1px solid ${C.card};font-size:12px;line-height:1;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+.bc-album-x:hover{filter:brightness(1.15);}
+
 .bc-fotoview{position:fixed;inset:0;z-index:80;background:rgba(8,6,5,.92);display:flex;
   align-items:center;justify-content:center;padding:24px;cursor:zoom-out;}
-.bc-fotoview img{max-width:100%;max-height:100%;border-radius:6px;cursor:default;
+.bc-fotoview img,.bc-fotoview video{max-width:100%;max-height:100%;border-radius:6px;cursor:default;
   box-shadow:0 20px 60px rgba(0,0,0,.5);}
 .bc-fotoview-x{position:fixed;top:18px;right:18px;color:var(--card);font-size:22px;}
 .bc-nome{width:100%;font-family:'Bodoni Moda',serif;font-size:25px;font-weight:600;color:var(--ink);
@@ -20625,8 +20809,14 @@ const CSS = `
 .bc-gopt{font-family:inherit;font-size:15px;line-height:1;cursor:pointer;border-radius:2px;
   width:30px;height:30px;color:var(--ink);background:transparent;border:1px solid var(--edge);}
 .bc-gopt:hover{border-color:var(--soft);}
+.bc-gopt.bc-g-red{color:var(--red);}
 .bc-gopt-on{background:var(--ink);color:var(--card);border-color:var(--ink);}
 .bc-gopt-on.bc-g-red{color:#F08A98;}
+.bc-gmenu-carta{position:static;width:auto;padding:0;border:0;box-shadow:none;background:transparent;
+  margin-top:4px;}
+.bc-naipelegenda{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;}
+.bc-naipelegenda li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);}
+.bc-naipelegenda .bc-g{font-size:15px;width:18px;text-align:center;}
 .bc-pill{font-family:inherit;font-size:11.5px;padding:6px 11px;cursor:pointer;border-radius:2px;
   display:inline-flex;align-items:center;gap:5px;color:var(--ink);background:transparent;border:1px solid var(--edge);
   transition:background .14s ease,color .14s ease,border-color .14s ease;}
@@ -20734,6 +20924,11 @@ const CSS = `
 .bc-msgtext:focus{outline:none;border-color:var(--red);}
 .bc-mini{margin:6px 0 0;font-size:10.5px;color:var(--soft);}
 
+.bc-traducaoauto{background:rgba(21,16,15,.03);border:1px dashed var(--edge);border-radius:3px;
+  padding:9px 11px;}
+.bc-traducaotexto{margin:6px 0 6px;font-size:13px;line-height:1.55;white-space:pre-wrap;
+  color:var(--ink);overflow-wrap:anywhere;}
+
 .bc-picker{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
 .bc-pick{font-family:inherit;font-size:12px;padding:7px 11px;cursor:pointer;border-radius:2px;
   display:inline-flex;align-items:center;gap:7px;color:rgba(251,247,238,.75);background:transparent;
@@ -20761,7 +20956,7 @@ const CSS = `
 .bc-catbtn:focus-visible,.bc-search:focus-visible,.bc-catinput:focus-visible,.bc-pick:focus-visible,
 .bc-link:focus-visible,.bc-msgtitle:focus-visible,.bc-del:focus-visible,.bc-homeinput:focus-visible,
 .bc-raioinput:focus-visible,.bc-feito:focus-visible,.bc-qtd:focus-visible,
-.bc-comentario:focus-visible,.bc-linhax:focus-visible,.bc-acaoadd:focus-visible,.bc-recolher:focus-visible,.bc-backupbtn:focus-visible,.bc-gbtn:focus-visible,.bc-gopt:focus-visible,.bc-index-naipebtn:focus-visible,.bc-goptauto:focus-visible{outline:2px solid var(--red);outline-offset:2px;}
+.bc-comentario:focus-visible,.bc-linhax:focus-visible,.bc-acaoadd:focus-visible,.bc-recolher:focus-visible,.bc-backupbtn:focus-visible,.bc-gbtn:focus-visible,.bc-gopt:focus-visible,.bc-index-naipebtn:focus-visible,.bc-goptauto:focus-visible,.bc-album-thumb:focus-visible,.bc-album-x:focus-visible{outline:2px solid var(--red);outline-offset:2px;}
 
 @media (max-width:860px){
   .bc-msg-layout{grid-template-columns:1fr;}
