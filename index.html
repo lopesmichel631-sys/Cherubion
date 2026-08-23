@@ -67,43 +67,52 @@
 </script>
 
 <script>
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
-const { useState, useEffect, useRef, useMemo } = React;
+const useState = React.useState, useEffect = React.useEffect, useRef = React.useRef, useMemo = React.useMemo;
+
+// ===== constantes =====
+// ======================================================================
+// Constantes de configuração do app: cores, listas de checklists, abas do Livro Razão,
+// categorias padrão e as funções que normalizam esses dados ao carregar do storage.
+// ======================================================================
 const STORAGE_KEY = 'minhas-tarefas-data';
 const CORES = ['#5B7C99', '#D96C4F', '#6E8C82', '#A85C4D', '#8E6BAE', '#C9A227'];
 const DURACOES = [5, 10, 15, 30, 60];
 // quantos usos recentes das pastas das Notas rápidas entram no cálculo da ordem dos botões
+// quantos usos recentes das pastas das Notas rápidas entram no cálculo da ordem dos botões
 const MAX_USOS_PASTAS = 15;
+// a mistura do 🎲 Aleatório usa os mesmos mapas de filtro das categorias (filtroSortear /
+// premiacaoDraft), sob esta chave reservada — assim o sorteio dela funciona igualzinho
 // a mistura do 🎲 Aleatório usa os mesmos mapas de filtro das categorias (filtroSortear /
 // premiacaoDraft), sob esta chave reservada — assim o sorteio dela funciona igualzinho
 const MISTURA_ID = '__mistura';
 // id reservado da "sessão" que abre o painel do Saldo B.E.S.T. dentro da aba B.E.S.T.
+// id reservado da "sessão" que abre o painel do Saldo B.E.S.T. dentro da aba B.E.S.T.
 const SALDO_SESSAO = '__saldo';
+// id reservado da "sessão" que abre o painel de Corte de cabelo dentro da aba Development
 // id reservado da "sessão" que abre o painel de Corte de cabelo dentro da aba Development
 const CORTE_SESSAO = '__corte';
 // id reservado da "sessão" que abre o painel de Medidas corporais dentro da aba Development
+// id reservado da "sessão" que abre o painel de Medidas corporais dentro da aba Development
 const MEDIDAS_SESSAO = '__medidas';
+// id reservado da "sessão" que abre o painel 💰 Bank dentro da aba Finanças
 // id reservado da "sessão" que abre o painel 💰 Bank dentro da aba Finanças
 const BANK_SESSAO = '__bank';
 // id reservado da "sessão" que abre o painel Ganhos (notas por ano) dentro da aba Atividades
+// id reservado da "sessão" que abre o painel Ganhos (notas por ano) dentro da aba Atividades
 const GANHOS_SESSAO = '__ganhos';
 // id reservado da "sessão" que abre o painel ⚔️ Batalha (Brasil x Estados Unidos) dentro da aba Atividades
+// id reservado da "sessão" que abre o painel ⚔️ Batalha (Brasil x Estados Unidos) dentro da aba Atividades
 const BATALHA_SESSAO = '__batalha';
+// id reservado da "sessão" que abre o painel ⏳ Contador Regressivo dentro da aba Atividades
 // id reservado da "sessão" que abre o painel ⏳ Contador Regressivo dentro da aba Atividades
 const CONTADOR_SESSAO = '__contador';
 // id reservado da "sessão" que abre o painel 🚗 Car dentro da aba Prefeituras — botão de
 // atalho que manda "Lavar carro" direto para os Prioritários
+// id reservado da "sessão" que abre o painel 🚗 Car dentro da aba Prefeituras — botão de
+// atalho que manda "Lavar carro" direto para os Prioritários
 const CAR_SESSAO = '__car';
+// Abas de checklist do Livro Razão — todas funcionam exatamente igual (sessões + tarefas).
+// 'prefeituras' é a original; as demais foram criadas no mesmo molde.
 // Abas de checklist do Livro Razão — todas funcionam exatamente igual (sessões + tarefas).
 // 'prefeituras' é a original; as demais foram criadas no mesmo molde.
 const CHECKLISTS = [
@@ -123,9 +132,12 @@ const CHECKLISTS = [
     { id: 'atividades', nome: 'Atividades', emoji: '📋', cor: '#B0546E' },
 ];
 // cores do sistema de "bolinha" de status usado nos itens da aba Atividades
+// cores do sistema de "bolinha" de status usado nos itens da aba Atividades
 const CORES_CIRCULO = { verde: '#4C9F6E', amarelo: '#D9B23C', vermelho: '#D9483C' };
 // ordem do ciclo ao tocar na bolinha: sem cor -> verde -> amarelo -> vermelho -> sem cor
+// ordem do ciclo ao tocar na bolinha: sem cor -> verde -> amarelo -> vermelho -> sem cor
 const CICLO_COR_ITEM = [null, 'verde', 'amarelo', 'vermelho'];
+// abas fixas do Livro Razão (as demais vêm de CHECKLISTS) + ordem padrão dos botões
 // abas fixas do Livro Razão (as demais vêm de CHECKLISTS) + ordem padrão dos botões
 const ABAS_RAZAO_FIXAS = [
     { id: 'categorias', nome: 'Categorias', emoji: '🗂️', cor: '#57A773' },
@@ -136,6 +148,7 @@ const ABAS_RAZAO_FIXAS = [
 const ABAS_RAZAO = [...ABAS_RAZAO_FIXAS, ...CHECKLISTS];
 const ORDEM_ABAS_RAZAO_PADRAO = ABAS_RAZAO.map((a) => a.id);
 // mantém só ids que existem e acrescenta no fim os que faltarem (abas novas entram sozinhas)
+// mantém só ids que existem e acrescenta no fim os que faltarem (abas novas entram sozinhas)
 const normalizarOrdemAbasRazao = (arr) => {
     const base = Array.isArray(arr) ? arr.filter((id) => ORDEM_ABAS_RAZAO_PADRAO.includes(id)) : [];
     ORDEM_ABAS_RAZAO_PADRAO.forEach((id) => { if (!base.includes(id))
@@ -144,10 +157,12 @@ const normalizarOrdemAbasRazao = (arr) => {
 };
 // Aceita tanto o formato novo (checklistItens/checklistSessoes) quanto o antigo
 // (prefeituras/prefeiturasSessoes), para que nenhum dado já salvo se perca.
+// Aceita tanto o formato novo (checklistItens/checklistSessoes) quanto o antigo
+// (prefeituras/prefeiturasSessoes), para que nenhum dado já salvo se perca.
 const normalizarChecklists = (dados) => {
     const ehObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
-    const itens = ehObj(dados.checklistItens) ? Object.assign({}, dados.checklistItens) : {};
-    const sessoes = ehObj(dados.checklistSessoes) ? Object.assign({}, dados.checklistSessoes) : {};
+    const itens = ehObj(dados.checklistItens) ? { ...dados.checklistItens } : {};
+    const sessoes = ehObj(dados.checklistSessoes) ? { ...dados.checklistSessoes } : {};
     if (!Array.isArray(itens.prefeituras) && Array.isArray(dados.prefeituras))
         itens.prefeituras = dados.prefeituras;
     if (!Array.isArray(sessoes.prefeituras) && Array.isArray(dados.prefeiturasSessoes))
@@ -179,17 +194,19 @@ const CATS_PADRAO = [
     { nome: 'Gift Shop 🎁', cor: '#D96C4F', tipo: 'normal' },
 ];
 // strip emojis/symbols for fuzzy matching
+// strip emojis/symbols for fuzzy matching
 const baseNome = (s) => s.replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\uFE00-\uFE0F🥇💡🔐🛌🎁]/gu, '').trim().toLowerCase();
 // after loading from backup, restore canonical names + order for the 5 known categories
+// after loading from backup, restore canonical names + order for the 5 known categories
 const normalizarCategorias = (cats) => {
-    const canonicals = CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { base: baseNome(c.nome) })));
+    const canonicals = CATS_PADRAO.map((c) => ({ ...c, base: baseNome(c.nome) }));
     // separate known from unknown
     const known = [];
     const unknown = [];
     cats.forEach((cat) => {
         const match = canonicals.find((c) => baseNome(cat.nome).includes(c.base) || c.base.includes(baseNome(cat.nome)));
         if (match)
-            known.push(Object.assign(Object.assign({}, cat), { nome: match.nome, cor: match.cor, _order: canonicals.indexOf(match) }));
+            known.push({ ...cat, nome: match.nome, cor: match.cor, _order: canonicals.indexOf(match) });
         else
             unknown.push(cat);
     });
@@ -197,10 +214,34 @@ const normalizarCategorias = (cats) => {
     known.forEach((c) => delete c._order);
     return [...known, ...unknown];
 };
+
+// ===== datasPeriodos =====
+// ======================================================================
+// Datas, períodos e formatação: conversão ISO, cálculo de início de cada período
+// (semana/mês/trimestre/semestre/ano), índices do histórico e formatação de tempo e moeda.
+// ======================================================================
+const paraISO = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const dataDeISO = (iso) => {
+    const [a, m, d] = iso.split('-').map(Number);
+    return new Date(a, m - 1, d);
+};
+const diasEntreISO = (isoA, isoB) => Math.round((dataDeISO(isoB) - dataDeISO(isoA)) / 86400000); // isoB - isoA, em dias
+// Pso: dias restantes do contador regressivo (nunca passa de 0 pra negativo — para de contar
+// quando chega em zero, momento em que o alerta 🚨 Pso 🚨 passa a ficar ativo).
+const somarDiasISO = (iso, n) => {
+    const d = dataDeISO(iso);
+    d.setDate(d.getDate() + n);
+    return paraISO(d);
+};
+// converte um item legado ({dia: 0-6}) para o novo formato da agenda ({data, repetir})
 const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const hoje = () => new Date().toLocaleDateString('en-CA');
 // compara o dia (dataISO) de dois registros do Livro Razão — usado para agrupar visualmente itens do mesmo dia
+// compara o dia (dataISO) de dois registros do Livro Razão — usado para agrupar visualmente itens do mesmo dia
 const mesmoDiaRegistro = (a, b) => !!a && !!b && a.dataISO === b.dataISO;
+// domingo da semana atual — a semana começa no domingo (mesma convenção do array DIAS_SEMANA,
+// onde índice 0 = Domingo, e de getDay(), onde 0 = Domingo). É essa chave que decide quando as
+// tarefas semanais renovam: a partir do primeiro minuto de domingo.
 // domingo da semana atual — a semana começa no domingo (mesma convenção do array DIAS_SEMANA,
 // onde índice 0 = Domingo, e de getDay(), onde 0 = Domingo). É essa chave que decide quando as
 // tarefas semanais renovam: a partir do primeiro minuto de domingo.
@@ -240,6 +281,8 @@ const formatCF = (s, valorHora) => `$ ${((s / 3600) * (valorHora !== null && val
 const formatMoeda = (v) => '$ ' + (Number(v) || 0).toFixed(2);
 // ---- Contador de prazo das tarefas fixas ----
 // prazoISO guarda a DATA-LIMITE (não o número de dias), assim a contagem cai sozinha a cada dia.
+// ---- Contador de prazo das tarefas fixas ----
+// prazoISO guarda a DATA-LIMITE (não o número de dias), assim a contagem cai sozinha a cada dia.
 const dataMaisDias = (n) => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -258,6 +301,7 @@ const diasRestantes = (t) => {
     agora.setHours(0, 0, 0, 0);
     return Math.round((alvo - agora) / 86400000);
 };
+// 3 dias ou menos = vermelho; uma semana ou menos = amarelo
 // 3 dias ou menos = vermelho; uma semana ou menos = amarelo
 const corDoPrazo = (dias) => {
     if (dias === null)
@@ -297,6 +341,7 @@ const TRIMESTRES = ['T1', 'T2', 'T3', 'T4'];
 const SEMESTRES = ['S1', 'S2'];
 const ANOS = [new Date().getFullYear().toString()];
 // chaves de período — mudam quando o período vira
+// chaves de período — mudam quando o período vira
 const chavePeriodo = (freq) => {
     const d = new Date();
     if (freq === 'diaria')
@@ -318,11 +363,17 @@ const chavePeriodo = (freq) => {
 // (7 dias, número ímpar, nunca dá empate), basta olhar a QUARTA-FEIRA (o 4º dia): se ela está no
 // mês X, então pelo menos 4 dos 7 dias estão em X. Ex: semana de 26/jan a 01/fev → quarta é 29/jan
 // → a semana inteira conta como janeiro. Já 02/fev a 08/fev → quarta 05/fev → fevereiro.
+// ---- a qual mês uma semana pertence ----
+// Regra: a semana pertence ao mês onde caem MAIS dias dela. Como a semana vai de domingo a sábado
+// (7 dias, número ímpar, nunca dá empate), basta olhar a QUARTA-FEIRA (o 4º dia): se ela está no
+// mês X, então pelo menos 4 dos 7 dias estão em X. Ex: semana de 26/jan a 01/fev → quarta é 29/jan
+// → a semana inteira conta como janeiro. Já 02/fev a 08/fev → quarta 05/fev → fevereiro.
 const quartaDaSemana = (chaveDomingoISO) => {
     const d = dataDeISO(chaveDomingoISO);
     d.setDate(d.getDate() + 3);
     return d;
 };
+// chave do mês dono da semana (primeiro dia desse mês) — muda sempre num domingo
 // chave do mês dono da semana (primeiro dia desse mês) — muda sempre num domingo
 const mesDaSemanaISO = (chaveDomingoISO) => {
     const q = quartaDaSemana(chaveDomingoISO);
@@ -330,10 +381,13 @@ const mesDaSemanaISO = (chaveDomingoISO) => {
 };
 // slot 0-4 da semana dentro do mês dono dela: as quartas-feiras de um mês são espaçadas de 7 em 7,
 // então a posição da quarta no mês dá direto o número da semana (Sem 1…Sem 5)
+// slot 0-4 da semana dentro do mês dono dela: as quartas-feiras de um mês são espaçadas de 7 em 7,
+// então a posição da quarta no mês dá direto o número da semana (Sem 1…Sem 5)
 const idxSemanaDoMes = (chaveDomingoISO) => {
     const q = quartaDaSemana(chaveDomingoISO);
     return Math.min(Math.floor((q.getDate() - 1) / 7), 4);
 };
+// qual índice no histórico (coluna) marcar ao arquivar
 // qual índice no histórico (coluna) marcar ao arquivar
 const idxHistorico = (freq) => {
     const d = new Date();
@@ -351,6 +405,9 @@ const idxHistorico = (freq) => {
         return 0;
     return 0;
 };
+// mesma lógica de idxHistorico, mas calculada a partir de uma chave ISO específica em vez de
+// "agora" — necessário para o rollover automático: quando ele roda, o relógio já virou para o
+// período NOVO, então "agora" não serve mais para descobrir o slot do período que está fechando.
 // mesma lógica de idxHistorico, mas calculada a partir de uma chave ISO específica em vez de
 // "agora" — necessário para o rollover automático: quando ele roda, o relógio já virou para o
 // período NOVO, então "agora" não serve mais para descobrir o slot do período que está fechando.
@@ -375,6 +432,8 @@ const idxDeChave = (freq, chaveISO) => {
 const SLOTS = { diaria: 7, semanal: 5, mensal: 12, trimestral: 4, semestral: 2, anual: 1 };
 // rótulo legível do período a que uma chave pertence (ex: 'Qua', 'Sem 2', 'Mar').
 // Para grupos custom (que não têm slots) cai no dd/mm da própria chave.
+// rótulo legível do período a que uma chave pertence (ex: 'Qua', 'Sem 2', 'Mar').
+// Para grupos custom (que não têm slots) cai no dd/mm da própria chave.
 const rotuloPeriodo = (freq, chaveISO) => {
     const i = idxDeChave(freq, chaveISO);
     if (freq === 'diaria')
@@ -396,6 +455,9 @@ const rotuloPeriodo = (freq, chaveISO) => {
 // qual período finaliza e arquiva o diário no livro das memórias
 // diária → arquiva no fim do dia (nova chave semanal detectada no início da semana)
 // mapeamento: quando o período SEGUINTE vira, arquiva o anterior no livro
+// qual período finaliza e arquiva o diário no livro das memórias
+// diária → arquiva no fim do dia (nova chave semanal detectada no início da semana)
+// mapeamento: quando o período SEGUINTE vira, arquiva o anterior no livro
 const ARQUIVO_GATILHO = {
     diaria: 'semanal', // diárias → livro quando começa nova semana
     // ‼️ as semanais fecham na VIRADA DO MÊS (dia 1º): todo o histórico semanal vai para o Livro
@@ -407,7 +469,14 @@ const ARQUIVO_GATILHO = {
     semestral: 'anual', // semestrais → livro quando começa novo ano
     anual: null,
 };
+
+// ===== medalhas =====
+// ======================================================================
+// Quadro de Medalhas: faixas de porcentagem, emojis/cores de cada medalha e os
+// quadros padrão. Domingo é dia de descanso e não recebe medalha (⭐ fixa).
+// ======================================================================
 const corPct = (pct) => pct >= 100 ? '#8E6BAE' : pct <= 33 ? '#E8633D' : pct <= 60 ? '#C9A227' : '#6E8C82';
+// quadro de medalhas: mesma lógica de cor do corPct, mas 0% nunca gera medalha
 // quadro de medalhas: mesma lógica de cor do corPct, mas 0% nunca gera medalha
 const medalhaPorPct = (pct) => (pct <= 0 ? null : pct >= 100 ? 'diamante' : pct <= 33 ? 'bronze' : pct <= 60 ? 'prata' : 'ouro');
 const MEDALHAS_INFO = {
@@ -426,6 +495,8 @@ const QUADRO_MEDALHAS_PADRAO = {
 };
 // espelha QUADRO_MEDALHAS_PADRAO, mas guarda a % (0-100) de cada slot em vez do emoji —
 // é a partir desses números que a medalha do período seguinte é calculada (soma / divide)
+// espelha QUADRO_MEDALHAS_PADRAO, mas guarda a % (0-100) de cada slot em vez do emoji —
+// é a partir desses números que a medalha do período seguinte é calculada (soma / divide)
 const QUADRO_PERCENTUAIS_PADRAO = {
     diaria: Array(7).fill(null),
     semanal: Array(5).fill(null),
@@ -436,6 +507,13 @@ const QUADRO_PERCENTUAIS_PADRAO = {
 };
 const diaSemanaHoje = () => new Date().getDay(); // 0 = Domingo ... 6 = Sábado
 // ---- agenda de alertas: rótulos e cálculo de recorrência ----
+
+// ===== agenda =====
+// ======================================================================
+// Agenda de alertas: rótulos de recorrência, cálculo da próxima ocorrência de um item
+// recorrente e os níveis de destaque conforme a proximidade do prazo.
+// ======================================================================
+// ---- agenda de alertas: rótulos e cálculo de recorrência ----
 const REPETIR_AGENDA_LABEL = {
     nenhuma: 'Não repete',
     diaria: 'Diária',
@@ -445,12 +523,6 @@ const REPETIR_AGENDA_LABEL = {
     anual: 'Anual',
     customizada: 'Customizado',
 };
-const paraISO = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-const dataDeISO = (iso) => {
-    const [a, m, d] = iso.split('-').map(Number);
-    return new Date(a, m - 1, d);
-};
-const diasEntreISO = (isoA, isoB) => Math.round((dataDeISO(isoB) - dataDeISO(isoA)) / 86400000); // isoB - isoA, em dias
 // Pso: dias restantes do contador regressivo (nunca passa de 0 pra negativo — para de contar
 // quando chega em zero, momento em que o alerta 🚨 Pso 🚨 passa a ficar ativo).
 const diasRestantesPsoContador = (dias, inicioISO) => {
@@ -458,6 +530,8 @@ const diasRestantesPsoContador = (dias, inicioISO) => {
         return null;
     return Math.max(0, dias - diasEntreISO(inicioISO, paraISO(new Date())));
 };
+// Quantos períodos de "freq" passaram entre duas chaves de período (isoA = mais antiga).
+// Serve para contar TODOS os períodos que passaram com o app fechado, e não só um.
 // Quantos períodos de "freq" passaram entre duas chaves de período (isoA = mais antiga).
 // Serve para contar TODOS os períodos que passaram com o app fechado, e não só um.
 const periodosEntre = (freq, isoA, isoB) => {
@@ -482,11 +556,6 @@ const periodosEntre = (freq, isoA, isoB) => {
         return b.getFullYear() - a.getFullYear();
     return 1;
 };
-const somarDiasISO = (iso, n) => {
-    const d = dataDeISO(iso);
-    d.setDate(d.getDate() + n);
-    return paraISO(d);
-};
 // converte um item legado ({dia: 0-6}) para o novo formato da agenda ({data, repetir})
 const migrarItemAgenda = (a) => {
     if (a && typeof a.dia === 'number' && !a.data) {
@@ -497,8 +566,15 @@ const migrarItemAgenda = (a) => {
         hojeDt.setDate(hojeDt.getDate() + diff);
         return { id: a.id, texto: a.texto, data: paraISO(hojeDt), repetir: 'semanal' };
     }
-    return Object.assign({ id: a.id, texto: a.texto, data: a.data || hoje(), repetir: a.repetir || 'nenhuma' }, (a.repetir === 'customizada' ? { intervaloDias: Math.max(1, Number(a.intervaloDias) || 1) } : {}));
+    return {
+        id: a.id,
+        texto: a.texto,
+        data: a.data || hoje(),
+        repetir: a.repetir || 'nenhuma',
+        ...(a.repetir === 'customizada' ? { intervaloDias: Math.max(1, Number(a.intervaloDias) || 1) } : {}),
+    };
 };
+// calcula a próxima ocorrência de um item da agenda em relação a hoje; retorna null se já passou e não repete
 // calcula a próxima ocorrência de um item da agenda em relação a hoje; retorna null se já passou e não repete
 const calcularOcorrenciaAgenda = (item, hojeIso) => {
     if (!item || !item.data)
@@ -538,6 +614,7 @@ const calcularOcorrenciaAgenda = (item, hojeIso) => {
     return null;
 };
 // nível de destaque: 'hoje' | 'amanha' | 'proximo3' | 'proximo7' | null (fora da janela de destaque)
+// nível de destaque: 'hoje' | 'amanha' | 'proximo3' | 'proximo7' | null (fora da janela de destaque)
 const nivelDestaqueAgenda = (diasRestantes) => {
     if (diasRestantes === 0)
         return 'hoje';
@@ -555,7 +632,8 @@ const DESTAQUE_AGENDA_INFO = {
     proximo3: { label: 'Em 3 dias', cor: '#B8952C', bg: '#FBF3DA' },
     proximo7: { label: 'Em 7 dias', cor: '#6E8C82', bg: '#EAF1EE' },
 };
-const storageExiste = () => typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+
+// ===== sincronizacaoPastas =====
 // ═══════════════════════════════════════════════════════════════════════
 // ESPELHAMENTO DE PASTAS: Notas Rápidas (Cherubion) ⇄ Cofre de Notas (Obsidian)
 // ═══════════════════════════════════════════════════════════════════════
@@ -682,7 +760,7 @@ const criarNotaObsidianSeNaoExiste = (notes, id, titulo) => {
     if (notes[id])
         return notes;
     const agora = Date.now();
-    return Object.assign(Object.assign({}, notes), { [id]: { id, title: titulo, content: '', createdAt: agora, updatedAt: agora } });
+    return { ...notes, [id]: { id, title: titulo, content: '', createdAt: agora, updatedAt: agora } };
 };
 // cria (recursivamente) a nota de uma pasta do Cherubion no Obsidian, com uma nota por
 // subpasta e os links entre elas — usado quando a pasta é inteiramente nova pro Obsidian
@@ -694,7 +772,7 @@ const criarSubarvoreNoObsidian = (notesEntrada, pastaCherubion) => {
         conteudo = adicionarLinkAoConteudo(conteudo, sub.nome);
     });
     if (conteudo !== notes[pastaCherubion.id].content) {
-        notes = Object.assign(Object.assign({}, notes), { [pastaCherubion.id]: Object.assign(Object.assign({}, notes[pastaCherubion.id]), { content: conteudo, updatedAt: Date.now() }) });
+        notes = { ...notes, [pastaCherubion.id]: { ...notes[pastaCherubion.id], content: conteudo, updatedAt: Date.now() } };
     }
     return notes;
 };
@@ -716,7 +794,7 @@ const apagarSubarvoreDoObsidian = (notesEntrada, id, visitados) => {
         if (alvo && !vistos.has(alvo.id))
             notes = apagarSubarvoreDoObsidian(notes, alvo.id, vistos);
     });
-    const resto = Object.assign({}, notes);
+    const resto = { ...notes };
     delete resto[id];
     return resto;
 };
@@ -764,7 +842,7 @@ const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsi
             if (nomeFinal !== emL.nome)
                 mudouCherubion = true;
             if (nomeFinal !== notes[id].title) {
-                notes = Object.assign(Object.assign({}, notes), { [id]: Object.assign(Object.assign({}, notes[id]), { title: nomeFinal, updatedAt: Date.now() }) });
+                notes = { ...notes, [id]: { ...notes[id], title: nomeFinal, updatedAt: Date.now() } };
             }
             const filho = sincronizarNivelPastas({
                 anteriorLista: emA ? emA.subpastas : [],
@@ -778,7 +856,7 @@ const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsi
                 mudouCherubion = true;
             if (filho.mudouObsidian)
                 mudouObsidian = true;
-            novaListaCherubion.push(Object.assign(Object.assign({}, emL), { nome: nomeFinal, subpastas: filho.novaListaCherubion }));
+            novaListaCherubion.push({ ...emL, nome: nomeFinal, subpastas: filho.novaListaCherubion });
             novaCanonica.push({ id, nome: nomeFinal, subpastas: filho.novaCanonica });
         }
         else if (emL && !emR) {
@@ -825,11 +903,24 @@ const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsi
         // se sumiu dos dois lados, a exclusão já foi propagada numa sincronização anterior: ignora
     });
     if (containerAtual && conteudoContainer !== containerAtual.content) {
-        notes = Object.assign(Object.assign({}, notes), { [idContainerReal]: Object.assign(Object.assign({}, notes[idContainerReal]), { content: conteudoContainer, updatedAt: Date.now() }) });
+        notes = { ...notes, [idContainerReal]: { ...notes[idContainerReal], content: conteudoContainer, updatedAt: Date.now() } };
         mudouObsidian = true;
     }
     return { notes, novaListaCherubion, novaCanonica, mudouCherubion, mudouObsidian };
 };
+
+// ===== armazenamentoR2 =====
+// ======================================================================
+// Cloudflare R2: upload de imagens e vídeos, compartilhado entre os 3 apps do Cherubion.
+// As credenciais ficam FORA do backup em JSON de propósito — são do dispositivo, não do usuário.
+// ======================================================================
+const storageExiste = () => typeof window !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+// ═══════════════════════════════════════════════════════════════════════
+// CLOUDFLARE R2: armazenamento de imagens e vídeos, compartilhado entre os
+// 3 apps do Cherubion (mesma origem do GitHub Pages = mesmo localStorage).
+// Fica FORA do backup em JSON de propósito — é credencial do dispositivo,
+// não dado do usuário — do mesmo jeito que o token do Gist dos Contatos.
+// ═══════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════
 // CLOUDFLARE R2: armazenamento de imagens e vídeos, compartilhado entre os
 // 3 apps do Cherubion (mesma origem do GitHub Pages = mesmo localStorage).
@@ -862,6 +953,9 @@ const salvarConfigR2 = (url, token) => {
 // comprime uma imagem antes de subir (reduz para no máx. 1280px de largura, JPEG 75%) —
 // corta o tamanho típico de uma foto de celular em ~80-90%, sem perda visual perceptível
 // numa tela de celular. Vídeo NÃO passa por aqui (comprimir vídeo no navegador é inviável).
+// comprime uma imagem antes de subir (reduz para no máx. 1280px de largura, JPEG 75%) —
+// corta o tamanho típico de uma foto de celular em ~80-90%, sem perda visual perceptível
+// numa tela de celular. Vídeo NÃO passa por aqui (comprimir vídeo no navegador é inviável).
 const comprimirImagemParaUpload = (file) => new Promise((resolve, reject) => {
     const img = new Image();
     const objUrl = URL.createObjectURL(file);
@@ -889,6 +983,8 @@ const comprimirImagemParaUpload = (file) => new Promise((resolve, reject) => {
 });
 // sobe um arquivo (Blob ou File) pro Worker do Cloudflare R2 e devolve a URL pública dele.
 // Lança 'sem-config' se o Worker/token ainda não foram configurados nas Configurações gerais.
+// sobe um arquivo (Blob ou File) pro Worker do Cloudflare R2 e devolve a URL pública dele.
+// Lança 'sem-config' se o Worker/token ainda não foram configurados nas Configurações gerais.
 const subirArquivoParaR2 = async (blob, nomeOriginal) => {
     const { url, token } = lerConfigR2();
     if (!url || !token)
@@ -911,6 +1007,8 @@ const subirArquivoParaR2 = async (blob, nomeOriginal) => {
         throw new Error('resposta do Worker sem url');
     return dados.url;
 };
+
+// ===== App =====
 function App() {
     const [categorias, setCategorias] = useState([]);
     const [fixas, setFixas] = useState([]);
@@ -1024,12 +1122,6 @@ function App() {
     // true depois que o Reset é pressionado: o contador congela em 0 (não reinicia sozinho) e
     // o alerta 🚨 Pso 🚨 fica dispensado até uma nova contagem ser criada no ⚙️.
     const [psoContadorZerado, setPsoContadorZerado] = useState(false);
-    // ---- Pso: Arquivo de fotos — tira foto pela câmera e arquiva (mesmo pipeline R2 das outras mídias) ----
-    const [psoFotos, setPsoFotos] = useState([]); // [{id, url, data, dataISO}]
-    const [psoFotoEnviando, setPsoFotoEnviando] = useState(false);
-    const [psoFotoMsg, setPsoFotoMsg] = useState('');
-    const [psoFotosExpandido, setPsoFotosExpandido] = useState(false);
-    const psoFotoInputRef = useRef(null);
     // ---- Ganhos: entradas de texto livre com data, agrupadas por ano (últimos 8 anos) — painel embutido na aba Atividades ----
     const [ganhosRegistro, setGanhosRegistro] = useState([]); // [{id, ano, texto, data, dataISO}]
     const [ganhosNovoTexto, setGanhosNovoTexto] = useState('');
@@ -1222,7 +1314,7 @@ function App() {
         setStatus('');
         if (!storageExiste()) {
             setStatus('Armazenamento automático não está disponível aqui. Use "copiar backup" / "restaurar" para guardar seus dados manualmente.');
-            setCategorias(CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { id: genId(), tarefas: [] }))));
+            setCategorias(CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] })));
             setCarregando(false);
             return;
         }
@@ -1244,7 +1336,7 @@ function App() {
                 // se não há categorias salvas, semente as padrão
                 const cats = Array.isArray(dados.categorias) && dados.categorias.length > 0
                     ? normalizarCategorias(dados.categorias)
-                    : CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { id: genId(), tarefas: [] })));
+                    : CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] }));
                 setCategorias(cats);
                 setFixas(dados.fixas || []);
                 setLista(dados.lista || []);
@@ -1252,11 +1344,14 @@ function App() {
                 setComentariosFixas(Array.isArray(dados.comentariosFixas) ? dados.comentariosFixas : []);
                 comentariosFixasRef.current = Array.isArray(dados.comentariosFixas) ? dados.comentariosFixas : [];
                 setQuadroMedalhas(dados.quadroMedalhas && typeof dados.quadroMedalhas === 'object'
-                    ? Object.assign(Object.assign({}, QUADRO_MEDALHAS_PADRAO), dados.quadroMedalhas) : QUADRO_MEDALHAS_PADRAO);
+                    ? { ...QUADRO_MEDALHAS_PADRAO, ...dados.quadroMedalhas }
+                    : QUADRO_MEDALHAS_PADRAO);
                 setQuadroPercentuais(dados.quadroPercentuais && typeof dados.quadroPercentuais === 'object'
-                    ? Object.assign(Object.assign({}, QUADRO_PERCENTUAIS_PADRAO), dados.quadroPercentuais) : QUADRO_PERCENTUAIS_PADRAO);
+                    ? { ...QUADRO_PERCENTUAIS_PADRAO, ...dados.quadroPercentuais }
+                    : QUADRO_PERCENTUAIS_PADRAO);
                 setResumoMedalhas(dados.resumoMedalhas && typeof dados.resumoMedalhas === 'object'
-                    ? Object.assign({ diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] }, dados.resumoMedalhas) : { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] });
+                    ? { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [], ...dados.resumoMedalhas }
+                    : { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] });
                 setFrases(dados.frases || []);
                 const prioridadeSalva = typeof dados.notaCatPrioridade === 'string' ? dados.notaCatPrioridade : 'aleatorio';
                 setNotaCatPrioridade(prioridadeSalva);
@@ -1272,7 +1367,7 @@ function App() {
                 setNotasPastaCmeeSeed(true);
                 setBancoDeHoras(dados.bancoDeHoras || 0);
                 setValorHora(typeof dados.valorHora === 'number' ? dados.valorHora : VALOR_HORA_PADRAO);
-                setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? Object.assign(Object.assign({}, REGRAS_ESTRELAS_PADRAO), dados.regrasEstrelas) : REGRAS_ESTRELAS_PADRAO);
+                setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? { ...REGRAS_ESTRELAS_PADRAO, ...dados.regrasEstrelas } : REGRAS_ESTRELAS_PADRAO);
                 setGruposCustom(dados.gruposCustom || []);
                 {
                     const versaoOrd = typeof dados.ordemJanelasVersao === 'number' ? dados.ordemJanelasVersao : 1;
@@ -1298,7 +1393,6 @@ function App() {
                 setPsoContadorDias(typeof dados.psoContadorDias === 'number' ? dados.psoContadorDias : null);
                 setPsoContadorInicioISO(typeof dados.psoContadorInicioISO === 'string' ? dados.psoContadorInicioISO : null);
                 setPsoContadorZerado(!!dados.psoContadorZerado);
-                setPsoFotos(Array.isArray(dados.psoFotos) ? dados.psoFotos : []);
                 setReservas(Array.isArray(dados.reservas) ? dados.reservas : []);
                 {
                     const chk = normalizarChecklists(dados);
@@ -1306,7 +1400,7 @@ function App() {
                     setChecklistSessoes(chk.sessoes);
                 }
                 setGanhosRegistro(Array.isArray(dados.ganhosRegistro) ? dados.ganhosRegistro : []);
-                setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? Object.assign({ brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] }, dados.batalhaNotas) : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
+                setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
                 setContadoresRegressivos(Array.isArray(dados.contadoresRegressivos) ? dados.contadoresRegressivos : []);
                 setModoConcluir(!!dados.modoConcluir);
                 setModoDone(dados.modoDone && typeof dados.modoDone === 'object' && !Array.isArray(dados.modoDone) ? dados.modoDone : {});
@@ -1328,7 +1422,7 @@ function App() {
             }
             else {
                 // primeira vez: semente categorias padrão
-                setCategorias(CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { id: genId(), tarefas: [] }))));
+                setCategorias(CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] })));
                 const freqsRoll = ['diaria', 'semanal', 'mensal', 'trimestral', 'semestral', 'anual'];
                 freqsRoll.forEach((fq) => { periodosRef.current[fq] = chavePeriodo(fq); });
                 dadosCarregadosRef.current = true;
@@ -1345,7 +1439,7 @@ function App() {
                     window.localStorage.setItem('mt-resgate:' + STORAGE_KEY + ':' + Date.now(), bruto);
             }
             catch (eResgate) { /* localStorage indisponível — nada a resgatar */ }
-            setCategorias(CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { id: genId(), tarefas: [] }))));
+            setCategorias(CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] })));
             const freqsRoll = ['diaria', 'semanal', 'mensal', 'trimestral', 'semestral', 'anual'];
             freqsRoll.forEach((fq) => { if (!periodosRef.current[fq])
                 periodosRef.current[fq] = chavePeriodo(fq); });
@@ -1369,7 +1463,7 @@ function App() {
             return;
         aberturaContadaRef.current = true;
         const d = hoje();
-        setAberturasApp((m) => (Object.assign(Object.assign({}, m), { [d]: (m[d] || 0) + 1 })));
+        setAberturasApp((m) => ({ ...m, [d]: (m[d] || 0) + 1 }));
         setSujo(true);
     }, [carregando]);
     // mantém o ref sempre sincronizado com o estado mais recente — o rollover automático
@@ -1423,7 +1517,7 @@ function App() {
         }
         setStatus('Salvando…');
         try {
-            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, psoFotos, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (ok) {
                 setSujo(false);
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1436,7 +1530,7 @@ function App() {
         catch (e) {
             // window.storage falhou (comum no preview do Claude.ai). Grava no localStorage real:
             // os dados ficam salvos e não mostramos alarme falso.
-            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, psoFotos, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (salvouLocal) {
                 setSujo(false);
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1474,12 +1568,12 @@ function App() {
             if (resultado.mudouCherubion) {
                 setNotasPastas(resultado.novaListaCherubion);
                 if (idsApagados.length) {
-                    setNotasRapidas((ns) => ns.map((n) => (idsApagados.includes(n.pastaId) ? Object.assign(Object.assign({}, n), { pastaId: 'geral' }) : n)));
+                    setNotasRapidas((ns) => ns.map((n) => (idsApagados.includes(n.pastaId) ? { ...n, pastaId: 'geral' } : n)));
                 }
                 marcarSujo();
             }
             if (resultado.mudouObsidian) {
-                salvarDadosObsidian(Object.assign(Object.assign({}, dadosObsidian), { notes: resultado.notes }));
+                salvarDadosObsidian({ ...dadosObsidian, notes: resultado.notes });
             }
             if (resultado.mudouCherubion || resultado.mudouObsidian) {
                 salvarEspelhoPastas(resultado.novaCanonica);
@@ -1512,7 +1606,10 @@ function App() {
         const carimbo = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         const blocoNovo = `${nota.texto}\n— enviado do Cherubion em ${carimbo} —\n`;
         const novoConteudo = notaDestino.content ? `${blocoNovo}\n${notaDestino.content}` : blocoNovo;
-        const ok = salvarDadosObsidian(Object.assign(Object.assign({}, dadosObsidian), { notes: Object.assign(Object.assign({}, dadosObsidian.notes), { [pastaId]: Object.assign(Object.assign({}, notaDestino), { content: novoConteudo, updatedAt: Date.now() }) }) }));
+        const ok = salvarDadosObsidian({
+            ...dadosObsidian,
+            notes: { ...dadosObsidian.notes, [pastaId]: { ...notaDestino, content: novoConteudo, updatedAt: Date.now() } },
+        });
         if (!ok) {
             setNotaCopiadaId({ id, estado: 'erro' });
             setTimeout(() => setNotaCopiadaId((v) => (v && v.id === id ? null : v)), 1800);
@@ -1641,7 +1738,7 @@ function App() {
                         return c;
                     const tarefas = [...c.tarefas];
                     tarefas.splice(Math.max(0, Math.min(item.idx, tarefas.length)), 0, item.tarefa);
-                    return Object.assign(Object.assign({}, c), { tarefas });
+                    return { ...c, tarefas };
                 }));
                 break;
             case 'fixa':
@@ -1701,21 +1798,18 @@ function App() {
             case 'teste':
                 restaurarEmLista(setPsoTestes, item.valor, item.idx);
                 break;
-            case 'psoFoto':
-                restaurarEmLista(setPsoFotos, item.valor, item.idx);
-                break;
             case 'checklistItem': {
                 const { chkId, valor, idx } = item;
                 setChecklistItens((m) => {
                     const arr = [...(m[chkId] || [])];
                     const i = Math.max(0, Math.min(idx, arr.length));
                     arr.splice(i, 0, valor);
-                    return Object.assign(Object.assign({}, m), { [chkId]: arr });
+                    return { ...m, [chkId]: arr };
                 });
                 break;
             }
             case 'checklistTudo':
-                setChecklistItens((m) => (Object.assign(Object.assign({}, m), { [item.chkId]: item.valor })));
+                setChecklistItens((m) => ({ ...m, [item.chkId]: item.valor }));
                 break;
             case 'sessaoChk': {
                 // devolve a sessão apagada à sua posição e recoloca nela as tarefas que tinham voltado para a Geral
@@ -1725,9 +1819,12 @@ function App() {
                     if (!arr.some((s) => s.id === sessao.id)) {
                         arr.splice(Math.max(0, Math.min(idx, arr.length)), 0, sessao);
                     }
-                    return Object.assign(Object.assign({}, m), { [chkId]: arr });
+                    return { ...m, [chkId]: arr };
                 });
-                setChecklistItens((m) => (Object.assign(Object.assign({}, m), { [chkId]: (m[chkId] || []).map((i) => (itensIds.includes(i.id) ? Object.assign(Object.assign({}, i), { sessaoId: sessao.id }) : i)) })));
+                setChecklistItens((m) => ({
+                    ...m,
+                    [chkId]: (m[chkId] || []).map((i) => (itensIds.includes(i.id) ? { ...i, sessaoId: sessao.id } : i)),
+                }));
                 setChkMapa(setChkSessaoSel, chkId, sessao.id);
                 break;
             }
@@ -1798,12 +1895,12 @@ function App() {
         setQuadroMedalhas((qm) => {
             const arr = [...(qm[freq] || [])];
             arr[i] = valor; // valor pode ser 'bronze' | 'prata' | 'ouro' | 'diamante' | null (retirar)
-            return Object.assign(Object.assign({}, qm), { [freq]: arr });
+            return { ...qm, [freq]: arr };
         });
         setQuadroPercentuais((qp) => {
             const arr = [...(qp[freq] || [])];
             arr[i] = valor ? PCT_REPRESENTATIVO_MEDALHA[valor] : null;
-            return Object.assign(Object.assign({}, qp), { [freq]: arr });
+            return { ...qp, [freq]: arr };
         });
         setMedalhaEditando(null);
         marcarSujo();
@@ -1816,10 +1913,10 @@ function App() {
         const abrindo = !comentarioAberto[freq];
         if (abrindo) {
             const atual = comentarioAtual(freq);
-            setComentarioRascunho((r) => (Object.assign(Object.assign({}, r), { [freq]: atual ? atual.texto : '' })));
-            setComentarioSolucao((r) => (Object.assign(Object.assign({}, r), { [freq]: atual && atual.solucao ? atual.solucao : '' })));
+            setComentarioRascunho((r) => ({ ...r, [freq]: atual ? atual.texto : '' }));
+            setComentarioSolucao((r) => ({ ...r, [freq]: atual && atual.solucao ? atual.solucao : '' }));
         }
-        setComentarioAberto((m) => (Object.assign(Object.assign({}, m), { [freq]: abrindo })));
+        setComentarioAberto((m) => ({ ...m, [freq]: abrindo }));
     };
     const salvarComentario = (freq) => {
         const texto = (comentarioRascunho[freq] || '').trim();
@@ -1833,7 +1930,7 @@ function App() {
                 setComentariosFixas((l) => l.filter((c) => !(c.freq === freq && c.chave === chave)));
                 marcarSujo();
             }
-            setComentarioAberto((m) => (Object.assign(Object.assign({}, m), { [freq]: false })));
+            setComentarioAberto((m) => ({ ...m, [freq]: false }));
             return;
         }
         const dataHoje = new Date().toLocaleString('pt-BR', {
@@ -1842,10 +1939,10 @@ function App() {
         setComentariosFixas((l) => {
             const existe = l.some((c) => c.freq === freq && c.chave === chave);
             if (existe)
-                return l.map((c) => (c.freq === freq && c.chave === chave ? Object.assign(Object.assign({}, c), { texto, solucao, data: dataHoje }) : c));
+                return l.map((c) => (c.freq === freq && c.chave === chave ? { ...c, texto, solucao, data: dataHoje } : c));
             return [{ id: genId(), freq, chave, texto, solucao, data: dataHoje, dataISO: hoje() }, ...l];
         });
-        setComentarioAberto((m) => (Object.assign(Object.assign({}, m), { [freq]: false })));
+        setComentarioAberto((m) => ({ ...m, [freq]: false }));
         marcarSujo();
     };
     const removerComentario = (id) => {
@@ -1893,7 +1990,7 @@ function App() {
         const novasFixas = fixasAtuais.map((t) => {
             if (t.freq !== freq)
                 return t;
-            return Object.assign(Object.assign({}, t), { historico: Array(SLOTS[freq] || 7).fill(false) });
+            return { ...t, historico: Array(SLOTS[freq] || 7).fill(false) };
         });
         return { novaFixas: novasFixas, novoLivro };
     };
@@ -1915,7 +2012,7 @@ function App() {
             // 1 = amarela, 2 ou mais = vermelha. Concluir a tarefa zera o contador.
             // Se o app ficou dias/semanas fechado, todos os períodos que passaram são contados.
             const atrasos = feita ? (pulados - 1) : (t.atrasos || 0) + pulados;
-            return Object.assign(Object.assign({}, t), { feitoEm: null, feitoDia: null, historico, atrasos });
+            return { ...t, feitoEm: null, feitoDia: null, historico, atrasos };
         });
     };
     // Dado o período "pai" (ex: 'semanal') e a chave ISO do período anterior dele (a que acabou de virar),
@@ -1976,13 +2073,13 @@ function App() {
         setResumoMedalhas((r) => {
             const lista = Array.isArray(r[freqFilho]) ? r[freqFilho] : [];
             const entrada = { id: genId(), label: labelPeriodo, medalha, mediaPct: media };
-            return Object.assign(Object.assign({}, r), { [freqFilho]: [entrada, ...lista] });
+            return { ...r, [freqFilho]: [entrada, ...lista] };
         });
         // zera o quadro do período filho para começar o novo ciclo do zero
-        const proximoPercentuais = Object.assign(Object.assign({}, quadroPercentuaisRef.current), { [freqFilho]: Array(tamanhoFilho).fill(null) });
+        const proximoPercentuais = { ...quadroPercentuaisRef.current, [freqFilho]: Array(tamanhoFilho).fill(null) };
         quadroPercentuaisRef.current = proximoPercentuais; // atualiza o ref imediatamente (evita closure desatualizada dentro do mesmo ciclo)
         setQuadroPercentuais(proximoPercentuais);
-        setQuadroMedalhas((q) => (Object.assign(Object.assign({}, q), { [freqFilho]: Array(tamanhoFilho).fill(null) })));
+        setQuadroMedalhas((q) => ({ ...q, [freqFilho]: Array(tamanhoFilho).fill(null) }));
     };
     // Verifica periodicamente se algum período virou
     const verificarRollovers = (fixasAtuais, livroAtual) => {
@@ -2028,15 +2125,15 @@ function App() {
                         const atual = Array.isArray(q[freq]) ? [...q[freq]] : Array(tamanhoFreq).fill(null);
                         if (idxFechado >= 0 && idxFechado < atual.length)
                             atual[idxFechado] = medalhaFechada;
-                        return Object.assign(Object.assign({}, q), { [freq]: atual });
+                        return { ...q, [freq]: atual };
                     });
                     const percentuaisFreqAtual = Array.isArray(quadroPercentuaisRef.current[freq])
                         ? [...quadroPercentuaisRef.current[freq]]
                         : Array(tamanhoFreq).fill(null);
                     if (idxFechado >= 0 && idxFechado < percentuaisFreqAtual.length)
                         percentuaisFreqAtual[idxFechado] = pctFechado;
-                    quadroPercentuaisRef.current = Object.assign(Object.assign({}, quadroPercentuaisRef.current), { [freq]: percentuaisFreqAtual });
-                    setQuadroPercentuais((q) => (Object.assign(Object.assign({}, q), { [freq]: percentuaisFreqAtual })));
+                    quadroPercentuaisRef.current = { ...quadroPercentuaisRef.current, [freq]: percentuaisFreqAtual };
+                    setQuadroPercentuais((q) => ({ ...q, [freq]: percentuaisFreqAtual }));
                 }
                 // o período virou: desmarca + atualiza histórico
                 // conta TODOS os períodos passados desde a última abertura, não só um
@@ -2127,7 +2224,8 @@ function App() {
         if (item && !item.repoFeito)
             tocarSinoConcluido(); // som só ao marcar, não ao desmarcar
         setCategorias((cs) => cs.map((c) => c.id === catId
-            ? Object.assign(Object.assign({}, c), { tarefas: c.tarefas.map((t) => (t.id === tarefaId ? Object.assign(Object.assign({}, t), { repoFeito: !t.repoFeito }) : t)) }) : c));
+            ? { ...c, tarefas: c.tarefas.map((t) => (t.id === tarefaId ? { ...t, repoFeito: !t.repoFeito } : t)) }
+            : c));
         marcarSujo();
     };
     const excluirCategoria = (id) => {
@@ -2141,7 +2239,7 @@ function App() {
         const nome = renameTexto.trim();
         if (!nome)
             return;
-        setCategorias((cs) => cs.map((c) => (c.id === id ? Object.assign(Object.assign({}, c), { nome }) : c)));
+        setCategorias((cs) => cs.map((c) => (c.id === id ? { ...c, nome } : c)));
         setRenamingCat(null);
         setRenameTexto('');
         marcarSujo();
@@ -2194,8 +2292,8 @@ function App() {
             return [...fs, { id: genId(), texto: t.texto, freq: grupoId, feitoEm: null, historico: [false] }];
         });
         // feedback visual: o botão daquela tarefa confirma "✓ Adicionado" por 1,2s
-        setPrioritarioFeito((m) => (Object.assign(Object.assign({}, m), { [t.id]: true })));
-        setTimeout(() => setPrioritarioFeito((m) => { const n = Object.assign({}, m); delete n[t.id]; return n; }), 1200);
+        setPrioritarioFeito((m) => ({ ...m, [t.id]: true }));
+        setTimeout(() => setPrioritarioFeito((m) => { const n = { ...m }; delete n[t.id]; return n; }), 1200);
         marcarSujo();
     };
     const adicionarTarefa = (cat) => {
@@ -2209,8 +2307,9 @@ function App() {
             : (filtroSortear[cat.id] != null ? filtroSortear[cat.id] : null);
         const premiacao = premiacaoDraft[cat.id] || 0;
         setCategorias((cs) => cs.map((c) => c.id === cat.id
-            ? Object.assign(Object.assign({}, c), { tarefas: [...c.tarefas, { id: genId(), texto, minutos, premiacao }] }) : c));
-        setRascunhoTarefa((r) => (Object.assign(Object.assign({}, r), { [cat.id]: '' })));
+            ? { ...c, tarefas: [...c.tarefas, { id: genId(), texto, minutos, premiacao }] }
+            : c));
+        setRascunhoTarefa((r) => ({ ...r, [cat.id]: '' }));
         marcarSujo();
     };
     const removerTarefa = (catId, tarefaId) => {
@@ -2218,7 +2317,7 @@ function App() {
         const idx = cat ? cat.tarefas.findIndex((t) => t.id === tarefaId) : -1;
         if (cat && idx !== -1)
             registrarDesfazer('categorias', 'tarefaCategoria', { catId, tarefa: cat.tarefas[idx], idx });
-        setCategorias((cs) => cs.map((c) => (c.id === catId ? Object.assign(Object.assign({}, c), { tarefas: c.tarefas.filter((t) => t.id !== tarefaId) }) : c)));
+        setCategorias((cs) => cs.map((c) => (c.id === catId ? { ...c, tarefas: c.tarefas.filter((t) => t.id !== tarefaId) } : c)));
         marcarSujo();
     };
     // pool de tarefas elegíveis para o sorteio, aplicando os filtros de duração e de estrela.
@@ -2995,7 +3094,7 @@ function App() {
             cancelarEdicaoTeste();
             return;
         }
-        setPsoTestes((ts) => ts.map((t) => (t.id === testeEditandoId ? Object.assign(Object.assign({}, t), { texto }) : t)));
+        setPsoTestes((ts) => ts.map((t) => (t.id === testeEditandoId ? { ...t, texto } : t)));
         setTesteEditandoId(null);
         setTesteEditTexto('');
         marcarSujo();
@@ -3107,9 +3206,9 @@ function App() {
         return chkAbasDe(chkId).some((s) => s.id === sel) ? sel : 'geral';
     };
     const chkItensDaSessao = (chkId, sid) => chkItensDe(chkId).filter((i) => sessaoDoItem(i) === sid);
-    const setChkMapa = (setter, chkId, valor) => setter((m) => (Object.assign(Object.assign({}, m), { [chkId]: valor })));
-    const setItensDe = (chkId, fn) => setChecklistItens((m) => (Object.assign(Object.assign({}, m), { [chkId]: fn(m[chkId] || []) })));
-    const setSessoesDe = (chkId, fn) => setChecklistSessoes((m) => (Object.assign(Object.assign({}, m), { [chkId]: fn(m[chkId] || []) })));
+    const setChkMapa = (setter, chkId, valor) => setter((m) => ({ ...m, [chkId]: valor }));
+    const setItensDe = (chkId, fn) => setChecklistItens((m) => ({ ...m, [chkId]: fn(m[chkId] || []) }));
+    const setSessoesDe = (chkId, fn) => setChecklistSessoes((m) => ({ ...m, [chkId]: fn(m[chkId] || []) }));
     const msgChk = (chkId, texto) => setChkMapa(setChkMsg, chkId, texto);
     const adicionarItemChk = (chkId) => {
         const texto = (chkNovoTexto[chkId] || '').trim();
@@ -3164,7 +3263,7 @@ function App() {
         }
         // remove por id e, por segurança, também qualquer outra entrada com o mesmo nome
         setSessoesDe(chkId, (s) => s.filter((x) => x.id !== sid && !(alvo && x.nome === alvo.nome)));
-        setItensDe(chkId, (l) => l.map((i) => (sessaoDoItem(i) === sid ? Object.assign(Object.assign({}, i), { sessaoId: null }) : i)));
+        setItensDe(chkId, (l) => l.map((i) => (sessaoDoItem(i) === sid ? { ...i, sessaoId: null } : i)));
         setChkMapa(setChkSessaoSel, chkId, 'geral');
         setChkMapa(setChkConfirmRemoverSessao, chkId, false);
         setChkMapa(setChkCriandoSessao, chkId, false);
@@ -3182,18 +3281,18 @@ function App() {
             const historico = t.historico ? [...t.historico] : [false];
             historico[idxHistorico(t.freq)] = feito;
             if (!feito)
-                return Object.assign(Object.assign({}, t), { feitoEm: null, feitoDia: null, historico });
+                return { ...t, feitoEm: null, feitoDia: null, historico };
             const mapa = {
                 diaria: hoje(), semanal: domingoDaSemana(), mensal: primeiroDiaDoMes(),
                 trimestral: primeiroDiaDoTrimestre(), semestral: primeiroDiaSemestre(), anual: primeiroDiaDoanual(),
             };
-            return Object.assign(Object.assign({}, t), { feitoEm: mapa[t.freq] || hoje(), feitoDia: hoje(), historico, atrasos: 0 });
+            return { ...t, feitoEm: mapa[t.freq] || hoje(), feitoDia: hoje(), historico, atrasos: 0 };
         }));
     };
     const alternarItemChk = (chkId, id) => {
         const item = chkItensDe(chkId).find((i) => i.id === id);
         const novo = item ? !item.feito : true;
-        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { feito: novo }) : i)));
+        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, feito: novo } : i)));
         // se o item foi marcado como Priority, a cópia nos Prioritários acompanha
         if (item && item.fixaId)
             marcarFixaComo(item.fixaId, novo);
@@ -3208,7 +3307,7 @@ function App() {
         if (item.prioridade) {
             if (item.fixaId)
                 setFixas((fs) => fs.filter((t) => t.id !== item.fixaId));
-            setItensDe(chkId, (l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { prioridade: false, fixaId: null }) : i)));
+            setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, prioridade: false, fixaId: null } : i)));
             marcarSujo();
             return;
         }
@@ -3224,7 +3323,7 @@ function App() {
                 feitoEm: item.feito ? hoje() : null, feitoDia: item.feito ? hoje() : null,
                 historico: [!!item.feito], origemChk: { chkId, itemId: id },
             }]);
-        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { prioridade: true, fixaId: novaFixaId }) : i)));
+        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, prioridade: true, fixaId: novaFixaId } : i)));
         marcarSujo();
     };
     // Painel 🚗 Car (dentro de Prefeituras): botões de atalho — cada toque manda a mensagem
@@ -3256,7 +3355,7 @@ function App() {
         if (!programaAberto)
             return;
         const { chkId, itemId } = programaAberto;
-        setItensDe(chkId, (l) => l.map((i) => (i.id === itemId ? Object.assign(Object.assign({}, i), { programa: programaTextoEdit }) : i)));
+        setItensDe(chkId, (l) => l.map((i) => (i.id === itemId ? { ...i, programa: programaTextoEdit } : i)));
         marcarSujo();
         setProgramaAberto(null);
         setProgramaTextoEdit('');
@@ -3272,7 +3371,7 @@ function App() {
             return;
         const atual = CICLO_COR_ITEM.indexOf(item.cor || null);
         const proxima = CICLO_COR_ITEM[(atual + 1) % CICLO_COR_ITEM.length];
-        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { cor: proxima }) : i)));
+        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, cor: proxima } : i)));
         marcarSujo();
     };
     const removerItemChk = (chkId, id) => {
@@ -3293,17 +3392,20 @@ function App() {
         if (!texto)
             return;
         const coluna = batalhaPaisSel + (batalhaTipoSel === 'pros' ? 'Pros' : 'Contras');
-        setBatalhaNotas((m) => (Object.assign(Object.assign({}, m), { [coluna]: [{ id: Date.now() + Math.random(), texto, estrelas: 0 }, ...(m[coluna] || [])] })));
+        setBatalhaNotas((m) => ({ ...m, [coluna]: [{ id: Date.now() + Math.random(), texto, estrelas: 0 }, ...(m[coluna] || [])] }));
         setBatalhaNovoTexto('');
         marcarSujo();
     };
     const removerNotaBatalha = (coluna, id) => {
-        setBatalhaNotas((m) => (Object.assign(Object.assign({}, m), { [coluna]: (m[coluna] || []).filter((n) => n.id !== id) })));
+        setBatalhaNotas((m) => ({ ...m, [coluna]: (m[coluna] || []).filter((n) => n.id !== id) }));
         marcarSujo();
     };
     // toca numa estrela pra dar aquela nota (1, 2 ou 3); tocar na mesma estrela que já está marcada zera
     const definirEstrelaBatalha = (coluna, id, estrelas) => {
-        setBatalhaNotas((m) => (Object.assign(Object.assign({}, m), { [coluna]: (m[coluna] || []).map((n) => (n.id === id ? Object.assign(Object.assign({}, n), { estrelas: n.estrelas === estrelas ? 0 : estrelas }) : n)) })));
+        setBatalhaNotas((m) => ({
+            ...m,
+            [coluna]: (m[coluna] || []).map((n) => (n.id === id ? { ...n, estrelas: n.estrelas === estrelas ? 0 : estrelas } : n)),
+        }));
         marcarSujo();
     };
     // Contador Regressivo: cada contador guarda o valor inicial (ex.: 256) e a data em que foi criado;
@@ -3450,7 +3552,7 @@ function App() {
                 const aberto = !!ganhosAnoAberto[ano];
                 const rotulo = ano === 'indefinido' ? 'Indefinido' : ano;
                 return (React.createElement("div", { key: ano, style: { marginBottom: 8 } },
-                    React.createElement("button", { onClick: () => setGanhosAnoAberto((m) => (Object.assign(Object.assign({}, m), { [ano]: !m[ano] }))), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
+                    React.createElement("button", { onClick: () => setGanhosAnoAberto((m) => ({ ...m, [ano]: !m[ano] })), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
                             display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                             fontSize: 13, fontWeight: 700, color: '#232323', padding: '8px 2px',
                             border: 'none', borderBottom: '1.5px solid #ddd8c9', background: 'none', cursor: 'pointer',
@@ -3651,7 +3753,8 @@ function App() {
     const alternarStatusLista = (id) => {
         setLista((l) => l.map((item) => item.id === id
             ? item.status === 'aguardando'
-                ? Object.assign(Object.assign({}, item), { status: 'feito', feitoEm: new Date().toISOString() }) : Object.assign(Object.assign({}, item), { status: 'aguardando', feitoEm: null })
+                ? { ...item, status: 'feito', feitoEm: new Date().toISOString() }
+                : { ...item, status: 'aguardando', feitoEm: null }
             : item));
         marcarSujo();
     };
@@ -3677,7 +3780,7 @@ function App() {
         const isCustomFreq = gruposCustom.some((g) => g.id === freq);
         const historico = Array(isCustomFreq ? 1 : (slots[freq] || 7)).fill(false);
         setFixas((fs) => [...fs, { id: genId(), texto, freq, feitoEm: null, historico }]);
-        setFixasCardNovoTexto((m) => (Object.assign(Object.assign({}, m), { [freq]: '' })));
+        setFixasCardNovoTexto((m) => ({ ...m, [freq]: '' }));
         marcarSujo();
     };
     // ---- banco de reservas: a tarefa fica guardada em segundo plano até você elevá-la ----
@@ -3686,7 +3789,7 @@ function App() {
         if (!texto)
             return;
         setReservas((rs) => [...rs, { id: genId(), texto, freq }]);
-        setReservaNovoTexto((m) => (Object.assign(Object.assign({}, m), { [freq]: '' })));
+        setReservaNovoTexto((m) => ({ ...m, [freq]: '' }));
         marcarSujo();
     };
     const removerReserva = (id) => {
@@ -3728,7 +3831,7 @@ function App() {
     // muda o contador de uma tarefa já existente (em dias a partir de hoje)
     const definirPrazoFixa = (id, dias) => {
         const n = parseInt(dias, 10);
-        setFixas((fs) => fs.map((t) => (t.id === id ? Object.assign(Object.assign({}, t), { prazoISO: Number.isFinite(n) && n > 0 ? dataMaisDias(n) : null }) : t)));
+        setFixas((fs) => fs.map((t) => (t.id === id ? { ...t, prazoISO: Number.isFinite(n) && n > 0 ? dataMaisDias(n) : null } : t)));
         marcarSujo();
     };
     // reordena dentro de cada lista: quem tem menos dias para vencer sobe para o topo;
@@ -3795,7 +3898,7 @@ function App() {
         setFixasGruposOrdem((ord) => ord.filter((x) => x !== id));
         setFixasGruposOcultos((ocultos) => ocultos.filter((x) => x !== id));
         setFixasGruposComoCard((cards) => cards.filter((x) => x !== id));
-        setQuadroMedalhas((q) => { const _a = q, _b = id, _removido = _a[_b], resto = __rest(_a, [typeof _b === "symbol" ? _b : _b + ""]); return resto; });
+        setQuadroMedalhas((q) => { const { [id]: _removido, ...resto } = q; return resto; });
         marcarSujo();
     };
     // ids válidos de grupos de tarefas fixas neste momento (padrão + listas custom)
@@ -3973,7 +4076,7 @@ function App() {
                 // desmarcar: remove a marca do histórico também
                 const historico = t.historico ? [...t.historico] : [];
                 historico[idxHistorico(t.freq)] = false;
-                return Object.assign(Object.assign({}, t), { feitoEm: null, feitoDia: null, historico });
+                return { ...t, feitoEm: null, feitoDia: null, historico };
             }
             // marcar: atualiza feitoEm E já marca o histórico
             const mapa = {
@@ -3983,12 +4086,15 @@ function App() {
             const isCustomFreq = gruposCustom.some((g) => g.id === t.freq);
             const historico = t.historico ? [...t.historico] : Array(isCustomFreq ? 1 : (SLOTS[t.freq] || 7)).fill(false);
             historico[idxHistorico(t.freq)] = true;
-            return Object.assign(Object.assign({}, t), { feitoEm: mapa[t.freq] || hoje(), feitoDia: hoje(), historico, atrasos: 0 });
+            return { ...t, feitoEm: mapa[t.freq] || hoje(), feitoDia: hoje(), historico, atrasos: 0 };
         }));
         // se esta fixa veio do botão Priority de um item do Livro Razão, marca o item lá também
         if (tarefa.origemChk) {
             const { chkId, itemId } = tarefa.origemChk;
-            setChecklistItens((m) => (Object.assign(Object.assign({}, m), { [chkId]: (m[chkId] || []).map((i) => (i.id === itemId ? Object.assign(Object.assign({}, i), { feito: !jaEstavaFeita }) : i)) })));
+            setChecklistItens((m) => ({
+                ...m,
+                [chkId]: (m[chkId] || []).map((i) => (i.id === itemId ? { ...i, feito: !jaEstavaFeita } : i)),
+            }));
         }
         marcarSujo();
     };
@@ -4010,14 +4116,14 @@ function App() {
             const atual = Array.isArray(q[freq]) ? [...q[freq]] : Array(tamanhoPadrao).fill(null);
             if (idx >= 0 && idx < atual.length)
                 atual[idx] = medalha;
-            return Object.assign(Object.assign({}, q), { [freq]: atual });
+            return { ...q, [freq]: atual };
         });
         setQuadroPercentuais((q) => {
             const tamanhoPadrao = SLOTS[freq] || 1;
             const atual = Array.isArray(q[freq]) ? [...q[freq]] : Array(tamanhoPadrao).fill(null);
             if (idx >= 0 && idx < atual.length)
                 atual[idx] = pct;
-            return Object.assign(Object.assign({}, q), { [freq]: atual });
+            return { ...q, [freq]: atual };
         });
     };
     // MEDALHA PROVISÓRIA: recalcula a medalha do período em andamento (hoje, esta semana, este mês…)
@@ -4094,7 +4200,7 @@ function App() {
                 historico[idxAtual(freq)] = true;
                 novosRegistros.push({ id: genId(), tipo: 'fixa', tarefa: t.texto, dia: labelPorFreq(freq, idxAtual(freq)), freq, data: dataHoje, dataISO: hoje() });
             }
-            return Object.assign(Object.assign({}, t), { feitoEm: null, historico });
+            return { ...t, feitoEm: null, historico };
         }));
         // comentários do grupo também vão para o livro e saem da tela
         const comentariosDaFreq = comentariosFixas.filter((c) => c.freq === freq);
@@ -4142,7 +4248,7 @@ function App() {
                 return t;
             const historico = t.historico ? [...t.historico] : [];
             historico[colIdx] = !historico[colIdx];
-            return Object.assign(Object.assign({}, t), { historico });
+            return { ...t, historico };
         }));
         marcarSujo();
     };
@@ -4150,7 +4256,7 @@ function App() {
         setHistoricoColunasOcultas((prev) => {
             const atual = prev[freq] || [];
             const jaOculta = atual.includes(colIdx);
-            return Object.assign(Object.assign({}, prev), { [freq]: jaOculta ? atual.filter((i) => i !== colIdx) : [...atual, colIdx] });
+            return { ...prev, [freq]: jaOculta ? atual.filter((i) => i !== colIdx) : [...atual, colIdx] };
         });
     };
     // ---- janela de alertas ----
@@ -4253,7 +4359,7 @@ function App() {
             return;
         }
         const t = setTimeout(() => {
-            setContagemPasta((c) => (c ? Object.assign(Object.assign({}, c), { restante: c.restante - 1 }) : null));
+            setContagemPasta((c) => (c ? { ...c, restante: c.restante - 1 } : null));
         }, 1000);
         return () => clearTimeout(t);
     }, [contagemPasta, novoTextoRapido]);
@@ -4305,7 +4411,7 @@ function App() {
             const destino = n.subpastaId || n.pastaId || 'geral';
             const base = { id: n.id, texto: typeof n.texto === 'string' ? n.texto : '', pastaId: validos.has(destino) ? destino : 'geral' };
             // preserva a marca de origem das notas criadas pelo PocketScribe (usada pra não duplicar transcrição)
-            return typeof n.origemPocketscribeTs === 'number' ? Object.assign(Object.assign({}, base), { origemPocketscribeTs: n.origemPocketscribeTs }) : base;
+            return typeof n.origemPocketscribeTs === 'number' ? { ...base, origemPocketscribeTs: n.origemPocketscribeTs } : base;
         });
     };
     // devolve o caminho de ids do topo até o nó procurado, ou null
@@ -4331,8 +4437,8 @@ function App() {
         return null;
     };
     // aplica fn no nó de id indicado, preservando o resto da árvore
-    const atualizarNo = (nos, id, fn) => (Array.isArray(nos) ? nos : []).map((n) => (n.id === id ? fn(n) : Object.assign(Object.assign({}, n), { subpastas: atualizarNo(n.subpastas, id, fn) })));
-    const removerNo = (nos, id) => (Array.isArray(nos) ? nos : []).filter((n) => n.id !== id).map((n) => (Object.assign(Object.assign({}, n), { subpastas: removerNo(n.subpastas, id) })));
+    const atualizarNo = (nos, id, fn) => (Array.isArray(nos) ? nos : []).map((n) => (n.id === id ? fn(n) : { ...n, subpastas: atualizarNo(n.subpastas, id, fn) }));
+    const removerNo = (nos, id) => (Array.isArray(nos) ? nos : []).filter((n) => n.id !== id).map((n) => ({ ...n, subpastas: removerNo(n.subpastas, id) }));
     // procura em qualquer profundidade uma pasta cuja palavra-chave seja exatamente o texto digitado
     const acharPorPalavraChave = (texto) => {
         const alvo = normalizarChave(texto);
@@ -4426,7 +4532,7 @@ function App() {
             return;
         const novo = { id: genId(), nome, palavraChave: '', subpastas: [] };
         if (paiId) {
-            setNotasPastas((ps) => atualizarNo(ps, paiId, (n) => (Object.assign(Object.assign({}, n), { subpastas: [...n.subpastas, novo] }))));
+            setNotasPastas((ps) => atualizarNo(ps, paiId, (n) => ({ ...n, subpastas: [...n.subpastas, novo] })));
             setSubNovoNome('');
             setSubNovoPara(null);
         }
@@ -4437,7 +4543,7 @@ function App() {
         marcarSujo();
     };
     const definirChavePasta = (id, chave) => {
-        setNotasPastas((ps) => atualizarNo(ps, id, (n) => (Object.assign(Object.assign({}, n), { palavraChave: chave }))));
+        setNotasPastas((ps) => atualizarNo(ps, id, (n) => ({ ...n, palavraChave: chave })));
         marcarSujo();
     };
     // apagar uma pasta manda as notas dela E as de todas as descendentes para a Geral — nada é perdido
@@ -4447,7 +4553,7 @@ function App() {
         const alvo = noPorId(notasPastas, id);
         const afetados = new Set(alvo ? todosIdsPastas([alvo]) : [id]);
         setNotasPastas((ps) => removerNo(ps, id));
-        setNotasRapidas((ns) => ns.map((n) => (afetados.has(n.pastaId) ? Object.assign(Object.assign({}, n), { pastaId: 'geral' }) : n)));
+        setNotasRapidas((ns) => ns.map((n) => (afetados.has(n.pastaId) ? { ...n, pastaId: 'geral' } : n)));
         // tira do histórico de uso as pastas que deixaram de existir, para não ocupar as 15 vagas à toa
         setNotasPastasUsos((u) => u.map((c) => c.filter((x) => !afetados.has(x))).filter((c) => c.length));
         setNotaCaminhoSel((c) => {
@@ -4488,7 +4594,7 @@ function App() {
     // edição de nota já criada — disponível só com o ⚙ das Notas rápidas aberto
     const editarNotaRapida = (id, texto) => {
         const limpo = String(texto);
-        setNotasRapidas((ns) => ns.map((n) => (n.id === id ? Object.assign(Object.assign({}, n), { texto: limpo }) : n)));
+        setNotasRapidas((ns) => ns.map((n) => (n.id === id ? { ...n, texto: limpo } : n)));
         marcarSujo();
     };
     const removerNotaRapida = (id) => {
@@ -4561,45 +4667,6 @@ function App() {
         finally {
             setUploadMidiaEmAndamento(false);
         }
-    };
-    // Pso: tira uma foto pela câmera do celular e arquiva na galeria do Pso. Usa o mesmo
-    // pipeline do Cloudflare R2 das outras mídias — comprime e sobe, guardando só a URL; sem
-    // R2 configurado, cai no base64 direto no localStorage pra nunca travar o fluxo.
-    const handlePsoFotoInput = async (e) => {
-        const file = e.target.files && e.target.files[0];
-        e.target.value = '';
-        if (!file)
-            return;
-        const registrarFoto = (urlFoto) => {
-            setPsoFotos((fs) => [{ id: genId(), url: urlFoto, data: new Date().toLocaleString('pt-BR'), dataISO: hoje() }, ...fs]);
-        };
-        const { url, token } = lerConfigR2();
-        if (!url || !token) {
-            const reader = new FileReader();
-            reader.onload = (ev) => registrarFoto(ev.target.result);
-            reader.onerror = () => setPsoFotoMsg('Não consegui ler a foto.');
-            reader.readAsDataURL(file);
-            return;
-        }
-        setPsoFotoMsg('');
-        setPsoFotoEnviando(true);
-        try {
-            const comprimida = await comprimirImagemParaUpload(file);
-            const urlFinal = await subirArquivoParaR2(comprimida, file.name || 'pso-foto.jpg');
-            registrarFoto(urlFinal);
-        }
-        catch (err) {
-            setPsoFotoMsg('Não consegui subir a foto. Confira a configuração do Cloudflare em ⚙️ Configurações gerais.');
-        }
-        finally {
-            setPsoFotoEnviando(false);
-        }
-    };
-    const removerPsoFoto = (id) => {
-        const idx = psoFotos.findIndex((f) => f.id === id);
-        if (idx !== -1)
-            registrarDesfazer('livroRazao', 'psoFoto', { valor: psoFotos[idx], idx });
-        setPsoFotos((fs) => fs.filter((f) => f.id !== id));
     };
     const salvarConfigR2Click = () => {
         const ok = salvarConfigR2(r2UrlDraft, r2TokenDraft);
@@ -5037,7 +5104,7 @@ function App() {
         catch (e) { /* localStorage indisponível: backup segue só com os dados do Minha Tela */ }
         return dados;
     };
-    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, psoFotos, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
+    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
     const copiarBackup = () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -5117,11 +5184,14 @@ function App() {
             setComentariosFixas(Array.isArray(dados.comentariosFixas) ? dados.comentariosFixas : []);
             comentariosFixasRef.current = Array.isArray(dados.comentariosFixas) ? dados.comentariosFixas : [];
             setQuadroMedalhas(dados.quadroMedalhas && typeof dados.quadroMedalhas === 'object'
-                ? Object.assign(Object.assign({}, QUADRO_MEDALHAS_PADRAO), dados.quadroMedalhas) : QUADRO_MEDALHAS_PADRAO);
+                ? { ...QUADRO_MEDALHAS_PADRAO, ...dados.quadroMedalhas }
+                : QUADRO_MEDALHAS_PADRAO);
             setQuadroPercentuais(dados.quadroPercentuais && typeof dados.quadroPercentuais === 'object'
-                ? Object.assign(Object.assign({}, QUADRO_PERCENTUAIS_PADRAO), dados.quadroPercentuais) : QUADRO_PERCENTUAIS_PADRAO);
+                ? { ...QUADRO_PERCENTUAIS_PADRAO, ...dados.quadroPercentuais }
+                : QUADRO_PERCENTUAIS_PADRAO);
             setResumoMedalhas(dados.resumoMedalhas && typeof dados.resumoMedalhas === 'object'
-                ? Object.assign({ diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] }, dados.resumoMedalhas) : { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] });
+                ? { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [], ...dados.resumoMedalhas }
+                : { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] });
             setFrases(Array.isArray(dados.frases) ? dados.frases : []);
             setAlertasSemana(Array.isArray(dados.alertasSemana) ? dados.alertasSemana.map(migrarItemAgenda) : []);
             setAlertasNotas(Array.isArray(dados.alertasNotas) ? dados.alertasNotas : []);
@@ -5134,7 +5204,7 @@ function App() {
             setNotasPastaCmeeSeed(true);
             setBancoDeHoras(typeof dados.bancoDeHoras === 'number' ? dados.bancoDeHoras : 0);
             setValorHora(typeof dados.valorHora === 'number' ? dados.valorHora : VALOR_HORA_PADRAO);
-            setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? Object.assign(Object.assign({}, REGRAS_ESTRELAS_PADRAO), dados.regrasEstrelas) : REGRAS_ESTRELAS_PADRAO);
+            setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? { ...REGRAS_ESTRELAS_PADRAO, ...dados.regrasEstrelas } : REGRAS_ESTRELAS_PADRAO);
             setGruposCustom(Array.isArray(dados.gruposCustom) ? dados.gruposCustom : []);
             {
                 const versaoOrd = typeof dados.ordemJanelasVersao === 'number' ? dados.ordemJanelasVersao : 1;
@@ -5160,7 +5230,6 @@ function App() {
             setPsoContadorDias(typeof dados.psoContadorDias === 'number' ? dados.psoContadorDias : null);
             setPsoContadorInicioISO(typeof dados.psoContadorInicioISO === 'string' ? dados.psoContadorInicioISO : null);
             setPsoContadorZerado(!!dados.psoContadorZerado);
-            setPsoFotos(Array.isArray(dados.psoFotos) ? dados.psoFotos : []);
             setReservas(Array.isArray(dados.reservas) ? dados.reservas : []);
             {
                 const chk = normalizarChecklists(dados);
@@ -5168,7 +5237,7 @@ function App() {
                 setChecklistSessoes(chk.sessoes);
             }
             setGanhosRegistro(Array.isArray(dados.ganhosRegistro) ? dados.ganhosRegistro : []);
-            setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? Object.assign({ brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] }, dados.batalhaNotas) : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
+            setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
             setContadoresRegressivos(Array.isArray(dados.contadoresRegressivos) ? dados.contadoresRegressivos : []);
             setModoConcluir(!!dados.modoConcluir);
             setModoDone(dados.modoDone && typeof dados.modoDone === 'object' && !Array.isArray(dados.modoDone) ? dados.modoDone : {});
@@ -5987,7 +6056,7 @@ function App() {
                                     React.createElement("b", null, "Done"),
                                     ". Ao tocar nele o item sai da lista na hora \u2014 tendo sido marcado ou n\u00E3o \u2014 e fica arquivado com a data aqui no \uD83D\uDCD6 Livro de Registro."),
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                                    React.createElement("button", { onClick: () => { setModoDone((m) => (Object.assign(Object.assign({}, m), { [freq]: !m[freq] }))); marcarSujo(); }, style: {
+                                    React.createElement("button", { onClick: () => { setModoDone((m) => ({ ...m, [freq]: !m[freq] })); marcarSujo(); }, style: {
                                             fontSize: 12, fontWeight: 700, padding: '7px 15px', borderRadius: 20,
                                             border: '1.5px solid #C9A227', cursor: 'pointer',
                                             background: ligado ? '#C9A227' : '#fff',
@@ -6031,13 +6100,13 @@ function App() {
                                     React.createElement("span", { style: { color: '#C0492E', fontWeight: 700 } }, "vermelho"),
                                     "."),
                                 React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' } },
-                                    React.createElement("select", { value: (contadorTarefaId[freq] || ''), onChange: (e) => setContadorTarefaId((m) => (Object.assign(Object.assign({}, m), { [freq]: e.target.value }))), style: {
+                                    React.createElement("select", { value: (contadorTarefaId[freq] || ''), onChange: (e) => setContadorTarefaId((m) => ({ ...m, [freq]: e.target.value })), style: {
                                             flex: 1, minWidth: 130, fontSize: 13, padding: '7px 8px',
                                             border: '1px solid #ddd8c9', borderRadius: 8, background: '#fff', color: '#232323',
                                         } },
                                         React.createElement("option", { value: "" }, "Escolher tarefa\u2026"),
                                         doGrupo.map((t) => (React.createElement("option", { key: t.id, value: t.id }, t.texto)))),
-                                    React.createElement("input", { type: "text", inputMode: "numeric", placeholder: "dias", value: (contadorDias[freq] || ''), onChange: (e) => setContadorDias((m) => (Object.assign(Object.assign({}, m), { [freq]: e.target.value }))), style: {
+                                    React.createElement("input", { type: "text", inputMode: "numeric", placeholder: "dias", value: (contadorDias[freq] || ''), onChange: (e) => setContadorDias((m) => ({ ...m, [freq]: e.target.value })), style: {
                                             width: 62, fontSize: 13, padding: '7px 8px', textAlign: 'center',
                                             border: '1px solid #ddd8c9', borderRadius: 8, background: '#fff', color: '#232323',
                                         } }),
@@ -6046,8 +6115,8 @@ function App() {
                                             if (!id)
                                                 return;
                                             definirPrazoFixa(id, contadorDias[freq] || '');
-                                            setContadorTarefaId((m) => (Object.assign(Object.assign({}, m), { [freq]: '' })));
-                                            setContadorDias((m) => (Object.assign(Object.assign({}, m), { [freq]: '' })));
+                                            setContadorTarefaId((m) => ({ ...m, [freq]: '' }));
+                                            setContadorDias((m) => ({ ...m, [freq]: '' }));
                                         } }, "Definir")),
                                 ordenadas.length === 0 ? (React.createElement("p", { className: "mt-empty", style: { margin: '10px 0 0' } }, "Nenhuma tarefa desta lista com contador.")) : (React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } }, ordenadas.map((t) => {
                                     const d = diasRestantes(t);
@@ -6067,7 +6136,7 @@ function App() {
                                     doGrupo.length > 0 ? ` (${doGrupo.length})` : ''),
                                 React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 8 } }, "Guardadas em segundo plano nesta lista. N\u00E3o contam em nada at\u00E9 voc\u00EA tocar em \u2191 para elev\u00E1-las."),
                                 React.createElement("div", { className: "mt-row" },
-                                    React.createElement("input", { className: "mt-input", placeholder: "Nova reserva\u2026", value: reservaNovoTexto[freq] || '', onChange: (e) => setReservaNovoTexto((m) => (Object.assign(Object.assign({}, m), { [freq]: e.target.value }))), onKeyDown: (e) => e.key === 'Enter' && adicionarReserva(freq) }),
+                                    React.createElement("input", { className: "mt-input", placeholder: "Nova reserva\u2026", value: reservaNovoTexto[freq] || '', onChange: (e) => setReservaNovoTexto((m) => ({ ...m, [freq]: e.target.value })), onKeyDown: (e) => e.key === 'Enter' && adicionarReserva(freq) }),
                                     React.createElement("button", { className: "mt-add-btn", onClick: () => adicionarReserva(freq) }, "+")),
                                 React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                                     doGrupo.length === 0 && React.createElement("p", { className: "mt-empty" }, "Banco vazio."),
@@ -6114,9 +6183,9 @@ function App() {
                                         React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0 } }, "Coment\u00E1rio do per\u00EDodo"),
                                         React.createElement("button", { className: "mt-discreto-btn", onClick: () => alternarComentario(freq), title: aberto ? 'Fechar' : (cAtual ? 'Editar comentário' : 'Escrever comentário') }, aberto ? '×' : '💬')),
                                     aberto ? (React.createElement(React.Fragment, null,
-                                        React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Como foi este per\u00EDodo\u2026", value: comentarioRascunho[freq] || '', onChange: (e) => setComentarioRascunho((r) => (Object.assign(Object.assign({}, r), { [freq]: e.target.value }))), style: { minHeight: 70, marginTop: 6 } }),
+                                        React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Como foi este per\u00EDodo\u2026", value: comentarioRascunho[freq] || '', onChange: (e) => setComentarioRascunho((r) => ({ ...r, [freq]: e.target.value })), style: { minHeight: 70, marginTop: 6 } }),
                                         React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '8px 0 4px' } }, "Solu\u00E7\u00E3o"),
-                                        React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "O que fazer a respeito\u2026", value: comentarioSolucao[freq] || '', onChange: (e) => setComentarioSolucao((r) => (Object.assign(Object.assign({}, r), { [freq]: e.target.value }))), style: { minHeight: 60 } }),
+                                        React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "O que fazer a respeito\u2026", value: comentarioSolucao[freq] || '', onChange: (e) => setComentarioSolucao((r) => ({ ...r, [freq]: e.target.value })), style: { minHeight: 60 } }),
                                         React.createElement("button", { className: "mt-btn-sm primary", onClick: () => salvarComentario(freq) }, "Salvar"))) : cAtual ? (React.createElement("div", { className: "mt-fixa-item", style: { borderBottom: 'none' } },
                                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                             React.createElement("span", { style: { display: 'block', fontSize: 13, color: '#232323', whiteSpace: 'pre-wrap' } }, cAtual.texto),
@@ -6137,7 +6206,7 @@ function App() {
                                 return (React.createElement("div", { className: "mt-card", key: freq, "data-grupo-fixa": freq },
                                     React.createElement("div", { className: "mt-fixa-grupo-head" },
                                         React.createElement("p", { className: "mt-fixa-grupo-label" }, label),
-                                        React.createElement("button", { className: "mt-discreto-btn", onClick: () => setFixasCardAberto((m) => (Object.assign(Object.assign({}, m), { [freq]: !m[freq] }))), title: fixasCardAberto[freq] ? 'Fechar edição' : 'Adicionar ou remover tarefas' }, fixasCardAberto[freq] ? '×' : '+')),
+                                        React.createElement("button", { className: "mt-discreto-btn", onClick: () => setFixasCardAberto((m) => ({ ...m, [freq]: !m[freq] })), title: fixasCardAberto[freq] ? 'Fechar edição' : 'Adicionar ou remover tarefas' }, fixasCardAberto[freq] ? '×' : '+')),
                                     total > 0 && (React.createElement("div", { style: { marginBottom: 10 } },
                                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 } },
                                             React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: '#232323' } },
@@ -6156,7 +6225,7 @@ function App() {
                                         React.createElement("div", { style: { marginBottom: 10 } },
                                             React.createElement(BotaoDesfazer, { janela: "tarefasFixas" })),
                                         React.createElement("div", { className: "mt-row", style: { marginTop: 10 } },
-                                            React.createElement("input", { className: "mt-input", placeholder: "Nova tarefa\u2026", value: fixasCardNovoTexto[freq] || '', onChange: (e) => setFixasCardNovoTexto((m) => (Object.assign(Object.assign({}, m), { [freq]: e.target.value }))), onKeyDown: (e) => e.key === 'Enter' && adicionarFixaDireto(freq, fixasCardNovoTexto[freq] || '') }),
+                                            React.createElement("input", { className: "mt-input", placeholder: "Nova tarefa\u2026", value: fixasCardNovoTexto[freq] || '', onChange: (e) => setFixasCardNovoTexto((m) => ({ ...m, [freq]: e.target.value })), onKeyDown: (e) => e.key === 'Enter' && adicionarFixaDireto(freq, fixasCardNovoTexto[freq] || '') }),
                                             React.createElement("button", { className: "mt-add-btn", onClick: () => adicionarFixaDireto(freq, fixasCardNovoTexto[freq] || '') }, "+")),
                                         renderModoDone(freq),
                                         renderContadorDias(freq),
@@ -6207,7 +6276,7 @@ function App() {
                                                     if (abrindo)
                                                         setFixasUnicaExpandida(true);
                                                     if (atual)
-                                                        setFixasCardAberto((m) => (Object.assign(Object.assign({}, m), { [atual.freq]: !m[atual.freq] })));
+                                                        setFixasCardAberto((m) => ({ ...m, [atual.freq]: !m[atual.freq] }));
                                                 }, title: mostrarAdicionarFixa ? 'Fechar' : 'Adicionar ou remover tarefas' }, mostrarAdicionarFixa ? '×' : '+'),
                                             React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
                                                     const abrindo = !mostrarConfigFixas;
@@ -6269,7 +6338,7 @@ function App() {
                                     React.createElement("div", { className: "mt-fixa-grupo-head", style: { marginBottom: 10 } },
                                         React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0, textTransform: 'uppercase' } }, labelHist),
                                         React.createElement("div", { style: { display: 'flex', gap: 6, alignItems: 'center' } },
-                                            React.createElement("button", { className: "mt-gear-btn", title: editandoHist ? 'Sair da edição' : 'Editar', onClick: () => setHistoricoEditando((h) => (Object.assign(Object.assign({}, h), { [freqHist]: !h[freqHist] }))) }, editandoHist ? '×' : '+'),
+                                            React.createElement("button", { className: "mt-gear-btn", title: editandoHist ? 'Sair da edição' : 'Editar', onClick: () => setHistoricoEditando((h) => ({ ...h, [freqHist]: !h[freqHist] })) }, editandoHist ? '×' : '+'),
                                             React.createElement("button", { className: "mt-recarregar-btn", onClick: () => arquivarTabela(freqHist), title: "Recarregar" }, "\uD83D\uDD04"))),
                                     itemsHist.length > 0 && (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
                                         React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 } }, "Rela\u00E7\u00E3o de tarefas completas"),
@@ -6463,7 +6532,12 @@ function App() {
                                 return null;
                             const arrastando = draggingAbaRazao === a.id;
                             const alvo = dragOverAbaRazao === a.id && draggingAbaRazao !== a.id;
-                            return (React.createElement("button", { key: a.id, "data-aba-razao-id": a.id, className: `mt-cat-tab-btn ${razaoTabSelecionada === a.id ? 'ativo' : ''}`, style: Object.assign(Object.assign({ '--cor': a.cor }, (modoMoverAbasRazao ? { touchAction: 'none', cursor: 'grab' } : null)), { opacity: arrastando ? 0.45 : 1, boxShadow: alvo ? '0 0 0 2px #C9A227' : 'none' }), onClick: () => { if (!modoMoverAbasRazao)
+                            return (React.createElement("button", { key: a.id, "data-aba-razao-id": a.id, className: `mt-cat-tab-btn ${razaoTabSelecionada === a.id ? 'ativo' : ''}`, style: {
+                                    '--cor': a.cor,
+                                    ...(modoMoverAbasRazao ? { touchAction: 'none', cursor: 'grab' } : null),
+                                    opacity: arrastando ? 0.45 : 1,
+                                    boxShadow: alvo ? '0 0 0 2px #C9A227' : 'none',
+                                }, onClick: () => { if (!modoMoverAbasRazao)
                                     setRazaoTabSelecionada(a.id); }, onTouchStart: modoMoverAbasRazao ? (e) => onAbaRazaoTouchStart(e, a.id) : undefined, onTouchMove: modoMoverAbasRazao ? onAbaRazaoTouchMove : undefined, onTouchEnd: modoMoverAbasRazao ? onAbaRazaoTouchEnd : undefined },
                                 a.emoji,
                                 " ",
@@ -6580,23 +6654,6 @@ function App() {
                                 React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Sensa\u00E7\u00E3o\u2026", value: psoSensacao, onChange: (e) => setPsoSensacao(e.target.value), style: { minHeight: 60 } }),
                                 React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Causa\u2026", value: psoCausa, onChange: (e) => setPsoCausa(e.target.value), style: { minHeight: 60 } }),
                                 msgPso && React.createElement("p", { className: "mt-premio-msg" }, msgPso)),
-                            React.createElement("div", { className: "mt-premio-secao", style: { marginTop: 10 } },
-                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
-                                    React.createElement("p", { className: "mt-premio-secao-titulo", style: { margin: 0 } }, "\uD83D\uDCF8 Fotos do Pso"),
-                                    React.createElement("button", { className: "mt-btn-sm primary", disabled: psoFotoEnviando, onClick: () => psoFotoInputRef.current && psoFotoInputRef.current.click() }, psoFotoEnviando ? 'Enviando…' : '📷 Tirar foto'),
-                                    React.createElement("input", { ref: psoFotoInputRef, type: "file", accept: "image/*", capture: "environment", style: { display: 'none' }, onChange: handlePsoFotoInput })),
-                                psoFotoMsg && React.createElement("p", { className: "mt-premio-msg" }, psoFotoMsg),
-                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 } },
-                                    React.createElement("button", { className: "mt-discreto-btn", onClick: () => setPsoFotosExpandido((v) => !v), title: psoFotosExpandido ? 'Ocultar arquivo de fotos' : 'Ver arquivo de fotos' }, psoFotosExpandido ? '▲' : '▼'),
-                                    React.createElement("span", { style: { fontSize: 12, color: '#999' } },
-                                        "Arquivo de fotos",
-                                        psoFotos.length > 0 ? ` (${psoFotos.length})` : '')),
-                                psoFotosExpandido && (React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 } },
-                                    psoFotos.length === 0 && React.createElement("p", { className: "mt-empty", style: { gridColumn: '1 / -1' } }, "Nenhuma foto arquivada ainda."),
-                                    psoFotos.map((f) => (React.createElement("div", { key: f.id, style: { position: 'relative' } },
-                                        React.createElement("img", { src: f.url, alt: "", style: { width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 8, display: 'block' } }),
-                                        React.createElement("button", { className: "mt-del", onClick: () => removerPsoFoto(f.id), style: { position: 'absolute', top: 4, right: 4, background: 'rgba(255,255,255,0.9)', borderRadius: '50%' } }, "\u00D7"),
-                                        React.createElement("span", { style: { display: 'block', fontSize: 10, color: '#999', textAlign: 'center', marginTop: 2 } }, f.dataISO))))))),
                             React.createElement("div", { className: "mt-premio-secao", style: { marginTop: 10 } },
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
                                     React.createElement("p", { className: "mt-premio-secao-titulo", style: { margin: 0 } }, "\uD83D\uDCCB Protocolo"),
@@ -6723,7 +6780,7 @@ function App() {
                                     React.createElement("div", null,
                                         React.createElement("p", { className: "mt-config-item-label" }, n === 0 ? 'Sem estrelas' : `${n} estrela${n > 1 ? 's' : ''}`),
                                         React.createElement("p", { className: "mt-config-item-desc" }, "Multiplicador aplicado ao tempo gasto ao premiar.")),
-                                    React.createElement("input", { type: "number", step: "0.1", className: "mt-premio-config-input", value: regrasEstrelas[n], onChange: (e) => { const v = parseFloat(e.target.value) || 0; setRegrasEstrelas((r) => (Object.assign(Object.assign({}, r), { [n]: v }))); marcarSujo(); } })))))))),
+                                    React.createElement("input", { type: "number", step: "0.1", className: "mt-premio-config-input", value: regrasEstrelas[n], onChange: (e) => { const v = parseFloat(e.target.value) || 0; setRegrasEstrelas((r) => ({ ...r, [n]: v })); marcarSujo(); } })))))))),
                         CHECKLISTS.map((c) => {
                             const abas = chkAbasDe(c.id);
                             const sid = chkSessaoAtual(c.id);
@@ -6844,22 +6901,22 @@ function App() {
                                             React.createElement("button", { className: "mt-fazer-btn", onClick: () => fazerTarefa(cat, t) }, "Fazer"),
                                             React.createElement("button", { className: `mt-prioritario-btn${prioritarioFeito[t.id] ? ' feito' : ''}`, onClick: () => priorizarTarefa(cat, t) }, prioritarioFeito[t.id] ? '✓ Adicionado' : 'Priority'),
                                             categoriasEdicaoAtiva && (React.createElement("button", { className: "mt-del", onClick: () => removerTarefa(cat.id, t.id) }, "\u00D7"))))))),
-                                React.createElement("button", { className: "mt-add-tarefa-toggle-btn", onClick: () => setMostrarAdicionarTarefaCat((m) => (Object.assign(Object.assign({}, m), { [cat.id]: !m[cat.id] }))), title: mostrarAdicionarTarefaCat[cat.id] ? 'Fechar' : 'Adicionar tarefa' }, mostrarAdicionarTarefaCat[cat.id] ? '×' : '+'),
+                                React.createElement("button", { className: "mt-add-tarefa-toggle-btn", onClick: () => setMostrarAdicionarTarefaCat((m) => ({ ...m, [cat.id]: !m[cat.id] })), title: mostrarAdicionarTarefaCat[cat.id] ? 'Fechar' : 'Adicionar tarefa' }, mostrarAdicionarTarefaCat[cat.id] ? '×' : '+'),
                                 mostrarAdicionarTarefaCat[cat.id] && (React.createElement("div", { className: "mt-row", style: { marginTop: 6 } },
-                                    React.createElement("input", { className: "mt-input", placeholder: "Adicionar tarefa\u2026", value: rascunhoTarefa[cat.id] || '', onChange: (e) => setRascunhoTarefa((r) => (Object.assign(Object.assign({}, r), { [cat.id]: e.target.value }))), onKeyDown: (e) => e.key === 'Enter' && adicionarTarefa(cat), autoFocus: true }),
+                                    React.createElement("input", { className: "mt-input", placeholder: "Adicionar tarefa\u2026", value: rascunhoTarefa[cat.id] || '', onChange: (e) => setRascunhoTarefa((r) => ({ ...r, [cat.id]: e.target.value })), onKeyDown: (e) => e.key === 'Enter' && adicionarTarefa(cat), autoFocus: true }),
                                     React.createElement("button", { className: "mt-add-btn", onClick: () => adicionarTarefa(cat) }, "+"))),
                                 (React.createElement(React.Fragment, null,
                                     React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginTop: 10 } },
                                         "Dura\u00E7\u00E3o ",
                                         React.createElement("span", { style: { textTransform: 'none', fontStyle: 'italic', color: '#b0aa98' } }, "(usada no sorteio e ao adicionar tarefas)")),
                                     React.createElement("div", { className: "mt-duracao-pills" },
-                                        React.createElement("button", { className: `mt-duracao-pill ${filtroSortear[cat.id] == null ? 'ativo' : ''}`, style: { '--cor': cat.cor }, onClick: () => setFiltroSortear((f) => (Object.assign(Object.assign({}, f), { [cat.id]: null }))) }, "Qualquer"),
-                                        DURACOES.map((min) => (React.createElement("button", { key: min, className: `mt-duracao-pill ${filtroSortear[cat.id] === min ? 'ativo' : ''}`, style: { '--cor': cat.cor }, onClick: () => setFiltroSortear((f) => (Object.assign(Object.assign({}, f), { [cat.id]: min }))) }, min < 60 ? `${min} min` : '1 hora')))),
+                                        React.createElement("button", { className: `mt-duracao-pill ${filtroSortear[cat.id] == null ? 'ativo' : ''}`, style: { '--cor': cat.cor }, onClick: () => setFiltroSortear((f) => ({ ...f, [cat.id]: null })) }, "Qualquer"),
+                                        DURACOES.map((min) => (React.createElement("button", { key: min, className: `mt-duracao-pill ${filtroSortear[cat.id] === min ? 'ativo' : ''}`, style: { '--cor': cat.cor }, onClick: () => setFiltroSortear((f) => ({ ...f, [cat.id]: min })) }, min < 60 ? `${min} min` : '1 hora')))),
                                     React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginTop: 10 } },
                                         "Premia\u00E7\u00E3o ",
                                         React.createElement("span", { style: { textTransform: 'none', fontStyle: 'italic', color: '#b0aa98' } }, "(usada no sorteio e ao adicionar tarefas)")),
                                     React.createElement("div", { className: "mt-star-picker" },
-                                        [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-star-btn", onClick: () => setPremiacaoDraft((d) => (Object.assign(Object.assign({}, d), { [cat.id]: (d[cat.id] || 0) === n ? 0 : n }))), "aria-label": `${n} estrela${n > 1 ? 's' : ''}` }, n <= (premiacaoDraft[cat.id] || 0) ? '⭐️' : '☆'))),
+                                        [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-star-btn", onClick: () => setPremiacaoDraft((d) => ({ ...d, [cat.id]: (d[cat.id] || 0) === n ? 0 : n })), "aria-label": `${n} estrela${n > 1 ? 's' : ''}` }, n <= (premiacaoDraft[cat.id] || 0) ? '⭐️' : '☆'))),
                                         !(premiacaoDraft[cat.id] > 0) && React.createElement("span", { style: { fontSize: 11.5, color: '#b0aa98', fontStyle: 'italic', marginLeft: 4 } }, "qualquer")))),
                                 React.createElement("button", { className: "mt-sortear-btn", style: { '--cor': cat.cor }, disabled: cat.tarefas.length === 0, onClick: () => sortear(cat) },
                                     "\uD83C\uDFB2 Sortear",
@@ -6924,13 +6981,13 @@ function App() {
                                                 "Dura\u00E7\u00E3o ",
                                                 React.createElement("span", { style: { textTransform: 'none', fontStyle: 'italic', color: '#b0aa98' } }, "(usada no sorteio da mistura)")),
                                             React.createElement("div", { className: "mt-duracao-pills" },
-                                                React.createElement("button", { className: `mt-duracao-pill ${filtroSortear[MISTURA_ID] == null ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, onClick: () => setFiltroSortear((f) => (Object.assign(Object.assign({}, f), { [MISTURA_ID]: null }))) }, "Qualquer"),
-                                                DURACOES.map((min) => (React.createElement("button", { key: min, className: `mt-duracao-pill ${filtroSortear[MISTURA_ID] === min ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, onClick: () => setFiltroSortear((f) => (Object.assign(Object.assign({}, f), { [MISTURA_ID]: min }))) }, min < 60 ? `${min} min` : '1 hora')))),
+                                                React.createElement("button", { className: `mt-duracao-pill ${filtroSortear[MISTURA_ID] == null ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, onClick: () => setFiltroSortear((f) => ({ ...f, [MISTURA_ID]: null })) }, "Qualquer"),
+                                                DURACOES.map((min) => (React.createElement("button", { key: min, className: `mt-duracao-pill ${filtroSortear[MISTURA_ID] === min ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, onClick: () => setFiltroSortear((f) => ({ ...f, [MISTURA_ID]: min })) }, min < 60 ? `${min} min` : '1 hora')))),
                                             React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginTop: 10 } },
                                                 "Premia\u00E7\u00E3o ",
                                                 React.createElement("span", { style: { textTransform: 'none', fontStyle: 'italic', color: '#b0aa98' } }, "(usada no sorteio da mistura)")),
                                             React.createElement("div", { className: "mt-star-picker" },
-                                                [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-star-btn", onClick: () => setPremiacaoDraft((d) => (Object.assign(Object.assign({}, d), { [MISTURA_ID]: (d[MISTURA_ID] || 0) === n ? 0 : n }))), "aria-label": `${n} estrela${n > 1 ? 's' : ''}` }, n <= (premiacaoDraft[MISTURA_ID] || 0) ? '⭐️' : '☆'))),
+                                                [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-star-btn", onClick: () => setPremiacaoDraft((d) => ({ ...d, [MISTURA_ID]: (d[MISTURA_ID] || 0) === n ? 0 : n })), "aria-label": `${n} estrela${n > 1 ? 's' : ''}` }, n <= (premiacaoDraft[MISTURA_ID] || 0) ? '⭐️' : '☆'))),
                                                 !(premiacaoDraft[MISTURA_ID] > 0) && React.createElement("span", { style: { fontSize: 11.5, color: '#b0aa98', fontStyle: 'italic', marginLeft: 4 } }, "qualquer")),
                                             React.createElement("button", { className: "mt-sortear-btn", style: { '--cor': '#8E6BAE' }, disabled: poolDaMistura().length === 0, onClick: sortearDaMistura },
                                                 "\uD83C\uDFB2 Sortear",
