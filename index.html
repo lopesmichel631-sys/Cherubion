@@ -3,7 +3,17 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<!-- Sem cache: o Safari guardava o index.html antigo e o app só atualizava com ?v=N no fim
+     do endereço. Com estas três linhas ele sempre busca a versão nova do GitHub Pages, então
+     basta abrir o app (ou o atalho da Tela de Início) para já vir atualizado. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>Minha Tela</title>
+<!-- ícone/nome do atalho na Tela de Início do iPhone -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Minha Tela" />
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <style>
@@ -1192,6 +1202,14 @@ function App() {
     const [carregando, setCarregando] = useState(true);
     const [sujo, setSujo] = useState(false); // há alterações não salvas
     const [status, setStatus] = useState('');
+    // ‼️ Tela de recuperação: fica true quando o app abre SEM nenhum dado salvo mas existe a
+    // marca de que ele já foi usado neste aparelho antes. Isso quer dizer que o navegador apagou
+    // o localStorage (limpeza do Safari, iOS liberando espaço, troca de aparelho...), e não que
+    // é a primeira vez de verdade. Em vez de abrir vazio e silencioso — deixando o usuário criar
+    // dados novos por cima e complicar a restauração —, o app avisa e oferece restaurar o backup.
+    const [mostrarRecuperacao, setMostrarRecuperacao] = useState(false);
+    // dias desde o último arquivo de backup baixado (null = nunca baixou, aí não lembramos nada)
+    const [diasSemBackup, setDiasSemBackup] = useState(null);
     const [revealCat, setRevealCat] = useState(null);
     const [revealStage, setRevealStage] = useState(null);
     const [revealGlobal, setRevealGlobal] = useState(false); // true quando o sorteio saiu do painel 🎲 Aleatório
@@ -1421,6 +1439,13 @@ function App() {
                 setStatus('Dados carregados.');
             }
             else {
+                // Nada salvo. Duas situações possíveis, e a marca 'jaUsouAntes' as separa:
+                if (jaUsouAntes()) {
+                    // O app JÁ rodou neste aparelho, então isto não é estreia: o navegador apagou os
+                    // dados (limpeza do Safari, iOS liberando espaço, etc.). Avisa antes que o usuário
+                    // comece a criar coisas novas por cima e a restauração vire uma bagunça.
+                    setMostrarRecuperacao(true);
+                }
                 // primeira vez: semente categorias padrão
                 setCategorias(CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] })));
                 const freqsRoll = ['diaria', 'semanal', 'mensal', 'trimestral', 'semestral', 'anual'];
@@ -1464,6 +1489,7 @@ function App() {
         aberturaContadaRef.current = true;
         const d = hoje();
         setAberturasApp((m) => ({ ...m, [d]: (m[d] || 0) + 1 }));
+        setDiasSemBackup(lerDiasSemBackup()); // alimenta o lembrete de backup
         setSujo(true);
     }, [carregando]);
     // mantém o ref sempre sincronizado com o estado mais recente — o rollover automático
@@ -1496,6 +1522,52 @@ function App() {
             return null;
         }
     };
+    // ---- marca de "este app já foi usado neste aparelho" ----
+    // Gravada uma única vez, no primeiro salvamento de verdade. Serve para distinguir dois
+    // cenários que, sem ela, seriam idênticos aos olhos do app (ambos = storage vazio):
+    //   a) primeira vez mesmo -> abre normal, com as categorias padrão;
+    //   b) o navegador apagou os dados -> avisa e oferece restaurar o backup.
+    // Fica numa chave própria (não entra no JSON do backup) justamente para sobreviver ao
+    // "Apagar tudo" e continuar valendo mesmo depois de uma restauração.
+    const CHAVE_JA_USOU = 'mt-ja-usou:v1';
+    const marcarQueJaUsou = () => {
+        try {
+            window.localStorage.setItem(CHAVE_JA_USOU, '1');
+        }
+        catch (e) { /* sem localStorage: só não avisa */ }
+    };
+    const jaUsouAntes = () => {
+        try {
+            return window.localStorage.getItem(CHAVE_JA_USOU) === '1';
+        }
+        catch (e) {
+            return false;
+        }
+    };
+    // ---- lembrete de backup ----
+    // Guarda a data do último arquivo baixado. Fica fora do JSON do backup de propósito: é um
+    // fato sobre ESTE aparelho ("quando eu baixei aqui"), não um dado do usuário — se entrasse
+    // no backup, restaurar um arquivo antigo faria o app achar que o backup é recente.
+    const CHAVE_ULTIMO_BACKUP = 'mt-ultimo-backup:v1';
+    const DIAS_LEMBRETE_BACKUP = 14; // avisa quando passar disso sem baixar nada
+    const registrarBackupFeito = () => {
+        try {
+            window.localStorage.setItem(CHAVE_ULTIMO_BACKUP, hoje());
+        }
+        catch (e) { /* sem localStorage */ }
+        setDiasSemBackup(0);
+    };
+    const lerDiasSemBackup = () => {
+        try {
+            const iso = window.localStorage.getItem(CHAVE_ULTIMO_BACKUP);
+            if (!iso)
+                return null; // nunca baixou: não enche o saco de quem acabou de começar
+            return diasEntreISO(iso, hoje());
+        }
+        catch (e) {
+            return null;
+        }
+    };
     const tentarSalvarComRetry = async (chave, valor, retries = 1) => {
         try {
             const res = await window.storage.set(chave, valor, false);
@@ -1520,6 +1592,7 @@ function App() {
             const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (ok) {
                 setSujo(false);
+                marcarQueJaUsou(); // a partir daqui, storage vazio = dados apagados, não estreia
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                 setStatus(`Salvo às ${hora}.`);
             }
@@ -2034,10 +2107,15 @@ function App() {
             return d.getMonth() < 6 ? 0 : 1;
         return 0; // anual (1 slot só) ou casos não mapeados
     };
-    // Rótulo amigável do período que está fechando, para exibir no resumo (ex: "Sem 2", "Jul", "T3"…)
-    const labelSlotQueFechou = (freqPai, idxPai) => {
-        if (freqPai === 'semanal')
-            return SEMANAS_MES[idxPai] || `Sem ${idxPai + 1}`;
+    // Rótulo amigável do período que está fechando, para exibir no resumo (ex: "Sem 2 · Ago", "Jul", "T3"…)
+    // ‼️ A semana leva o mês junto: sem isso, a "Sem 3" de julho e a "Sem 3" de agosto ficam com
+    // rótulos idênticos no resumo e parecem entrada repetida ou fora de ordem.
+    const labelSlotQueFechou = (freqPai, idxPai, chaveAnteriorPai) => {
+        if (freqPai === 'semanal') {
+            const base = SEMANAS_MES[idxPai] || `Sem ${idxPai + 1}`;
+            const mesDaSemana = chaveAnteriorPai ? MESES[quartaDaSemana(chaveAnteriorPai).getMonth()] : '';
+            return mesDaSemana ? `${base} · ${mesDaSemana}` : base;
+        }
         if (freqPai === 'mensal')
             return MESES[idxPai] || '';
         if (freqPai === 'trimestral')
@@ -2067,7 +2145,7 @@ function App() {
         // trava em 99 para nunca virar diamante "por acidente" de arredondamento (ex: 99.6% → 100%)
         const medalha = todosSaoCem ? 'diamante' : medalhaPorPct(Math.min(media, 99));
         const idxPai = indiceSlotQueFechou(freqPai, chaveAnteriorPai);
-        const labelPeriodo = labelSlotQueFechou(freqPai, idxPai);
+        const labelPeriodo = labelSlotQueFechou(freqPai, idxPai, chaveAnteriorPai);
         const tamanhoFilho = SLOTS[freqFilho] || 1;
         // adiciona a memória do período filho fechado — mais recente primeiro
         setResumoMedalhas((r) => {
@@ -5148,6 +5226,7 @@ function App() {
             a.click();
             document.body.removeChild(a);
             setTimeout(() => URL.revokeObjectURL(url), 2000);
+            registrarBackupFeito(); // zera o lembrete de "faz tempo que você não baixa um backup"
             setMsgBackup('Arquivo baixado! No iPhone ele fica em Arquivos → Downloads (ou some a pedir onde salvar, dependendo do ajuste do Safari).');
         }
         catch (e) {
@@ -5156,6 +5235,8 @@ function App() {
     };
     // ---- restaurar a partir de um arquivo .json escolhido, sem precisar colar texto ----
     const arquivoRestaurarRef = useRef(null);
+    // input separado, usado pela tela de recuperação (que aparece com o painel de Backup fechado)
+    const arquivoRecuperacaoRef = useRef(null);
     const abrirSeletorArquivoRestaurar = () => {
         if (arquivoRestaurarRef.current)
             arquivoRestaurarRef.current.click();
@@ -5168,6 +5249,7 @@ function App() {
         leitor.onload = () => {
             const texto = typeof leitor.result === 'string' ? leitor.result : '';
             restaurarBackupDeTexto(texto);
+            setMostrarRecuperacao(false); // se veio da tela de recuperação, fecha depois de restaurar
         };
         leitor.onerror = () => setMsgBackup('Não consegui ler esse arquivo. Tente novamente ou use "Colar".');
         leitor.readAsText(arquivo);
@@ -5745,7 +5827,43 @@ function App() {
           100% { transform: translateY(110vh) rotate(720deg); opacity: 0.85; }
         }
       `),
+        mostrarRecuperacao && (React.createElement("div", { role: "dialog", "aria-modal": "true", "aria-labelledby": "mt-recup-titulo", style: {
+                position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(35,35,35,0.72)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+            } },
+            React.createElement("div", { style: {
+                    background: '#F6F5F2', borderRadius: 16, padding: '22px 20px', maxWidth: 420, width: '100%',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.3)', maxHeight: '85vh', overflowY: 'auto',
+                } },
+                React.createElement("p", { style: { fontSize: 34, margin: '0 0 6px', textAlign: 'center' } }, "\uD83D\uDEDF"),
+                React.createElement("h2", { id: "mt-recup-titulo", style: { fontSize: 19, fontWeight: 700, margin: '0 0 10px', textAlign: 'center', color: '#232323' } }, "Seus dados n\u00E3o foram encontrados"),
+                React.createElement("p", { style: { fontSize: 14, lineHeight: 1.5, color: '#5a5648', margin: '0 0 10px' } }, "O app j\u00E1 foi usado neste aparelho, mas o navegador apagou os dados guardados. Isso costuma acontecer ao limpar o hist\u00F3rico do Safari, quando o iPhone libera espa\u00E7o sozinho, ou ao trocar de aparelho."),
+                React.createElement("p", { style: { fontSize: 14, lineHeight: 1.5, color: '#5a5648', margin: '0 0 16px' } },
+                    React.createElement("b", null, "Seus backups n\u00E3o foram afetados."),
+                    " Escolha o arquivo mais recente para restaurar tudo."),
+                React.createElement("button", { className: "mt-btn-sm primary", style: { width: '100%', padding: '13px', fontSize: 15, marginBottom: 10 }, onClick: () => { if (arquivoRecuperacaoRef.current)
+                        arquivoRecuperacaoRef.current.click(); } }, "\uD83D\uDCC2 Restaurar de um arquivo"),
+                React.createElement("input", { ref: arquivoRecuperacaoRef, type: "file", accept: "application/json,.json", style: { display: 'none' }, onChange: arquivoRestaurarEscolhido }),
+                React.createElement("button", { className: "mt-btn-sm", style: { width: '100%', padding: '11px', fontSize: 14 }, onClick: () => {
+                        // Grava já: sem isso o storage continuaria vazio até o próximo salvamento e
+                        // este mesmo aviso reapareceria a cada abertura do app.
+                        setMostrarRecuperacao(false);
+                        marcarSujo();
+                    } }, "Come\u00E7ar do zero"),
+                React.createElement("p", { style: { fontSize: 12, lineHeight: 1.45, color: '#8a8470', margin: '12px 0 0', textAlign: 'center' } }, "Ainda d\u00E1 para restaurar depois, em Backup manual \u2014 mas quanto antes, menos chance de misturar dados novos com os antigos.")))),
         React.createElement("div", { className: "mt-wrap" },
+            typeof diasSemBackup === 'number' && diasSemBackup >= DIAS_LEMBRETE_BACKUP && (React.createElement("div", { style: {
+                    display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                    background: '#FDF6E3', border: '1px solid #E0CE8E', borderRadius: 10,
+                    padding: '10px 12px', marginBottom: 12,
+                } },
+                React.createElement("span", { style: { fontSize: 18 } }, "\uD83D\uDCBE"),
+                React.createElement("p", { style: { margin: 0, fontSize: 13, color: '#7a6a2f', flex: 1, minWidth: 160, lineHeight: 1.4 } },
+                    "Faz ",
+                    diasSemBackup,
+                    " dias que voc\u00EA n\u00E3o baixa um backup."),
+                React.createElement("button", { className: "mt-btn-sm primary", onClick: baixarBackupArquivo }, "\u2B07\uFE0F Baixar agora"),
+                React.createElement("button", { className: "mt-btn-sm", onClick: () => setDiasSemBackup(null), title: "Esconde o aviso at\u00E9 a pr\u00F3xima abertura do app" }, "Depois"))),
             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, position: 'relative' } },
                 React.createElement("h1", { className: "mt-header-nome", style: { flex: 1, minWidth: 0 } }, "Cherubion"),
                 React.createElement("button", { className: "mt-atalho-btn", style: { position: 'static', width: 36, height: 36, fontSize: 15 }, onClick: () => { window.location.href = 'contatos.html'; }, title: "Baralho de Contatos", "aria-label": "Abrir o Baralho de Contatos" }, "\uD83D\uDCC7"),
@@ -7060,7 +7178,7 @@ function App() {
                                         "\uD83D\uDCCC Resumo de cada ",
                                         NOME_FILHO[freq] || 'período',
                                         " fechado (soma das % \u00F7 quantidade \u2014 \uD83D\uDC8E s\u00F3 se todas forem 100%):"),
-                                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } }, resumoMedalhas[freq].map((r) => {
+                                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } }, resumoMedalhas[freq].slice().reverse().map((r) => {
                                         const infoR = r.medalha ? MEDALHAS_INFO[r.medalha] : null;
                                         return (React.createElement("div", { key: r.id, style: {
                                                 flex: '0 0 auto', minWidth: 46, textAlign: 'center', padding: '6px 6px',
