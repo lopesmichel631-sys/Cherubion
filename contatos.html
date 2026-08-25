@@ -18927,6 +18927,7 @@ function BaralhoDeContatos() {
                     react_1.default.createElement("button", { className: tela === "razao" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("razao") },
                         "Raz\u00E3o ",
                         react_1.default.createElement("em", null, cards.reduce((n, c) => n + (c.fcskill || []).length, 0)))),
+                react_1.default.createElement("a", { className: "bc-configbtn bc-homelink", href: "index.html", "aria-label": "Voltar para a Minha Tela" }, "\uD83C\uDFE0 Minha Tela"),
                 react_1.default.createElement("button", { className: "bc-configbtn", onClick: () => setConfigAberta(true), "aria-label": "Configura\u00E7\u00F5es" }, "\u2699 Configura\u00E7\u00F5es"))),
         nuvemAberta && (react_1.default.createElement(ModalNuvem, { status: nuvemStatus, onVerificar: () => sincronizarNuvem(true), onFechar: () => setNuvemAberta(false) })),
         configAberta && (react_1.default.createElement(ModalConfig, { minhaCidade: minhaCidade, onMudarCidade: setMinhaCidade, temCidade: temCidade, chaveMinha: chaveMinha, statusOrigem: statusOrigem, onFechar: () => setConfigAberta(false) })),
@@ -19321,9 +19322,11 @@ function Semaforo({ valor, onEscolher }) {
 }
 /* ── linha compacta da tela inicial ────────────────────── */
 function Linha({ carta, sources, sourceGlyphs, onAbrir }) {
+    const g = naipeDaCarta(carta, sources, sourceGlyphs);
     return (react_1.default.createElement("button", { className: "bc-linhacarta", onClick: onAbrir },
         react_1.default.createElement("span", { className: "bc-lc-topo" },
             carta.foto && react_1.default.createElement("img", { className: "bc-lc-foto", src: carta.foto, alt: "" }),
+            g !== "·" && (react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-lc-naipe bc-g-red" : "bc-lc-naipe" }, g)),
             react_1.default.createElement("span", { className: "bc-lc-nome" }, carta.nome.trim() || "sem nome"),
             farolDe(carta.farol) && (react_1.default.createElement("span", { className: "bc-lc-farol", style: { background: farolDe(carta.farol)[2] }, title: farolDe(carta.farol)[3] }))),
         react_1.default.createElement("span", { className: "bc-lc-linha" },
@@ -19462,13 +19465,10 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
     const [novaTag, setNovaTag] = (0, react_1.useState)("");
     const [verFoto, setVerFoto] = (0, react_1.useState)(false);
     const [fotoErro, setFotoErro] = (0, react_1.useState)("");
-    const [videoErro, setVideoErro] = (0, react_1.useState)("");
-    const [subindoVideo, setSubindoVideo] = (0, react_1.useState)(false);
     const [albumErro, setAlbumErro] = (0, react_1.useState)("");
     const [subindoAlbum, setSubindoAlbum] = (0, react_1.useState)(false);
     const [verAlbumItem, setVerAlbumItem] = (0, react_1.useState)(null);
     const fotoRef = (0, react_1.useRef)(null);
-    const videoRef = (0, react_1.useRef)(null);
     const albumRef = (0, react_1.useRef)(null);
     const trocarFoto = async (e) => {
         const arquivo = e.target.files && e.target.files[0];
@@ -19490,29 +19490,6 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
         }
         catch (err) {
             setFotoErro((err && err.message) || "não consegui usar essa foto");
-        }
-    };
-    const trocarVideo = async (e) => {
-        const arquivo = e.target.files && e.target.files[0];
-        e.target.value = "";
-        if (!arquivo)
-            return;
-        setVideoErro("");
-        const { url, token } = lerConfigR2();
-        if (!url || !token) {
-            setVideoErro("configure o armazenamento de mídia (Minha Tela) antes de anexar vídeo");
-            return;
-        }
-        try {
-            setSubindoVideo(true);
-            const urlSubida = await subirArquivoParaR2(arquivo, arquivo.name);
-            onPatch("video", urlSubida);
-        }
-        catch (err) {
-            setVideoErro((err && err.message) || "não consegui subir esse vídeo");
-        }
-        finally {
-            setSubindoVideo(false);
         }
     };
     const adicionarAlbum = async (e) => {
@@ -19569,6 +19546,8 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
         setTimeout(() => setDatingSalvo(false), 1600);
     };
     const inicial = (carta.nome.trim()[0] || "?").toUpperCase();
+    const naipeAtivo = naipeDaCarta(carta, sources, sourceGlyphs);
+    const naipeAtivoRed = naipeAtivo !== "·" && glyphDaFonteRed(naipeAtivo);
     const ultima = carta.historico?.[0];
     const lancamentos = carta.lancamentos || [];
     const lancHoras = lancamentos.filter((l) => l.tipo === "horas");
@@ -19576,7 +19555,8 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
     const saldoHoras = saldoDe(lancamentos, "horas");
     const saldoValor = saldoDe(lancamentos, "valor");
     const Index = ({ virado }) => (react_1.default.createElement("div", { className: virado ? "bc-index bc-index-baixo" : "bc-index" },
-        react_1.default.createElement("span", { className: "bc-index-letra", "aria-hidden": "true" }, inicial)));
+        react_1.default.createElement("span", { className: "bc-index-letra", "aria-hidden": "true" }, inicial),
+        naipeAtivo !== "·" && (react_1.default.createElement("span", { className: naipeAtivoRed ? "bc-index-naipe bc-g-red" : "bc-index-naipe", "aria-hidden": "true" }, naipeAtivo))));
     const addTag = () => {
         const t = novaTag.trim();
         if (!t)
@@ -19596,19 +19576,9 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
             react_1.default.createElement("div", { className: "bc-body" },
                 react_1.default.createElement("div", { className: "bc-foto-wrap" },
                     react_1.default.createElement("button", { type: "button", className: "bc-foto", onClick: () => (carta.foto ? setVerFoto(true) : fotoRef.current && fotoRef.current.click()), "aria-label": carta.foto ? "Ver foto" : "Adicionar foto" }, carta.foto ? (react_1.default.createElement("img", { className: "bc-foto-img", src: carta.foto, alt: "" })) : (react_1.default.createElement("span", { className: "bc-foto-placeholder" }, "\u25C9 foto"))),
-                    react_1.default.createElement("div", { className: "bc-foto-acoes" },
-                        react_1.default.createElement("button", { className: "bc-link", onClick: () => fotoRef.current && fotoRef.current.click() }, carta.foto ? "trocar foto" : "adicionar foto"),
-                        carta.foto && (react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatch("foto", "") }, "remover"))),
+                    react_1.default.createElement("div", { className: "bc-foto-acoes" }, carta.foto ? (react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatch("foto", "") }, "remover")) : (react_1.default.createElement("button", { className: "bc-link", onClick: () => fotoRef.current && fotoRef.current.click() }, "adicionar foto"))),
                     fotoErro && react_1.default.createElement("p", { className: "bc-ocrstatus bc-ocrstatus-erro" }, fotoErro),
                     react_1.default.createElement("input", { ref: fotoRef, type: "file", accept: "image/*", className: "bc-file", onChange: trocarFoto, "aria-label": "Escolher foto do perfil" })),
-                react_1.default.createElement("div", { className: "bc-video-wrap" },
-                    carta.video ? (react_1.default.createElement(react_1.default.Fragment, null,
-                        react_1.default.createElement("video", { className: "bc-video-player", src: carta.video, controls: true, playsInline: true }),
-                        react_1.default.createElement("div", { className: "bc-foto-acoes" },
-                            react_1.default.createElement("button", { className: "bc-link", onClick: () => videoRef.current && videoRef.current.click() }, "trocar v\u00EDdeo"),
-                            react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatch("video", "") }, "remover")))) : (react_1.default.createElement("button", { type: "button", className: "bc-link", onClick: () => videoRef.current && videoRef.current.click(), disabled: subindoVideo }, subindoVideo ? "enviando vídeo…" : "+ vídeo")),
-                    videoErro && react_1.default.createElement("p", { className: "bc-ocrstatus bc-ocrstatus-erro" }, videoErro),
-                    react_1.default.createElement("input", { ref: videoRef, type: "file", accept: "video/*", className: "bc-file", onChange: trocarVideo, "aria-label": "Escolher v\u00EDdeo do contato" })),
                 react_1.default.createElement("div", { className: "bc-album-wrap" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "\u00C1lbum de fotos"),
                     (carta.album || []).length > 0 && (react_1.default.createElement("div", { className: "bc-album-grade" }, (carta.album || []).map((item) => (react_1.default.createElement("div", { key: item.id, className: "bc-album-item" },
@@ -19669,9 +19639,7 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                     react_1.default.createElement("div", { className: "bc-opts" }, BASE_SOURCES.map((s) => (react_1.default.createElement(Pill, { key: s, ativo: carta.fonte === s, onClick: () => onPatch("fonte", carta.fonte === s ? "" : s) }, s))))),
                 react_1.default.createElement("div", { className: "bc-group" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Naipe"),
-                    react_1.default.createElement("div", { className: "bc-gmenu bc-gmenu-carta" }, GLYPHS.map((g) => (react_1.default.createElement("button", { key: g, type: "button", className: (carta.naipe === g ? "bc-gopt bc-gopt-on " : "bc-gopt ") +
-                            (glyphDaFonteRed(g) ? "bc-g-red" : ""), onClick: () => onPatch("naipe", carta.naipe === g ? "" : g), "aria-pressed": carta.naipe === g, "aria-label": "Escolher naipe " + g }, g)))),
-                    react_1.default.createElement("ul", { className: "bc-naipelegenda" }, NAIPE_LEGENDA.map(([g, rotulo]) => (react_1.default.createElement("li", { key: g },
+                    react_1.default.createElement("div", { className: "bc-opts bc-naipeopts" }, NAIPE_LEGENDA.map(([g, rotulo]) => (react_1.default.createElement("button", { key: g, type: "button", className: carta.naipe === g ? "bc-pill bc-pill-on" : "bc-pill", onClick: () => onPatch("naipe", carta.naipe === g ? "" : g), "aria-pressed": carta.naipe === g },
                         react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-g bc-g-red" : "bc-g" }, g),
                         rotulo))))),
                 react_1.default.createElement("hr", { className: "bc-hr" }),
@@ -20236,7 +20204,6 @@ function Mensagem({ msg, sources, sourceGlyphs, aberta, onAbrir, onPatch, onPatc
     const [traduzindo, setTraduzindo] = (0, react_1.useState)(false);
     const [traducaoAuto, setTraducaoAuto] = (0, react_1.useState)("");
     const [traduzErro, setTraduzErro] = (0, react_1.useState)("");
-    const toggleFonte = (s) => onPatch("fontes", msg.fontes.includes(s) ? msg.fontes.filter((f) => f !== s) : [...msg.fontes, s]);
     const textoIngles = (msg.textos["Inglês"] || "").trim();
     (0, react_1.useEffect)(() => {
         if (!textoIngles) {
@@ -20276,15 +20243,6 @@ function Mensagem({ msg, sources, sourceGlyphs, aberta, onAbrir, onPatch, onPatc
             react_1.default.createElement("label", { className: "bc-group" },
                 react_1.default.createElement("span", { className: "bc-lbl" }, "T\u00EDtulo"),
                 react_1.default.createElement("input", { className: "bc-input", value: msg.titulo, onChange: (e) => onPatch("titulo", e.target.value), placeholder: "Primeira abordagem" })),
-            react_1.default.createElement("div", { className: "bc-group" },
-                react_1.default.createElement("span", { className: "bc-lbl" }, "Fonte"),
-                react_1.default.createElement("div", { className: "bc-opts" }, sources.map((s, i) => {
-                    const g = glyphDaFonte(s, i, sourceGlyphs);
-                    return (react_1.default.createElement(Pill, { key: s, ativo: msg.fontes.includes(s), onClick: () => toggleFonte(s) },
-                        react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-g bc-g-red" : "bc-g" }, g),
-                        s));
-                })),
-                msg.fontes.length === 0 && react_1.default.createElement("p", { className: "bc-mini" }, "Sem fonte marcada, serve para qualquer contato.")),
             IDIOMAS.map((l) => (react_1.default.createElement("label", { className: "bc-group", key: l },
                 react_1.default.createElement("span", { className: "bc-lbl" }, l),
                 react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 4, value: msg.textos[l] || "", onChange: (e) => onPatchTexto(l, e.target.value), placeholder: l === "Inglês" ? "Hi {nome}, ..." : "Hola {nome}, ..." })))),
@@ -20396,7 +20354,7 @@ const CSS = `
 .bc-tab-on{background:${C.card};color:${C.ink};border-color:${C.card};}
 .bc-configbtn{font-family:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
   padding:9px 15px;cursor:pointer;border-radius:2px;color:rgba(251,247,238,.6);background:transparent;
-  border:1px solid rgba(251,247,238,.18);}
+  border:1px solid rgba(251,247,238,.18);text-decoration:none;display:inline-block;}
 .bc-configbtn:hover{color:${C.card};border-color:rgba(251,247,238,.4);}
 .bc-footer{max-width:1200px;margin:40px auto 0;padding-top:18px;
   border-top:1px solid rgba(251,247,238,.16);display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
@@ -20574,7 +20532,7 @@ const CSS = `
   overflow-wrap:anywhere;}
 .bc-fcreg .bc-linhax{margin-left:auto;flex-shrink:0;}
 .bc-fcreg .bc-linhax + .bc-linhax{margin-left:0;}
-.bc-fcedit-btn{font-size:13px;}
+.bc-fcedit-btn.bc-linhax{font-size:20px;line-height:1;padding:2px 6px;}
 .bc-fccampo{margin:0 0 7px;font-size:12.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;}
 .bc-fccampo:last-child{margin-bottom:0;}
 .bc-fclbl{display:block;font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--soft);margin-bottom:1px;}
@@ -20754,8 +20712,6 @@ const CSS = `
 .bc-foto-img{width:100%;height:100%;object-fit:cover;display:block;}
 .bc-foto-placeholder{font-size:10px;letter-spacing:.08em;color:var(--soft);}
 .bc-foto-acoes{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
-.bc-video-wrap{margin-top:10px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
-.bc-video-player{width:100%;max-width:280px;border-radius:6px;border:1px solid var(--rule);background:#000;}
 
 .bc-album-wrap{margin-top:10px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;}
 .bc-album-grade{display:flex;flex-wrap:wrap;gap:8px;width:100%;}
@@ -20812,11 +20768,7 @@ const CSS = `
 .bc-gopt.bc-g-red{color:var(--red);}
 .bc-gopt-on{background:var(--ink);color:var(--card);border-color:var(--ink);}
 .bc-gopt-on.bc-g-red{color:#F08A98;}
-.bc-gmenu-carta{position:static;width:auto;padding:0;border:0;box-shadow:none;background:transparent;
-  margin-top:4px;}
-.bc-naipelegenda{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;}
-.bc-naipelegenda li{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);}
-.bc-naipelegenda .bc-g{font-size:15px;width:18px;text-align:center;}
+.bc-naipeopts .bc-pill{font-size:12px;}
 .bc-pill{font-family:inherit;font-size:11.5px;padding:6px 11px;cursor:pointer;border-radius:2px;
   display:inline-flex;align-items:center;gap:5px;color:var(--ink);background:transparent;border:1px solid var(--edge);
   transition:background .14s ease,color .14s ease,border-color .14s ease;}
@@ -20906,6 +20858,8 @@ const CSS = `
 .bc-link{font-family:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:none;border:none;
   color:rgba(251,247,238,.6);cursor:pointer;padding:2px;}
 .bc-link:hover{color:${C.card};}
+.bc-card .bc-link,.bc-modalbox .bc-link,.bc-msgcard .bc-link,.bc-fcreg .bc-link{color:var(--ink);opacity:.7;}
+.bc-card .bc-link:hover,.bc-modalbox .bc-link:hover,.bc-msgcard .bc-link:hover,.bc-fcreg .bc-link:hover{opacity:1;}
 
 .bc-msglist{display:flex;flex-direction:column;gap:10px;}
 .bc-msgcard{background:var(--card);border-radius:3px;padding:12px 14px;color:var(--ink);
