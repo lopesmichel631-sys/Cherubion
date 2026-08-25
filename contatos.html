@@ -17352,6 +17352,16 @@ const lerConfigR2 = () => {
         return { url: "", token: "" };
     }
 };
+const salvarConfigR2 = (url, token) => {
+    try {
+        window.localStorage.setItem(CHAVE_R2_URL, (url || "").trim().replace(/\/+$/, ""));
+        window.localStorage.setItem(CHAVE_R2_TOKEN, (token || "").trim());
+        return true;
+    }
+    catch (e) {
+        return false;
+    }
+};
 /* só para imagens — reduz para no máx. 1280px de largura, JPEG 75% antes de subir pro R2 */
 const comprimirImagemParaUpload = (file) => new Promise((resolve, reject) => {
     const img = new Image();
@@ -18930,7 +18940,7 @@ function BaralhoDeContatos() {
                 react_1.default.createElement("a", { className: "bc-configbtn bc-homelink", href: "index.html", "aria-label": "Voltar para a Minha Tela" }, "\uD83C\uDFE0 Minha Tela"),
                 react_1.default.createElement("button", { className: "bc-configbtn", onClick: () => setConfigAberta(true), "aria-label": "Configura\u00E7\u00F5es" }, "\u2699 Configura\u00E7\u00F5es"))),
         nuvemAberta && (react_1.default.createElement(ModalNuvem, { status: nuvemStatus, onVerificar: () => sincronizarNuvem(true), onFechar: () => setNuvemAberta(false) })),
-        configAberta && (react_1.default.createElement(ModalConfig, { minhaCidade: minhaCidade, onMudarCidade: setMinhaCidade, temCidade: temCidade, chaveMinha: chaveMinha, statusOrigem: statusOrigem, onFechar: () => setConfigAberta(false) })),
+        configAberta && (react_1.default.createElement(ModalConfig, { minhaCidade: minhaCidade, onMudarCidade: setMinhaCidade, temCidade: temCidade, chaveMinha: chaveMinha, statusOrigem: statusOrigem, onR2Salvo: () => setR2Check((n) => n + 1), onFechar: () => setConfigAberta(false) })),
         !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
         react_1.default.createElement("footer", { className: "bc-footer" },
             react_1.default.createElement("span", { className: erro ? "bc-status bc-status-erro" : "bc-status" }, erro
@@ -19249,7 +19259,20 @@ function LeitorPerfil({ onFechar, onCriar }) {
                 react_1.default.createElement("button", { className: "bc-link", onClick: onFechar }, "Cancelar")))));
 }
 /* ── nuvem: liga o Meg a um Gist privado onde o Extrator do Android deixa os perfis ── */
-function ModalConfig({ minhaCidade, onMudarCidade, temCidade, chaveMinha, statusOrigem, onFechar }) {
+function ModalConfig({ minhaCidade, onMudarCidade, temCidade, chaveMinha, statusOrigem, onR2Salvo, onFechar }) {
+    const cfgAtual = lerConfigR2();
+    const [r2Url, setR2Url] = (0, react_1.useState)(cfgAtual.url);
+    const [r2Token, setR2Token] = (0, react_1.useState)(cfgAtual.token);
+    const [r2Salvo, setR2Salvo] = (0, react_1.useState)(false);
+    const salvarR2 = () => {
+        const ok = salvarConfigR2(r2Url, r2Token);
+        if (ok) {
+            setR2Salvo(true);
+            onR2Salvo && onR2Salvo();
+            setTimeout(() => setR2Salvo(false), 1800);
+        }
+    };
+    const configurado = !!(r2Url.trim() && r2Token.trim());
     return (react_1.default.createElement("div", { className: "bc-modal", role: "dialog", "aria-label": "Configura\u00E7\u00F5es" },
         react_1.default.createElement("div", { className: "bc-modalbox" },
             react_1.default.createElement("div", { className: "bc-modalhead" },
@@ -19263,7 +19286,20 @@ function ModalConfig({ minhaCidade, onMudarCidade, temCidade, chaveMinha, status
                         react_1.default.createElement("span", { className: "bc-lbl" }, "Minha cidade"),
                         react_1.default.createElement("input", { className: "bc-msgtext", style: { marginTop: 4 }, value: minhaCidade, list: "bc-cidades", onChange: (e) => onMudarCidade(e.target.value), placeholder: "Sua cidade", "aria-label": "Minha cidade" })),
                     react_1.default.createElement("p", { className: temCidade && !chaveMinha ? "bc-mini bc-homestatus-erro" : "bc-mini" }, statusOrigem),
-                    react_1.default.createElement("p", { className: "bc-mini bc-leitordica" }, "Usada como ponto de partida para calcular dist\u00E2ncia at\u00E9 os contatos."))))));
+                    react_1.default.createElement("p", { className: "bc-mini bc-leitordica" }, "Usada como ponto de partida para calcular dist\u00E2ncia at\u00E9 os contatos.")),
+                react_1.default.createElement("hr", { className: "bc-hr" }),
+                react_1.default.createElement("section", { className: "bc-nextbloco" },
+                    react_1.default.createElement("span", { className: "bc-lbl" }, "Armazenamento de m\u00EDdia (R2)"),
+                    react_1.default.createElement("p", { className: "bc-mini bc-leitordica", style: { marginTop: 4 } }, "Compartilhado com o resto do conjunto Cherubion. Sem isso configurado, fotos ficam salvas s\u00F3 neste dispositivo e v\u00EDdeos n\u00E3o podem ser anexados."),
+                    react_1.default.createElement("label", { className: "campo", style: { marginTop: 10 } },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "URL do Worker"),
+                        react_1.default.createElement("input", { className: "bc-msgtext", style: { marginTop: 4 }, value: r2Url, onChange: (e) => setR2Url(e.target.value), placeholder: "https://meu-worker.workers.dev", "aria-label": "URL do Worker R2", autoCapitalize: "none", autoCorrect: "off" })),
+                    react_1.default.createElement("label", { className: "campo", style: { marginTop: 10 } },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "Token"),
+                        react_1.default.createElement("input", { className: "bc-msgtext", style: { marginTop: 4 }, type: "password", value: r2Token, onChange: (e) => setR2Token(e.target.value), placeholder: "token do Worker", "aria-label": "Token do Worker R2", autoCapitalize: "none", autoCorrect: "off" })),
+                    react_1.default.createElement("p", { className: configurado ? "bc-mini bc-r2ok" : "bc-mini bc-r2off", style: { marginTop: 8 } }, configurado ? "☁ mídia: R2 configurado" : "☁ mídia: não configurado — fotos ficam salvas localmente"),
+                    react_1.default.createElement("div", { className: "bc-bancoacoes", style: { marginTop: 6 } },
+                        react_1.default.createElement("button", { className: "bc-feito", onClick: salvarR2 }, r2Salvo ? "Salvo" : "Salvar")))))));
 }
 function ModalNuvem({ status, onVerificar, onFechar }) {
     const [token, setToken] = (0, react_1.useState)("");
@@ -20373,6 +20409,8 @@ const CSS = `
 .bc-r2status .bc-link{font-size:9px;color:rgba(251,247,238,.35);}
 .bc-r2ok{font-size:9px;letter-spacing:.04em;color:#8FCB9B;}
 .bc-r2off{font-size:9px;letter-spacing:.04em;color:rgba(251,247,238,.45);}
+.bc-modalbox .bc-r2ok{color:#1F7A3D;}
+.bc-modalbox .bc-r2off{color:rgba(21,16,15,.5);}
 
 /* minha cidade */
 .bc-homecity{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:14px;}
