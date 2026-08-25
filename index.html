@@ -104,9 +104,19 @@ const CORTE_SESSAO = '__corte';
 // id reservado da "sessão" que abre o painel de Medidas corporais dentro da aba Development
 // id reservado da "sessão" que abre o painel de Medidas corporais dentro da aba Development
 const MEDIDAS_SESSAO = '__medidas';
+// id reservado da "sessão" que abre o painel 🧴 Face (foto/vídeo + comentário) dentro da aba Development
+// id reservado da "sessão" que abre o painel 🧴 Face (foto/vídeo + comentário) dentro da aba Development
+const FACE_SESSAO = '__face';
 // id reservado da "sessão" que abre o painel 💰 Bank dentro da aba Finanças
 // id reservado da "sessão" que abre o painel 💰 Bank dentro da aba Finanças
 const BANK_SESSAO = '__bank';
+// id reservado da "sessão" que abre o painel 💰 Bank do Snat — mesmo molde do Saldo B.E.S.T.
+// (saldo + extrato de gastos + adicionar fundos + corrigir saldo), mas com estado próprio,
+// separado do Saldo B.E.S.T. e do Bank de Finanças
+// id reservado da "sessão" que abre o painel 💰 Bank do Snat — mesmo molde do Saldo B.E.S.T.
+// (saldo + extrato de gastos + adicionar fundos + corrigir saldo), mas com estado próprio,
+// separado do Saldo B.E.S.T. e do Bank de Finanças
+const SNAT_BANK_SESSAO = '__snatbank';
 // id reservado da "sessão" que abre o painel Ganhos (notas por ano) dentro da aba Atividades
 // id reservado da "sessão" que abre o painel Ganhos (notas por ano) dentro da aba Atividades
 const GANHOS_SESSAO = '__ganhos';
@@ -116,6 +126,20 @@ const BATALHA_SESSAO = '__batalha';
 // id reservado da "sessão" que abre o painel ⏳ Contador Regressivo dentro da aba Atividades
 // id reservado da "sessão" que abre o painel ⏳ Contador Regressivo dentro da aba Atividades
 const CONTADOR_SESSAO = '__contador';
+// id reservado da "sessão" que abre o painel Momentum (livro de registro com separação
+// mensal) dentro da aba Atividades
+// id reservado da "sessão" que abre o painel Momentum (livro de registro com separação
+// mensal) dentro da aba Atividades
+const MOMENTUM_SESSAO = '__momentum';
+// id reservado da sessão fixa "Programa" — disponível nas abas Snat, PE, Skill e B.E.S.T.
+// É uma sessão de tarefas normal (checklist de verdade), só que os itens dela mostram o
+// mesmo botão "Programa" (janela de texto livre por tarefa) que já existe na aba Realidade,
+// em vez do botão "Priority" padrão
+// id reservado da sessão fixa "Programa" — disponível nas abas Snat, PE, Skill e B.E.S.T.
+// É uma sessão de tarefas normal (checklist de verdade), só que os itens dela mostram o
+// mesmo botão "Programa" (janela de texto livre por tarefa) que já existe na aba Realidade,
+// em vez do botão "Priority" padrão
+const PROGRAMA_SESSAO = '__programa';
 // id reservado da "sessão" que abre o painel 🚗 Car dentro da aba Prefeituras — botão de
 // atalho que manda "Lavar carro" direto para os Prioritários
 // id reservado da "sessão" que abre o painel 🚗 Car dentro da aba Prefeituras — botão de
@@ -1070,6 +1094,19 @@ function App() {
     const [valorCorrigirSaldo, setValorCorrigirSaldo] = useState('');
     const [livroRazaoExpandido, setLivroRazaoExpandido] = useState(false);
     const [msgLivroRazao, setMsgLivroRazao] = useState('');
+    // ---- 💰 Bank (aba Snat): mesmo molde do Saldo B.E.S.T. (saldo + extrato de gastos +
+    // adicionar fundos + corrigir saldo), mas com estado próprio — separado do Saldo B.E.S.T.
+    // e do Bank de Finanças.
+    const [snatBankSaldo, setSnatBankSaldo] = useState(0);
+    const [snatBankRegistro, setSnatBankRegistro] = useState([]); // [{id, valor, descricao, data, dataISO}]
+    const [novoGastoValorSnat, setNovoGastoValorSnat] = useState('');
+    const [novoGastoDescSnat, setNovoGastoDescSnat] = useState('');
+    const [mostrarAdicionarFundosSnat, setMostrarAdicionarFundosSnat] = useState(false);
+    const [valorAdicionarFundosSnat, setValorAdicionarFundosSnat] = useState('');
+    const [mostrarCorrigirSaldoSnat, setMostrarCorrigirSaldoSnat] = useState(false);
+    const [valorCorrigirSaldoSnat, setValorCorrigirSaldoSnat] = useState('');
+    const [snatBankExpandido, setSnatBankExpandido] = useState(false);
+    const [msgSnatBank, setMsgSnatBank] = useState('');
     const [corteDeCabeloRegistro, setCorteDeCabeloRegistro] = useState([]); // [{id, data, dataISO}] — registro individual, separado do extrato de gastos
     const [corteExpandido, setCorteExpandido] = useState(false);
     const [confirmApagarGastos, setConfirmApagarGastos] = useState(false);
@@ -1080,6 +1117,21 @@ function App() {
     const [medidasExpandido, setMedidasExpandido] = useState(false);
     const [confirmApagarMedidas, setConfirmApagarMedidas] = useState(false);
     const [msgMedidas, setMsgMedidas] = useState('');
+    // ---- 🧴 Face (aba Development): foto/vídeo (câmera) + comentário — mesmo pipeline do R2
+    // usado no Pso (foto comprimida e sobe pro servidor quando o R2 está configurado; sem R2,
+    // a foto cai no fallback local em base64; vídeo sempre exige R2). Cada registro guarda a
+    // mídia como miniatura ao lado da data — o arquivo bruto mesmo fica só no servidor.
+    const [faceRegistro, setFaceRegistro] = useState([]); // [{id, comentario, foto, video, data, dataISO}]
+    const [faceComentario, setFaceComentario] = useState('');
+    const [faceNovaFoto, setFaceNovaFoto] = useState(null);
+    const [faceNovoVideo, setFaceNovoVideo] = useState(null);
+    const [uploadMidiaFaceEmAndamento, setUploadMidiaFaceEmAndamento] = useState(false);
+    const [msgUploadMidiaFace, setMsgUploadMidiaFace] = useState('');
+    const faceFotoInputRef = useRef(null);
+    const faceVideoInputRef = useRef(null);
+    const [faceExpandido, setFaceExpandido] = useState(false);
+    const [confirmApagarFace, setConfirmApagarFace] = useState(false);
+    const [msgFace, setMsgFace] = useState('');
     // ---- 💰 Bank (aba Finanças): saldo + registro de lançamentos com % vs. o lançamento anterior ----
     const [bankSaldo, setBankSaldo] = useState(0);
     const [bankRegistro, setBankRegistro] = useState([]); // [{id, valor, nota, percentual, saldoAnterior, saldoNovo, data, dataISO}]
@@ -1103,14 +1155,29 @@ function App() {
     const [psoValor, setPsoValor] = useState(0); // -10 (esquerda) .. 0 (centro) .. +10 (direita)
     const [psoSensacao, setPsoSensacao] = useState('');
     const [psoCausa, setPsoCausa] = useState('');
-    const [psoRegistro, setPsoRegistro] = useState([]); // [{id, valor, sensacao, causa, botoes, data, dataISO}]
-    const [psoTarefas, setPsoTarefas] = useState([]); // [{id, nome}] botões nomeáveis criados pelo usuário (igual ao Pump)
+    const [psoRegistro, setPsoRegistro] = useState([]); // [{id, valor, sensacao, causa, botoes, comentario, foto, video, data, dataISO}]
+    const [psoTarefas, setPsoTarefas] = useState([]); // [{id, nome, categoria}] botões nomeáveis criados pelo usuário (igual ao Pump)
     const [psoNovoNome, setPsoNovoNome] = useState('');
+    // categoria escolhida para o PRÓXIMO botão a ser criado: 'padrao' (círculo branco vazado,
+    // roxo quando marcado — visual atual) ou 'verde' (círculo verde, nova categoria de botões).
+    const [psoNovaTarefaCategoria, setPsoNovaTarefaCategoria] = useState('padrao');
     const [psoConfigAberto, setPsoConfigAberto] = useState(false);
     const [psoSelecionados, setPsoSelecionados] = useState([]); // ids marcados, ainda não registrados
     const [psoExpandido, setPsoExpandido] = useState(false);
     const [confirmApagarPso, setConfirmApagarPso] = useState(false);
     const [msgPso, setMsgPso] = useState('');
+    // ---- Pso: foto/vídeo + comentário — mesmo pipeline do R2 usado nas Notas do alerta.
+    // Com o Cloudflare R2 configurado, a foto é comprimida e sobe para o servidor (só a URL
+    // fica salva aqui); sem R2, cai no fallback antigo em base64. O vídeo sempre exige R2
+    // (grande demais pra guardar em base64). No registro, cada entrada guarda o arquivo como
+    // uma miniatura ao lado da data — o arquivo bruto mesmo fica só no servidor.
+    const [psoNovaFoto, setPsoNovaFoto] = useState(null);
+    const [psoNovoVideo, setPsoNovoVideo] = useState(null);
+    const [psoComentarioMidia, setPsoComentarioMidia] = useState('');
+    const [uploadMidiaPsoEmAndamento, setUploadMidiaPsoEmAndamento] = useState(false);
+    const [msgUploadMidiaPso, setMsgUploadMidiaPso] = useState('');
+    const psoFotoInputRef = useRef(null);
+    const psoVideoInputRef = useRef(null);
     // ---- Pso: Protocolo — lista numerada de protocolos, adicionados pelo painel de configurações ----
     const [psoProtocolos, setPsoProtocolos] = useState([]); // [{id, texto}]
     const [protocoloConfigAberto, setProtocoloConfigAberto] = useState(false);
@@ -1137,6 +1204,11 @@ function App() {
     const [ganhosNovoTexto, setGanhosNovoTexto] = useState('');
     const [ganhosAnoSelecionado, setGanhosAnoSelecionado] = useState(new Date().getFullYear());
     const [ganhosAnoAberto, setGanhosAnoAberto] = useState({}); // { [ano]: bool } — controla a seta de expandir cada ano
+    // ---- Momentum (aba Atividades): caixa de entrada simples — cada registro carimba a data
+    // do dia sozinho (sem escolha de ano/categoria) e o livro de registro fica separado por mês.
+    const [momentumRegistro, setMomentumRegistro] = useState([]); // [{id, texto, mesChave, data, dataISO}]
+    const [momentumNovoTexto, setMomentumNovoTexto] = useState('');
+    const [momentumMesAberto, setMomentumMesAberto] = useState({}); // { [mesChave]: bool } — controla a seta de expandir cada mês
     // ---- Batalha: Brasil x Estados Unidos, cada um com Prós e Contras (listas de notas livres) — painel embutido na aba Atividades ----
     const [batalhaNotas, setBatalhaNotas] = useState({ brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] }); // { [coluna]: [{id, texto}] }
     const [batalhaNovoTexto, setBatalhaNovoTexto] = useState(''); // texto do único input de adicionar
@@ -1160,8 +1232,10 @@ function App() {
     const [chkMsg, setChkMsg] = useState({});
     // ---- Botão "Programa" da aba Realidade: abre uma janela para escrever um texto livre
     // ligado à tarefa. O texto fica guardado no próprio item (campo `programa`), então já
-    // viaja de graça pelos 4 pontos de persistência (checklistItens já está neles).
-    const [programaAberto, setProgramaAberto] = useState(null); // { chkId, itemId } | null
+    // viaja de graça pelos 4 pontos de persistência (checklistItens já está neles). O mesmo
+    // botão/função também vale pros itens do ⏳ Contador (aba Atividades) — o campo `fonte`
+    // diz se o texto deve ser salvo num item de checklist ou num contador regressivo.
+    const [programaAberto, setProgramaAberto] = useState(null); // { fonte: 'checklist', chkId, itemId } | { fonte: 'contador', id } | null
     const [programaTextoEdit, setProgramaTextoEdit] = useState('');
     // ---- Modo "Concluir" + Livro de Registro das tarefas fixas excluídas ----
     // Com o modo ligado, apagar uma tarefa fixa toca uma musiquinha e guarda o registro
@@ -1399,8 +1473,11 @@ function App() {
                 setLivroRazao(Array.isArray(dados.livroRazao) ? dados.livroRazao : []);
                 setCorteDeCabeloRegistro(Array.isArray(dados.corteDeCabeloRegistro) ? dados.corteDeCabeloRegistro : []);
                 setMedidasRegistro(Array.isArray(dados.medidasRegistro) ? dados.medidasRegistro : []);
+                setFaceRegistro(Array.isArray(dados.faceRegistro) ? dados.faceRegistro : []);
                 setBankSaldo(typeof dados.bankSaldo === 'number' ? dados.bankSaldo : 0);
                 setBankRegistro(Array.isArray(dados.bankRegistro) ? dados.bankRegistro : []);
+                setSnatBankSaldo(typeof dados.snatBankSaldo === 'number' ? dados.snatBankSaldo : 0);
+                setSnatBankRegistro(Array.isArray(dados.snatBankRegistro) ? dados.snatBankRegistro : []);
                 setOrdemAbasRazao(normalizarOrdemAbasRazao(dados.ordemAbasRazao));
                 setPumpTarefas(Array.isArray(dados.pumpTarefas) ? dados.pumpTarefas : []);
                 setPumpRegistro(Array.isArray(dados.pumpRegistro) ? dados.pumpRegistro : []);
@@ -1418,6 +1495,7 @@ function App() {
                     setChecklistSessoes(chk.sessoes);
                 }
                 setGanhosRegistro(Array.isArray(dados.ganhosRegistro) ? dados.ganhosRegistro : []);
+                setMomentumRegistro(Array.isArray(dados.momentumRegistro) ? dados.momentumRegistro : []);
                 setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
                 setContadoresRegressivos(Array.isArray(dados.contadoresRegressivos) ? dados.contadoresRegressivos : []);
                 setModoConcluir(!!dados.modoConcluir);
@@ -1589,7 +1667,7 @@ function App() {
         }
         setStatus('Salvando…');
         try {
-            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (ok) {
                 setSujo(false);
                 marcarQueJaUsou(); // a partir daqui, storage vazio = dados apagados, não estreia
@@ -1603,7 +1681,7 @@ function App() {
         catch (e) {
             // window.storage falhou (comum no preview do Claude.ai). Grava no localStorage real:
             // os dados ficam salvos e não mostramos alarme falso.
-            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (salvouLocal) {
                 setSujo(false);
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1832,6 +1910,10 @@ function App() {
                 restaurarEmLista(setLivroRazao, item.valor, item.idx);
                 setSaldoLivroRazao((s) => s - item.valor.valor); // desfaz a devolução ao saldo que a exclusão tinha feito
                 break;
+            case 'lancamentoSnatBank':
+                restaurarEmLista(setSnatBankRegistro, item.valor, item.idx);
+                setSnatBankSaldo((s) => s - item.valor.valor); // desfaz a devolução ao saldo que a exclusão tinha feito
+                break;
             case 'gastosTudo':
                 setLivroRazao(item.valor);
                 setSaldoLivroRazao((s) => s - item.total);
@@ -1847,6 +1929,9 @@ function App() {
                 break;
             case 'medidasTudo':
                 setMedidasRegistro(item.valor);
+                break;
+            case 'faceRegistro':
+                restaurarEmLista(setFaceRegistro, item.valor, item.idx);
                 break;
             case 'lancamentoBank':
                 restaurarEmLista(setBankRegistro, item.valor, item.idx);
@@ -2794,6 +2879,63 @@ function App() {
         });
         marcarSujo();
     };
+    // ---- 💰 Bank (Snat) — mesmas regras do Saldo B.E.S.T. acima, com estado próprio ----
+    const adicionarGastoSnatBank = () => {
+        const valor = parseFloat(String(novoGastoValorSnat).replace(',', '.'));
+        const descricao = novoGastoDescSnat.trim();
+        if (!valor || valor <= 0) {
+            setMsgSnatBank('Digite um valor gasto válido (ex: 23,50).');
+            return;
+        }
+        if (!descricao) {
+            setMsgSnatBank('Diga no que esse valor foi gasto.');
+            return;
+        }
+        const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        setSnatBankRegistro((l) => [{ id: genId(), valor, descricao, data: dataHoje, dataISO: hoje() }, ...l]);
+        setSnatBankSaldo((s) => s - valor);
+        setNovoGastoValorSnat('');
+        setNovoGastoDescSnat('');
+        setMsgSnatBank('');
+        marcarSujo();
+    };
+    const adicionarFundosSnatBank = () => {
+        const valor = parseFloat(String(valorAdicionarFundosSnat).replace(',', '.'));
+        if (!valor || valor <= 0) {
+            setMsgSnatBank('Digite um valor válido para adicionar.');
+            return;
+        }
+        setSnatBankSaldo((s) => s + valor);
+        setValorAdicionarFundosSnat('');
+        setMostrarAdicionarFundosSnat(false);
+        setMsgSnatBank('');
+        marcarSujo();
+    };
+    // corrige o saldo direto, substituindo o valor atual — igual ao "Corrigir saldo" do B.E.S.T.
+    const corrigirSaldoSnatBank = () => {
+        const valor = parseFloat(String(valorCorrigirSaldoSnat).replace(',', '.'));
+        if (isNaN(valor)) {
+            setMsgSnatBank('Digite um valor válido para corrigir o saldo.');
+            return;
+        }
+        setSnatBankSaldo(valor);
+        setValorCorrigirSaldoSnat('');
+        setMostrarCorrigirSaldoSnat(false);
+        setMsgSnatBank('');
+        marcarSujo();
+    };
+    const removerLancamentoSnatBank = (id) => {
+        const idx = snatBankRegistro.findIndex((x) => x.id === id);
+        if (idx !== -1)
+            registrarDesfazer('livroRazao', 'lancamentoSnatBank', { valor: snatBankRegistro[idx], idx });
+        setSnatBankRegistro((l) => {
+            const item = l.find((x) => x.id === id);
+            if (item)
+                setSnatBankSaldo((s) => s + item.valor); // devolve o valor ao saldo ao apagar o lançamento
+            return l.filter((x) => x.id !== id);
+        });
+        marcarSujo();
+    };
     // copia um texto simples para a área de transferência — usado nos botões "copiar tudo"
     // do livro razão (gastos e corte de cabelo)
     const copiarLancamento = (texto) => {
@@ -3102,7 +3244,7 @@ function App() {
             setMsgPso('Digite um nome para o novo botão.');
             return;
         }
-        setPsoTarefas((ts) => [...ts, { id: genId(), nome }]);
+        setPsoTarefas((ts) => [...ts, { id: genId(), nome, categoria: psoNovaTarefaCategoria }]);
         setPsoNovoNome('');
         setMsgPso('');
         marcarSujo();
@@ -3207,20 +3349,29 @@ function App() {
         setPsoSelecionados((sel) => sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
         setMsgPso('');
     };
-    // ---- Pso: grava valor do cursor (-10..+10), botões marcados, sensação e causa, carimbando dia e horário ----
+    // ---- Pso: grava valor do cursor (-10..+10), botões marcados, sensação, causa, comentário
+    // e foto/vídeo (se anexados), carimbando dia e horário ----
     const registrarPso = () => {
         const sensacao = psoSensacao.trim();
         const causa = psoCausa.trim();
+        const comentario = psoComentarioMidia.trim();
         // usa a ordem em que os botões aparecem na tela, não a ordem dos toques
         const botoes = psoTarefas.filter((t) => psoSelecionados.includes(t.id)).map((t) => t.nome).join(' + ');
         const agora = new Date();
         const dataHoje = agora.toLocaleString('pt-BR', {
             day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
         });
-        setPsoRegistro((l) => [{ id: genId(), valor: psoValor, sensacao, causa, botoes, data: dataHoje, dataISO: hoje() }, ...l]);
+        setPsoRegistro((l) => [{
+                id: genId(), valor: psoValor, sensacao, causa, botoes, comentario,
+                foto: psoNovaFoto, video: psoNovoVideo, data: dataHoje, dataISO: hoje(),
+            }, ...l]);
         setPsoValor(0);
         setPsoSensacao('');
         setPsoCausa('');
+        setPsoComentarioMidia('');
+        setPsoNovaFoto(null);
+        setPsoNovoVideo(null);
+        setMsgUploadMidiaPso('');
         setPsoSelecionados([]);
         setMsgPso('Registrado!');
         marcarSujo();
@@ -3271,10 +3422,13 @@ function App() {
     // No B.E.S.T. existe ainda o botão "💰 Saldo", que abre o painel do Saldo B.E.S.T. no lugar da lista.
     const chkAbasDe = (chkId) => [
         ...(chkId === 'best' ? [{ id: SALDO_SESSAO, nome: '💰 Saldo' }] : []),
-        ...(chkId === 'development' ? [{ id: CORTE_SESSAO, nome: '💇 Cabelo' }, { id: MEDIDAS_SESSAO, nome: '📏 Medidas' }] : []),
+        ...(chkId === 'development' ? [{ id: CORTE_SESSAO, nome: '💇 Cabelo' }, { id: MEDIDAS_SESSAO, nome: '📏 Medidas' }, { id: FACE_SESSAO, nome: '🧴 Face' }] : []),
         ...(chkId === 'financas' ? [{ id: BANK_SESSAO, nome: '💰 Bank' }] : []),
-        ...(chkId === 'atividades' ? [{ id: GANHOS_SESSAO, nome: 'Ganhos' }, { id: BATALHA_SESSAO, nome: '⚔️ Batalha' }, { id: CONTADOR_SESSAO, nome: '⏳ Contador' }] : []),
+        ...(chkId === 'snat' ? [{ id: SNAT_BANK_SESSAO, nome: '💰 Bank' }] : []),
+        ...(chkId === 'atividades' ? [{ id: GANHOS_SESSAO, nome: 'Ganhos' }, { id: BATALHA_SESSAO, nome: '⚔️ Batalha' }, { id: CONTADOR_SESSAO, nome: '⏳ Contador' }, { id: MOMENTUM_SESSAO, nome: 'Momentum' }] : []),
         ...(chkId === 'prefeituras' ? [{ id: CAR_SESSAO, nome: '🚗 Car' }] : []),
+        // sessão fixa "Programa" (checklist normal, mas com o botão "Programa" em vez do "Priority")
+        ...(['snat', 'pe', 'skill', 'best'].includes(chkId) ? [{ id: PROGRAMA_SESSAO, nome: 'Programa' }] : []),
         { id: 'geral', nome: 'Geral' },
         ...chkSessoesDe(chkId),
     ];
@@ -3295,7 +3449,7 @@ function App() {
             return;
         }
         const sid = chkSessaoAtual(chkId);
-        if (sid === SALDO_SESSAO || sid === MEDIDAS_SESSAO || sid === BANK_SESSAO || sid === CAR_SESSAO)
+        if (sid === SALDO_SESSAO || sid === MEDIDAS_SESSAO || sid === FACE_SESSAO || sid === BANK_SESSAO || sid === SNAT_BANK_SESSAO || sid === CAR_SESSAO)
             return; // esses painéis não são listas de tarefas (o Cabelo é, e aceita tarefas)
         setItensDe(chkId, (l) => [...l, { id: genId(), texto, feito: false, sessaoId: sid === 'geral' ? null : sid }]);
         setChkMapa(setChkNovoTexto, chkId, '');
@@ -3322,7 +3476,7 @@ function App() {
     const removerSessaoChk = (chkId, sid) => {
         if (!sid || sid === 'geral')
             return;
-        if (sid === SALDO_SESSAO || sid === CORTE_SESSAO || sid === MEDIDAS_SESSAO || sid === BANK_SESSAO || sid === CAR_SESSAO) {
+        if (sid === SALDO_SESSAO || sid === CORTE_SESSAO || sid === MEDIDAS_SESSAO || sid === FACE_SESSAO || sid === BANK_SESSAO || sid === SNAT_BANK_SESSAO || sid === CAR_SESSAO || sid === PROGRAMA_SESSAO) {
             msgChk(chkId, 'Esta sessão é fixa do sistema e não pode ser apagada.');
             setChkMapa(setChkConfirmRemoverSessao, chkId, false);
             return;
@@ -3427,13 +3581,25 @@ function App() {
     const abrirPrograma = (chkId, id) => {
         const item = chkItensDe(chkId).find((i) => i.id === id);
         setProgramaTextoEdit((item === null || item === void 0 ? void 0 : item.programa) || '');
-        setProgramaAberto({ chkId, itemId: id });
+        setProgramaAberto({ fonte: 'checklist', chkId, itemId: id });
+    };
+    // Mesmo botão "Programa", agora também disponível nos itens do ⏳ Contador Regressivo.
+    const abrirProgramaContador = (id) => {
+        const item = contadoresRegressivos.find((c) => c.id === id);
+        setProgramaTextoEdit((item === null || item === void 0 ? void 0 : item.programa) || '');
+        setProgramaAberto({ fonte: 'contador', id });
     };
     const salvarPrograma = () => {
         if (!programaAberto)
             return;
-        const { chkId, itemId } = programaAberto;
-        setItensDe(chkId, (l) => l.map((i) => (i.id === itemId ? { ...i, programa: programaTextoEdit } : i)));
+        if (programaAberto.fonte === 'contador') {
+            const { id } = programaAberto;
+            setContadoresRegressivos((l) => l.map((c) => (c.id === id ? { ...c, programa: programaTextoEdit } : c)));
+        }
+        else {
+            const { chkId, itemId } = programaAberto;
+            setItensDe(chkId, (l) => l.map((i) => (i.id === itemId ? { ...i, programa: programaTextoEdit } : i)));
+        }
         marcarSujo();
         setProgramaAberto(null);
         setProgramaTextoEdit('');
@@ -3576,6 +3742,47 @@ function App() {
                 React.createElement("input", { className: "mt-nota-input", placeholder: "No que foi gasto\u2026", value: novoGastoDesc, onChange: (e) => setNovoGastoDesc(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarGasto() }),
                 React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarGasto }, "Adicionar"))),
         msgLivroRazao && React.createElement("p", { className: "mt-premio-msg" }, msgLivroRazao)));
+    // "💰 Bank" do Snat — mesmo molde do Saldo B.E.S.T. acima (saldo + adicionar fundos +
+    // corrigir saldo + extrato de gastos), mas com estado próprio, dentro da aba Snat.
+    const renderSnatBank = () => (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "mt-premio-secao" },
+            React.createElement("p", { className: "mt-premio-secao-titulo" }, "\uD83D\uDCB0 Bank"),
+            React.createElement("p", { className: "mt-premio-valor" }, formatMoeda(snatBankSaldo)),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+                React.createElement("button", { className: "mt-discreto-btn", onClick: () => { setMostrarAdicionarFundosSnat((v) => !v); setMostrarCorrigirSaldoSnat(false); }, title: mostrarAdicionarFundosSnat ? 'Fechar' : 'Adicionar fundos' }, mostrarAdicionarFundosSnat ? '×' : '+'),
+                React.createElement("span", { style: { fontSize: 12, color: '#999' } }, "Adicionar fundos"),
+                React.createElement("span", { style: { fontSize: 12, color: '#ddd', margin: '0 2px' } }, "|"),
+                React.createElement("button", { className: "mt-discreto-corrigir", onClick: () => { setMostrarCorrigirSaldoSnat((v) => !v); setMostrarAdicionarFundosSnat(false); if (!mostrarCorrigirSaldoSnat)
+                        setValorCorrigirSaldoSnat(String(snatBankSaldo)); }, title: mostrarCorrigirSaldoSnat ? 'Fechar' : 'Corrigir saldo' }, mostrarCorrigirSaldoSnat ? 'Fechar' : 'Corrigir saldo')),
+            mostrarAdicionarFundosSnat && (React.createElement("div", { className: "mt-premio-saque-row", style: { marginTop: 8 } },
+                React.createElement("input", { type: "text", inputMode: "decimal", className: "mt-nota-input", placeholder: "Valor a adicionar (ex: 100,00)", value: valorAdicionarFundosSnat, onChange: (e) => setValorAdicionarFundosSnat(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarFundosSnatBank(), autoFocus: true }),
+                React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarFundosSnatBank }, "Adicionar"))),
+            mostrarCorrigirSaldoSnat && (React.createElement("div", { className: "mt-premio-saque-row", style: { marginTop: 8 } },
+                React.createElement("input", { type: "text", inputMode: "decimal", className: "mt-nota-input", placeholder: "Valor correto do saldo", value: valorCorrigirSaldoSnat, onChange: (e) => setValorCorrigirSaldoSnat(e.target.value), onKeyDown: (e) => e.key === 'Enter' && corrigirSaldoSnatBank(), autoFocus: true }),
+                React.createElement("button", { className: "mt-btn-sm primary", onClick: corrigirSaldoSnatBank }, "Corrigir")))),
+        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
+            React.createElement("button", { className: "mt-discreto-btn", onClick: () => setSnatBankExpandido((v) => !v), title: snatBankExpandido ? 'Ocultar extrato' : 'Ver extrato' }, snatBankExpandido ? '▲' : '▼'),
+            React.createElement("span", { style: { fontSize: 12, color: '#999' } }, "Extrato de gastos")),
+        snatBankExpandido && (React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
+                snatBankRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum lan\u00E7amento ainda."),
+                snatBankRegistro.map((l) => (React.createElement("div", { key: l.id, className: "mt-fixa-item" },
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, l.descricao),
+                        React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, l.data)),
+                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: '#A85C4D', flexShrink: 0 } },
+                        "- ",
+                        formatMoeda(l.valor)),
+                    React.createElement("button", { className: "mt-del", onClick: () => removerLancamentoSnatBank(l.id) }, "\u00D7"))))))),
+        React.createElement("div", { className: "mt-premio-divisor" }),
+        React.createElement("div", { className: "mt-premio-secao" },
+            React.createElement("p", { className: "mt-premio-secao-titulo" }, "Novo gasto"),
+            React.createElement("div", { className: "mt-premio-saque-row" },
+                React.createElement("input", { type: "text", inputMode: "decimal", className: "mt-nota-input", placeholder: "Valor gasto (ex: 23,50)", value: novoGastoValorSnat, onChange: (e) => setNovoGastoValorSnat(e.target.value) })),
+            React.createElement("div", { className: "mt-premio-saque-row", style: { marginTop: 6 } },
+                React.createElement("input", { className: "mt-nota-input", placeholder: "No que foi gasto\u2026", value: novoGastoDescSnat, onChange: (e) => setNovoGastoDescSnat(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarGastoSnatBank() }),
+                React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarGastoSnatBank }, "Adicionar"))),
+        msgSnatBank && React.createElement("p", { className: "mt-premio-msg" }, msgSnatBank)));
     // O antigo painel "💇 Corte de cabelo" agora mora dentro da aba Development,
     // no botão "Cabelo" ao lado das sessões.
     const renderCorteCabelo = () => (React.createElement(React.Fragment, null,
@@ -3611,28 +3818,62 @@ function App() {
         setGanhosRegistro((l) => l.filter((r) => r.id !== id));
         marcarSujo();
     };
+    // Painel "Momentum": mora dentro da aba Atividades, no botão "Momentum" ao lado das sessões.
+    // Caixa de entrada simples — cada registro carimba sozinho a data do dia (sem escolha de
+    // ano/categoria) e o livro de registro fica agrupado por mês (mesChave no formato YYYY-MM).
+    const adicionarRegistroMomentum = () => {
+        const texto = momentumNovoTexto.trim();
+        if (!texto)
+            return;
+        const agora = new Date();
+        const dataHoje = agora.toLocaleString('pt-BR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        });
+        const mesChave = hoje().slice(0, 7); // 'YYYY-MM'
+        setMomentumRegistro((l) => [{ id: genId(), texto, mesChave, data: dataHoje, dataISO: hoje() }, ...l]);
+        setMomentumNovoTexto('');
+        marcarSujo();
+    };
+    const removerRegistroMomentum = (id) => {
+        setMomentumRegistro((l) => l.filter((r) => r.id !== id));
+        marcarSujo();
+    };
     const renderGanhos = () => {
         const anoAtual = new Date().getFullYear();
-        const anos = Array.from({ length: 8 }, (_, i) => anoAtual - i); // ex: 2026..2019
-        const grupos = [...anos, 'indefinido']; // além dos anos, um grupo "Indefinido" para entradas sem ano certo
+        const ANO_INICIO_GANHOS = 1982;
+        // de 1982 até o ano atual, do mais recente para o mais antigo (ex: 2026..1982)
+        const anos = Array.from({ length: anoAtual - ANO_INICIO_GANHOS + 1 }, (_, i) => anoAtual - i);
+        // além dos anos: "Indefinido" e, por último, "Lary" — sempre na parte de baixo da lista
+        const grupos = [...anos, 'indefinido', 'lary'];
+        // fonte do ano em vermelho de 2019 até o ano atual; anos mais antigos e os grupos
+        // especiais ("Indefinido", "Lary") ficam na cor tradicional preta. Isso vale só pro
+        // rótulo do ano — o texto digitado dentro de cada entrada nunca muda de cor.
+        const corRotuloAno = (ano) => (typeof ano === 'number' && ano >= 2019 ? '#C0492E' : '#232323');
+        const rotuloDe = (ano) => (ano === 'indefinido' ? 'Indefinido' : ano === 'lary' ? 'Lary' : ano);
         return (React.createElement(React.Fragment, null,
             React.createElement("div", { className: "mt-premio-secao" },
                 React.createElement("p", { className: "mt-premio-secao-titulo" }, "Ganhos"),
-                React.createElement("p", { style: { fontSize: 12, color: '#999', marginTop: -4, marginBottom: 10 } }, "Registre uma entrada e escolha o ano \u2014 os \u00FAltimos 8 anos, ou Indefinido."),
+                React.createElement("p", { style: { fontSize: 12, color: '#999', marginTop: -4, marginBottom: 10 } },
+                    "Registre uma entrada e escolha o ano \u2014 de ",
+                    ANO_INICIO_GANHOS,
+                    " at\u00E9 ",
+                    anoAtual,
+                    ", Indefinido, ou Lary."),
                 React.createElement("div", { className: "mt-premio-saque-row" },
-                    React.createElement("select", { value: ganhosAnoSelecionado, onChange: (e) => setGanhosAnoSelecionado(e.target.value === 'indefinido' ? 'indefinido' : parseInt(e.target.value, 10)), style: { flexShrink: 0, fontSize: 13, padding: '9px 8px', borderRadius: 9, border: '1.5px solid #ddd8c9', background: '#FBFAF6', color: '#232323' } },
-                        anos.map((ano) => React.createElement("option", { key: ano, value: ano }, ano)),
-                        React.createElement("option", { value: "indefinido" }, "Indefinido")),
+                    React.createElement("select", { value: ganhosAnoSelecionado, onChange: (e) => setGanhosAnoSelecionado(e.target.value === 'indefinido' || e.target.value === 'lary' ? e.target.value : parseInt(e.target.value, 10)), style: { flexShrink: 0, fontSize: 13, padding: '9px 8px', borderRadius: 9, border: '1.5px solid #ddd8c9', background: '#FBFAF6', color: '#232323' } },
+                        anos.map((ano) => React.createElement("option", { key: ano, value: ano, style: { color: corRotuloAno(ano) } }, ano)),
+                        React.createElement("option", { value: "indefinido" }, "Indefinido"),
+                        React.createElement("option", { value: "lary" }, "Lary")),
                     React.createElement("input", { className: "mt-nota-input", placeholder: "Nova entrada\u2026", value: ganhosNovoTexto, onChange: (e) => setGanhosNovoTexto(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarRegistroGanhos() }),
                     React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarRegistroGanhos }, "Adicionar"))),
             grupos.map((ano) => {
                 const doAno = ganhosRegistro.filter((r) => r.ano === ano);
                 const aberto = !!ganhosAnoAberto[ano];
-                const rotulo = ano === 'indefinido' ? 'Indefinido' : ano;
+                const rotulo = rotuloDe(ano);
                 return (React.createElement("div", { key: ano, style: { marginBottom: 8 } },
                     React.createElement("button", { onClick: () => setGanhosAnoAberto((m) => ({ ...m, [ano]: !m[ano] })), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
                             display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                            fontSize: 13, fontWeight: 700, color: '#232323', padding: '8px 2px',
+                            fontSize: 13, fontWeight: 700, color: corRotuloAno(ano), padding: '8px 2px',
                             border: 'none', borderBottom: '1.5px solid #ddd8c9', background: 'none', cursor: 'pointer',
                         } },
                         React.createElement("span", { style: { fontSize: 11, color: '#999' } }, aberto ? '▲' : '▼'),
@@ -3650,6 +3891,54 @@ function App() {
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto)),
                             React.createElement("button", { className: "mt-del", onClick: () => removerRegistroGanhos(r.id) }, "\u00D7"))))))));
+            })));
+    };
+    // Painel "Momentum": mesmo padrão de agrupamento do Ganhos, mas por mês em vez de ano —
+    // e sem seletor: cada entrada carimba sozinha o mês/ano corrente ao ser adicionada.
+    const renderMomentum = () => {
+        // meses com pelo menos um registro, do mais recente para o mais antigo
+        const mesesComRegistro = Array.from(new Set(momentumRegistro.map((r) => r.mesChave))).sort().reverse();
+        const mesAtualChave = hoje().slice(0, 7);
+        // garante que o mês corrente sempre apareça no topo, mesmo sem registro ainda
+        const grupos = mesesComRegistro.includes(mesAtualChave) ? mesesComRegistro : [mesAtualChave, ...mesesComRegistro];
+        const rotuloMes = (mesChave) => {
+            const [ano, mes] = mesChave.split('-');
+            const nome = new Date(Number(ano), Number(mes) - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
+            return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${ano}`;
+        };
+        return (React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "mt-premio-secao" },
+                React.createElement("p", { className: "mt-premio-secao-titulo" }, "Momentum"),
+                React.createElement("p", { style: { fontSize: 12, color: '#999', marginTop: -4, marginBottom: 10 } }, "Registre uma entrada \u2014 a data do dia \u00E9 carimbada sozinha, e o livro fica separado por m\u00EAs."),
+                React.createElement("div", { className: "mt-premio-saque-row" },
+                    React.createElement("input", { className: "mt-nota-input", placeholder: "Nova entrada\u2026", value: momentumNovoTexto, onChange: (e) => setMomentumNovoTexto(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarRegistroMomentum() }),
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarRegistroMomentum }, "Adicionar"))),
+            grupos.map((mesChave) => {
+                const doMes = momentumRegistro.filter((r) => r.mesChave === mesChave);
+                const aberto = !!momentumMesAberto[mesChave];
+                const rotulo = rotuloMes(mesChave);
+                return (React.createElement("div", { key: mesChave, style: { marginBottom: 8 } },
+                    React.createElement("button", { onClick: () => setMomentumMesAberto((m) => ({ ...m, [mesChave]: !m[mesChave] })), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            fontSize: 13, fontWeight: 700, color: '#232323', padding: '8px 2px',
+                            border: 'none', borderBottom: '1.5px solid #ddd8c9', background: 'none', cursor: 'pointer',
+                        } },
+                        React.createElement("span", { style: { fontSize: 11, color: '#999' } }, aberto ? '▲' : '▼'),
+                        React.createElement("span", null, rotulo),
+                        React.createElement("span", { style: { fontSize: 11, color: '#999', fontWeight: 400 } },
+                            "(",
+                            doMes.length,
+                            ")")),
+                    aberto && (React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 6 } },
+                        doMes.length === 0 && React.createElement("p", { className: "mt-empty" },
+                            "Nenhuma entrada em ",
+                            rotulo,
+                            "."),
+                        doMes.map((r) => (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto),
+                                React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
+                            React.createElement("button", { className: "mt-del", onClick: () => removerRegistroMomentum(r.id) }, "\u00D7"))))))));
             })));
     };
     // Batalha: um bloco Prós ou Contras — só exibe a lista de notas já criadas (o input é único, lá em cima)
@@ -3712,6 +4001,13 @@ function App() {
                             dias,
                             " ",
                             dias === 1 ? 'dia' : 'dias')),
+                    React.createElement("button", { onClick: () => abrirProgramaContador(c.id), title: c.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
+                            flexShrink: 0, fontSize: 10.5, fontWeight: 700, padding: '4px 9px',
+                            borderRadius: 20, border: '1.5px solid', cursor: 'pointer',
+                            background: c.programa ? '#4A7FD9' : '#fff',
+                            color: c.programa ? '#fff' : '#4A7FD9',
+                            borderColor: '#4A7FD9',
+                        } }, "Programa"),
                     React.createElement("button", { className: "mt-del", onClick: () => removerContador(c.id) }, "\u00D7")));
             }))));
     const renderMedidas = () => (React.createElement(React.Fragment, null,
@@ -3736,6 +4032,43 @@ function App() {
                         React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, [m.peso !== null ? `Peso: ${m.peso} kg` : null, m.cintura !== null ? `Cintura: ${m.cintura} cm` : null].filter(Boolean).join(' · ')),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, m.data)),
                     React.createElement("button", { className: "mt-del", onClick: () => removerMedida(m.id) }, "\u00D7")))))))));
+    // 🧴 Face: mora dentro da aba Development, no botão "Face" ao lado de Cabelo e Medidas.
+    // Foto/vídeo tirados na hora (câmera direto) + comentário — mesmo pipeline do Pso: com o
+    // R2 configurado, a foto sobe comprimida pro servidor e o vídeo sobe puro (só a URL fica
+    // salva aqui); sem R2, a foto cai no fallback local em base64. No registro, cada entrada
+    // guarda a mídia como uma miniatura ao lado da data.
+    const renderFace = () => (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "mt-premio-secao" },
+            React.createElement("p", { className: "mt-premio-secao-titulo" }, "\uD83E\uDDF4 Face"),
+            React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Coment\u00E1rio\u2026", value: faceComentario, onChange: (e) => setFaceComentario(e.target.value), style: { minHeight: 50 } }),
+            faceNovaFoto && (React.createElement("div", { style: { position: 'relative', marginTop: 8 } },
+                React.createElement("img", { src: faceNovaFoto, style: { maxWidth: '100%', maxHeight: 120, borderRadius: 8, objectFit: 'cover', display: 'block' }, alt: "" }),
+                React.createElement("button", { className: "mt-del", style: { position: 'absolute', top: 4, right: 4 }, onClick: () => setFaceNovaFoto(null) }, "\u00D7"))),
+            faceNovoVideo && (React.createElement("div", { style: { position: 'relative', marginTop: 8 } },
+                React.createElement("video", { src: faceNovoVideo, controls: true, playsInline: true, style: { maxWidth: '100%', maxHeight: 160, borderRadius: 8, display: 'block', background: '#000' } }),
+                React.createElement("button", { className: "mt-del", style: { position: 'absolute', top: 4, right: 4 }, onClick: () => setFaceNovoVideo(null) }, "\u00D7"))),
+            uploadMidiaFaceEmAndamento && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12, margin: '6px 0 0' } }, "Enviando\u2026"),
+            msgUploadMidiaFace && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12, margin: '6px 0 0', color: msgUploadMidiaFace.startsWith('⚠️') ? '#C9A227' : '#C0492E' } }, msgUploadMidiaFace),
+            React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' } },
+                React.createElement("button", { className: "mt-btn-sm", disabled: uploadMidiaFaceEmAndamento, onClick: () => faceFotoInputRef.current && faceFotoInputRef.current.click() }, "\uD83D\uDCF7 Tirar foto"),
+                React.createElement("button", { className: "mt-btn-sm", disabled: uploadMidiaFaceEmAndamento, onClick: () => faceVideoInputRef.current && faceVideoInputRef.current.click() }, "\uD83C\uDFA5 Gravar v\u00EDdeo"),
+                React.createElement("input", { ref: faceFotoInputRef, type: "file", accept: "image/*", capture: "environment", style: { display: 'none' }, onChange: handleFotoInputFace }),
+                React.createElement("input", { ref: faceVideoInputRef, type: "file", accept: "video/*", capture: "environment", style: { display: 'none' }, onChange: handleVideoInputFace })),
+            React.createElement("button", { className: "mt-btn-sm primary", style: { marginTop: 8 }, onClick: registrarFace }, "Registrar"),
+            msgFace && React.createElement("p", { className: "mt-premio-msg" }, msgFace)),
+        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
+            React.createElement("button", { className: "mt-discreto-btn", onClick: () => setFaceExpandido((v) => !v), title: faceExpandido ? 'Ocultar registro' : 'Ver registro de Face' }, faceExpandido ? '▲' : '▼'),
+            React.createElement("span", { style: { fontSize: 12, color: '#999' } }, "Registro de Face")),
+        faceExpandido && (React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
+                faceRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum registro ainda."),
+                faceRegistro.map((r, i) => (React.createElement("div", { key: r.id, className: "mt-fixa-item", style: mesmoDiaRegistro(r, faceRegistro[i + 1]) ? { borderBottom: 'none' } : undefined },
+                    r.foto && React.createElement("img", { src: r.foto, className: "mt-alerta-img-preview", alt: "" }),
+                    r.video && React.createElement("video", { src: r.video, className: "mt-alerta-img-preview", muted: true }),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, r.comentario),
+                        React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
+                    React.createElement("button", { className: "mt-del", onClick: () => removerRegistroFace(r.id) }, "\u00D7")))))))));
     // Painel "💰 Bank": mora dentro da aba Finanças, no botão "Bank" ao lado das sessões.
     const renderBank = () => {
         const ultimo = bankRegistro[0] || null;
@@ -4746,6 +5079,134 @@ function App() {
             setUploadMidiaEmAndamento(false);
         }
     };
+    // ---- Pso: foto (câmera) + vídeo (câmera) — mesmo pipeline de cima (comprime e sobe pro
+    // R2 quando configurado; sem R2, foto cai no fallback em base64 e vídeo fica bloqueado). ----
+    const handleFotoInputPso = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file)
+            return;
+        const { url, token } = lerConfigR2();
+        if (!url || !token) {
+            const reader = new FileReader();
+            reader.onload = (ev) => setPsoNovaFoto(ev.target.result);
+            reader.readAsDataURL(file);
+            setMsgUploadMidiaPso('⚠️ Cloudflare R2 não configurado — a foto foi guardada localmente (base64). Configure em ⚙️ Configurações gerais para subir pro servidor.');
+            return;
+        }
+        setMsgUploadMidiaPso('');
+        setUploadMidiaPsoEmAndamento(true);
+        try {
+            const comprimida = await comprimirImagemParaUpload(file);
+            const urlFinal = await subirArquivoParaR2(comprimida, file.name || 'pso-foto.jpg');
+            setPsoNovaFoto(urlFinal);
+        }
+        catch (err) {
+            setMsgUploadMidiaPso('Não consegui subir a foto. Confira a configuração do Cloudflare em ⚙️ Configurações gerais.');
+        }
+        finally {
+            setUploadMidiaPsoEmAndamento(false);
+        }
+    };
+    const handleVideoInputPso = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file)
+            return;
+        const { url, token } = lerConfigR2();
+        if (!url || !token) {
+            setMsgUploadMidiaPso('Configure o Cloudflare R2 em ⚙️ Configurações gerais antes de gravar vídeos.');
+            return;
+        }
+        setMsgUploadMidiaPso('');
+        setUploadMidiaPsoEmAndamento(true);
+        try {
+            const urlFinal = await subirArquivoParaR2(file, file.name || 'pso-video.mp4');
+            setPsoNovoVideo(urlFinal);
+        }
+        catch (err) {
+            setMsgUploadMidiaPso('Não consegui subir o vídeo. Confira a configuração do Cloudflare em ⚙️ Configurações gerais.');
+        }
+        finally {
+            setUploadMidiaPsoEmAndamento(false);
+        }
+    };
+    // ---- Face (Development): foto (câmera) + vídeo (câmera) — mesmo pipeline do Pso acima ----
+    const handleFotoInputFace = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file)
+            return;
+        const { url, token } = lerConfigR2();
+        if (!url || !token) {
+            const reader = new FileReader();
+            reader.onload = (ev) => setFaceNovaFoto(ev.target.result);
+            reader.readAsDataURL(file);
+            setMsgUploadMidiaFace('⚠️ Cloudflare R2 não configurado — a foto foi guardada localmente (base64). Configure em ⚙️ Configurações gerais para subir pro servidor.');
+            return;
+        }
+        setMsgUploadMidiaFace('');
+        setUploadMidiaFaceEmAndamento(true);
+        try {
+            const comprimida = await comprimirImagemParaUpload(file);
+            const urlFinal = await subirArquivoParaR2(comprimida, file.name || 'face-foto.jpg');
+            setFaceNovaFoto(urlFinal);
+        }
+        catch (err) {
+            setMsgUploadMidiaFace('Não consegui subir a foto. Confira a configuração do Cloudflare em ⚙️ Configurações gerais.');
+        }
+        finally {
+            setUploadMidiaFaceEmAndamento(false);
+        }
+    };
+    const handleVideoInputFace = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file)
+            return;
+        const { url, token } = lerConfigR2();
+        if (!url || !token) {
+            setMsgUploadMidiaFace('Configure o Cloudflare R2 em ⚙️ Configurações gerais antes de gravar vídeos.');
+            return;
+        }
+        setMsgUploadMidiaFace('');
+        setUploadMidiaFaceEmAndamento(true);
+        try {
+            const urlFinal = await subirArquivoParaR2(file, file.name || 'face-video.mp4');
+            setFaceNovoVideo(urlFinal);
+        }
+        catch (err) {
+            setMsgUploadMidiaFace('Não consegui subir o vídeo. Confira a configuração do Cloudflare em ⚙️ Configurações gerais.');
+        }
+        finally {
+            setUploadMidiaFaceEmAndamento(false);
+        }
+    };
+    // grava um registro de Face: comentário + foto/vídeo (se anexados), carimbando dia e horário
+    const registrarFace = () => {
+        const comentario = faceComentario.trim();
+        if (!comentario && !faceNovaFoto && !faceNovoVideo) {
+            setMsgFace('Escreva um comentário, tire uma foto ou grave um vídeo.');
+            return;
+        }
+        const dataHoje = new Date().toLocaleString('pt-BR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+        });
+        setFaceRegistro((l) => [{ id: genId(), comentario, foto: faceNovaFoto, video: faceNovoVideo, data: dataHoje, dataISO: hoje() }, ...l]);
+        setFaceComentario('');
+        setFaceNovaFoto(null);
+        setFaceNovoVideo(null);
+        setMsgUploadMidiaFace('');
+        setMsgFace('Registrado!');
+        marcarSujo();
+    };
+    const removerRegistroFace = (id) => {
+        const idx = faceRegistro.findIndex((x) => x.id === id);
+        if (idx !== -1)
+            registrarDesfazer('livroRazao', 'faceRegistro', { valor: faceRegistro[idx], idx });
+        setFaceRegistro((l) => l.filter((x) => x.id !== id));
+        marcarSujo();
+    };
     const salvarConfigR2Click = () => {
         const ok = salvarConfigR2(r2UrlDraft, r2TokenDraft);
         setR2ConfigMsg(ok ? 'Salvo!' : 'Não consegui salvar — tente de novo.');
@@ -5182,7 +5643,7 @@ function App() {
         catch (e) { /* localStorage indisponível: backup segue só com os dados do Minha Tela */ }
         return dados;
     };
-    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, bankSaldo, bankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
+    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
     const copiarBackup = () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -5300,8 +5761,11 @@ function App() {
             setLivroRazao(Array.isArray(dados.livroRazao) ? dados.livroRazao : []);
             setCorteDeCabeloRegistro(Array.isArray(dados.corteDeCabeloRegistro) ? dados.corteDeCabeloRegistro : []);
             setMedidasRegistro(Array.isArray(dados.medidasRegistro) ? dados.medidasRegistro : []);
+            setFaceRegistro(Array.isArray(dados.faceRegistro) ? dados.faceRegistro : []);
             setBankSaldo(typeof dados.bankSaldo === 'number' ? dados.bankSaldo : 0);
             setBankRegistro(Array.isArray(dados.bankRegistro) ? dados.bankRegistro : []);
+            setSnatBankSaldo(typeof dados.snatBankSaldo === 'number' ? dados.snatBankSaldo : 0);
+            setSnatBankRegistro(Array.isArray(dados.snatBankRegistro) ? dados.snatBankRegistro : []);
             setOrdemAbasRazao(normalizarOrdemAbasRazao(dados.ordemAbasRazao));
             setPumpTarefas(Array.isArray(dados.pumpTarefas) ? dados.pumpTarefas : []);
             setPumpRegistro(Array.isArray(dados.pumpRegistro) ? dados.pumpRegistro : []);
@@ -5319,6 +5783,7 @@ function App() {
                 setChecklistSessoes(chk.sessoes);
             }
             setGanhosRegistro(Array.isArray(dados.ganhosRegistro) ? dados.ganhosRegistro : []);
+            setMomentumRegistro(Array.isArray(dados.momentumRegistro) ? dados.momentumRegistro : []);
             setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
             setContadoresRegressivos(Array.isArray(dados.contadoresRegressivos) ? dados.contadoresRegressivos : []);
             setModoConcluir(!!dados.modoConcluir);
@@ -6119,6 +6584,17 @@ function App() {
                         const editandoHist = freqHist ? !!historicoEditando[freqHist] : false;
                         const colunasOcultasHist = (freqHist && historicoColunasOcultas[freqHist]) || [];
                         const colsVisiveisHist = colsHist.map((c, i) => ({ col: c, idx: i, oculta: colunasOcultasHist.includes(i) }));
+                        // Prioritários não é baseado num ciclo (dia da semana / semana do mês / etc.) como
+                        // as outras listas — então o histórico dele não usa a tabela de colunas: mostra só
+                        // o nome da tarefa e o dia em que foi concluída, no formato dia/mês (sem dia da
+                        // semana, sem ano).
+                        const ehHistPriorit = freqHist ? String(nomeGrupoFixa(freqHist) || '').toLowerCase().includes('priorit') : false;
+                        const formatarDiaMesHist = (iso) => {
+                            if (!iso)
+                                return null;
+                            const [, mes, dia] = iso.split('-');
+                            return `${dia}/${mes}`;
+                        };
                         // cálculo de porcentagem até a data corrente (sem contar datas futuras)
                         const hoje2Hist = new Date();
                         const maxIdxHojeHist = (_a = {
@@ -6473,7 +6949,9 @@ function App() {
                                     itemsHist.length === 0 ? (React.createElement("p", { className: "mt-empty" },
                                         "Nenhuma tarefa ",
                                         labelHist.toLowerCase(),
-                                        " ainda.")) : (React.createElement("div", { className: "mt-tabela-wrap" },
+                                        " ainda.")) : ehHistPriorit ? (React.createElement("div", { className: "mt-fixas-scroll" }, itemsHist.map((t) => (React.createElement("div", { key: t.id, className: "mt-fixa-item" },
+                                        React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#232323' } }, t.texto),
+                                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: t.feitoDia ? '#3E8E5A' : '#a8a293', flexShrink: 0 } }, formatarDiaMesHist(t.feitoDia) || 'não concluído')))))) : (React.createElement("div", { className: "mt-tabela-wrap" },
                                         React.createElement("table", { className: "mt-tabela-historico" },
                                             React.createElement("thead", null,
                                                 React.createElement("tr", null,
@@ -6735,6 +7213,20 @@ function App() {
                                     React.createElement("button", { className: "mt-discreto-btn", onClick: () => setPsoConfigAberto((v) => !v), title: psoConfigAberto ? 'Fechar configurações' : 'Configurações (criar botão)' }, psoConfigAberto ? '×' : '+')),
                                 psoConfigAberto && (React.createElement("div", { style: { marginTop: 8, paddingTop: 10, borderTop: '1px solid #f0efe9' } },
                                     React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 6 } }, "Crie um bot\u00E3o com o nome que quiser. Ele aparece logo abaixo e entra no registro ao tocar em \"Done\". Com este painel aberto, um \u00D7 ao lado de cada bot\u00E3o permite apag\u00E1-lo."),
+                                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 } },
+                                        React.createElement("span", { className: "mt-config-item-desc", style: { marginBottom: 0 } }, "Categoria do novo bot\u00E3o:"),
+                                        React.createElement("button", { type: "button", onClick: () => setPsoNovaTarefaCategoria('padrao'), title: "Categoria padr\u00E3o (bot\u00F5es como os atuais)", "aria-label": "Categoria padr\u00E3o", style: {
+                                                width: 22, height: 22, borderRadius: '50%', padding: 0, cursor: 'pointer',
+                                                background: '#fff',
+                                                border: psoNovaTarefaCategoria === 'padrao' ? '2.5px solid #232323' : '1.5px solid #ddd8c9',
+                                                boxShadow: psoNovaTarefaCategoria === 'padrao' ? '0 0 0 2px rgba(35,35,35,0.15)' : 'none',
+                                            } }),
+                                        React.createElement("button", { type: "button", onClick: () => setPsoNovaTarefaCategoria('verde'), title: "Nova categoria: bot\u00F5es verdes", "aria-label": "Nova categoria verde", style: {
+                                                width: 22, height: 22, borderRadius: '50%', padding: 0, cursor: 'pointer',
+                                                background: '#3E8E5A',
+                                                border: psoNovaTarefaCategoria === 'verde' ? '2.5px solid #232323' : '1.5px solid #3E8E5A',
+                                                boxShadow: psoNovaTarefaCategoria === 'verde' ? '0 0 0 2px rgba(35,35,35,0.15)' : 'none',
+                                            } })),
                                     React.createElement("div", { className: "mt-premio-saque-row" },
                                         React.createElement("input", { className: "mt-nota-input", placeholder: "Nome do novo bot\u00E3o\u2026", value: psoNovoNome, onChange: (e) => setPsoNovoNome(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarPsoTarefa() }),
                                         React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarPsoTarefa }, "Adicionar")))),
@@ -6743,13 +7235,16 @@ function App() {
                                     React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 } },
                                         psoTarefas.map((t) => {
                                             const marcado = psoSelecionados.includes(t.id);
+                                            // categoria 'verde' pinta o botão de verde (borda sempre, preenchido
+                                            // quando marcado); categoria 'padrao' mantém o visual roxo original.
+                                            const corCategoria = t.categoria === 'verde' ? '#3E8E5A' : '#8E6BAE';
                                             return (React.createElement("span", { key: t.id, style: { display: 'inline-flex', alignItems: 'center', gap: 2 } },
                                                 React.createElement("button", { onClick: () => alternarPsoSelecionado(t.id), style: {
                                                         fontSize: 12.5, fontWeight: 600, padding: '7px 13px', borderRadius: 20,
                                                         border: '1.5px solid', cursor: 'pointer', transition: 'background 0.15s, color 0.15s',
-                                                        background: marcado ? '#8E6BAE' : '#fff',
-                                                        color: marcado ? '#fff' : '#777',
-                                                        borderColor: marcado ? '#8E6BAE' : '#ddd8c9',
+                                                        background: marcado ? corCategoria : '#fff',
+                                                        color: marcado ? '#fff' : (t.categoria === 'verde' ? corCategoria : '#777'),
+                                                        borderColor: marcado ? corCategoria : (t.categoria === 'verde' ? corCategoria : '#ddd8c9'),
                                                     } }, t.nome),
                                                 psoConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerPsoTarefa(t.id) }, "\u00D7"))));
                                         }),
@@ -6771,6 +7266,20 @@ function App() {
                                 React.createElement("input", { type: "range", min: "-10", max: "10", step: "1", value: psoValor, onChange: (e) => setPsoValor(parseInt(e.target.value, 10)), style: { width: '100%', accentColor: '#C9A227', margin: '2px 0 10px' } }),
                                 React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Sensa\u00E7\u00E3o\u2026", value: psoSensacao, onChange: (e) => setPsoSensacao(e.target.value), style: { minHeight: 60 } }),
                                 React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Causa\u2026", value: psoCausa, onChange: (e) => setPsoCausa(e.target.value), style: { minHeight: 60 } }),
+                                React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Coment\u00E1rio\u2026", value: psoComentarioMidia, onChange: (e) => setPsoComentarioMidia(e.target.value), style: { minHeight: 50, marginTop: 10 } }),
+                                psoNovaFoto && (React.createElement("div", { style: { position: 'relative', marginTop: 8 } },
+                                    React.createElement("img", { src: psoNovaFoto, style: { maxWidth: '100%', maxHeight: 120, borderRadius: 8, objectFit: 'cover', display: 'block' }, alt: "" }),
+                                    React.createElement("button", { className: "mt-del", style: { position: 'absolute', top: 4, right: 4 }, onClick: () => setPsoNovaFoto(null) }, "\u00D7"))),
+                                psoNovoVideo && (React.createElement("div", { style: { position: 'relative', marginTop: 8 } },
+                                    React.createElement("video", { src: psoNovoVideo, controls: true, playsInline: true, style: { maxWidth: '100%', maxHeight: 160, borderRadius: 8, display: 'block', background: '#000' } }),
+                                    React.createElement("button", { className: "mt-del", style: { position: 'absolute', top: 4, right: 4 }, onClick: () => setPsoNovoVideo(null) }, "\u00D7"))),
+                                uploadMidiaPsoEmAndamento && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12, margin: '6px 0 0' } }, "Enviando\u2026"),
+                                msgUploadMidiaPso && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12, margin: '6px 0 0', color: msgUploadMidiaPso.startsWith('⚠️') ? '#C9A227' : '#C0492E' } }, msgUploadMidiaPso),
+                                React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                                    React.createElement("button", { className: "mt-btn-sm", disabled: uploadMidiaPsoEmAndamento, onClick: () => psoFotoInputRef.current && psoFotoInputRef.current.click() }, "\uD83D\uDCF7 Tirar foto"),
+                                    React.createElement("button", { className: "mt-btn-sm", disabled: uploadMidiaPsoEmAndamento, onClick: () => psoVideoInputRef.current && psoVideoInputRef.current.click() }, "\uD83C\uDFA5 Gravar v\u00EDdeo"),
+                                    React.createElement("input", { ref: psoFotoInputRef, type: "file", accept: "image/*", capture: "environment", style: { display: 'none' }, onChange: handleFotoInputPso }),
+                                    React.createElement("input", { ref: psoVideoInputRef, type: "file", accept: "video/*", capture: "environment", style: { display: 'none' }, onChange: handleVideoInputPso })),
                                 msgPso && React.createElement("p", { className: "mt-premio-msg" }, msgPso)),
                             React.createElement("div", { className: "mt-premio-secao", style: { marginTop: 10 } },
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
@@ -6854,6 +7363,8 @@ function App() {
                                 React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                                     psoRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum registro ainda."),
                                     psoRegistro.map((r, i) => (React.createElement("div", { key: r.id, className: "mt-fixa-item", style: mesmoDiaRegistro(r, psoRegistro[i + 1]) ? { borderBottom: 'none' } : undefined },
+                                        r.foto && React.createElement("img", { src: r.foto, className: "mt-alerta-img-preview", alt: "" }),
+                                        r.video && React.createElement("video", { src: r.video, className: "mt-alerta-img-preview", muted: true }),
                                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                             React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 700, color: r.valor > 0 ? '#3E8E5A' : r.valor < 0 ? '#C0492E' : '#232323' } },
                                                 "Pso ",
@@ -6865,6 +7376,7 @@ function App() {
                                             r.causa && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#232323' } },
                                                 "Causa: ",
                                                 r.causa),
+                                            r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#232323' } }, r.comentario),
                                             React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
                                         React.createElement("button", { className: "mt-del", onClick: () => removerRegistroPso(r.id) }, "\u00D7"))))))))),
                         razaoTabSelecionada === 'premiacao' && (React.createElement(React.Fragment, null,
@@ -6904,19 +7416,25 @@ function App() {
                             const sid = chkSessaoAtual(c.id);
                             const visiveis = chkItensDaSessao(c.id, sid);
                             const nomeSessao = (abas.find((s) => s.id === sid) || {}).nome;
+                            // sessão "Anti-frust" dentro de Protocolos Gerais: troca o botão "Priority" pelo
+                            // "Programa", igual já foi feito pra sessão fixa Programa (Snat/PE/Skill/B.E.S.T.)
+                            const ehSessaoAntifrust = c.id === 'protocolosgerais' && String(nomeSessao || '').toLowerCase().replace(/[^a-z]/g, '').includes('antifrust');
                             const ehSaldo = c.id === 'best' && sid === SALDO_SESSAO;
                             const ehCorte = c.id === 'development' && sid === CORTE_SESSAO;
                             const ehMedidas = c.id === 'development' && sid === MEDIDAS_SESSAO;
+                            const ehFace = c.id === 'development' && sid === FACE_SESSAO;
                             const ehBank = c.id === 'financas' && sid === BANK_SESSAO;
+                            const ehSnatBank = c.id === 'snat' && sid === SNAT_BANK_SESSAO;
                             const ehGanhos = c.id === 'atividades' && sid === GANHOS_SESSAO;
                             const ehBatalha = c.id === 'atividades' && sid === BATALHA_SESSAO;
                             const ehContador = c.id === 'atividades' && sid === CONTADOR_SESSAO;
+                            const ehMomentum = c.id === 'atividades' && sid === MOMENTUM_SESSAO;
                             const ehCar = c.id === 'prefeituras' && sid === CAR_SESSAO;
-                            // painéis embutidos (Saldo, Cabelo, Medidas, Bank, Ganhos, Batalha, Contador, Car)
-                            const ehPainel = ehSaldo || ehCorte || ehMedidas || ehBank || ehGanhos || ehBatalha || ehContador || ehCar;
+                            // painéis embutidos (Saldo, Cabelo, Medidas, Face, Bank, Bank Snat, Ganhos, Batalha, Contador, Momentum, Car)
+                            const ehPainel = ehSaldo || ehCorte || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehBatalha || ehContador || ehMomentum || ehCar;
                             // o Cabelo é o único painel que mantém a lista de tarefas embaixo dele;
                             // os outros substituem a lista por completo
-                            const escondeTarefas = ehSaldo || ehMedidas || ehBank || ehGanhos || ehBatalha || ehContador || ehCar;
+                            const escondeTarefas = ehSaldo || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehBatalha || ehContador || ehMomentum || ehCar;
                             if (razaoTabSelecionada !== c.id)
                                 return null;
                             return (React.createElement(React.Fragment, { key: c.id },
@@ -6928,7 +7446,7 @@ function App() {
                                     React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 10 } },
                                         abas.map((s) => {
                                             const ativo = sid === s.id;
-                                            const fixa = s.id === 'geral' || s.id === SALDO_SESSAO || s.id === CORTE_SESSAO || s.id === MEDIDAS_SESSAO || s.id === BANK_SESSAO || s.id === GANHOS_SESSAO || s.id === BATALHA_SESSAO || s.id === CONTADOR_SESSAO || s.id === CAR_SESSAO;
+                                            const fixa = s.id === 'geral' || s.id === SALDO_SESSAO || s.id === CORTE_SESSAO || s.id === MEDIDAS_SESSAO || s.id === FACE_SESSAO || s.id === BANK_SESSAO || s.id === SNAT_BANK_SESSAO || s.id === GANHOS_SESSAO || s.id === BATALHA_SESSAO || s.id === CONTADOR_SESSAO || s.id === MOMENTUM_SESSAO || s.id === CAR_SESSAO || s.id === PROGRAMA_SESSAO;
                                             return (React.createElement(React.Fragment, { key: s.id },
                                                 React.createElement("button", { onClick: () => { setChkMapa(setChkSessaoSel, c.id, s.id); setChkMapa(setChkConfirmRemoverSessao, c.id, false); msgChk(c.id, ''); }, style: {
                                                         fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20,
@@ -6955,10 +7473,13 @@ function App() {
                                     ehSaldo && renderSaldoBest(),
                                     ehCorte && renderCorteCabelo(),
                                     ehMedidas && renderMedidas(),
+                                    ehFace && renderFace(),
                                     ehBank && renderBank(),
+                                    ehSnatBank && renderSnatBank(),
                                     ehGanhos && renderGanhos(),
                                     ehBatalha && renderBatalha(),
                                     ehContador && renderContadores(),
+                                    ehMomentum && renderMomentum(),
                                     ehCar && renderCar(),
                                     !escondeTarefas && (React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                                         visiveis.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhuma tarefa ainda nesta sess\u00E3o."),
@@ -6975,7 +7496,7 @@ function App() {
                                                     border: '1.5px solid ' + (it.cor ? CORES_CIRCULO[it.cor] : '#ddd8c9'),
                                                     background: it.cor ? CORES_CIRCULO[it.cor] : '#fff',
                                                 } })),
-                                            c.id === 'objetivas' ? (React.createElement("button", { onClick: () => abrirPrograma(c.id, it.id), title: it.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
+                                            (c.id === 'objetivas' || sid === PROGRAMA_SESSAO || ehSessaoAntifrust) ? (React.createElement("button", { onClick: () => abrirPrograma(c.id, it.id), title: it.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
                                                     flexShrink: 0, fontSize: 10.5, fontWeight: 700, padding: '4px 9px',
                                                     borderRadius: 20, border: '1.5px solid', cursor: 'pointer',
                                                     background: it.programa ? '#4A7FD9' : '#fff',
@@ -7297,7 +7818,6 @@ function App() {
                 transform: `rotate(${p.rotacao}deg)`,
             } })))))));
 }
-
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(React.createElement(App));
 </script>
