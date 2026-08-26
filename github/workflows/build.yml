@@ -1,0 +1,72 @@
+name: Compilar Meg (notas.html)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Meg.jsx'
+      - 'entry.jsx'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-notas
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar JSX com esbuild
+        run: |
+          npx --yes esbuild@0.23.1 entry.jsx --bundle --format=esm --jsx=transform \
+            --external:react --external:react-dom/client --external:d3 --external:lucide-react \
+            --outfile=meg.compiled.js
+
+      - name: Montar o notas.html
+        run: |
+          cat > notas.html << 'CABECALHO'
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+          <title>Meg — Notas</title>
+          <style>
+            html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; overscroll-behavior: none; }
+            #root { height: 100%; }
+          </style>
+          <script type="importmap">
+          {
+            "imports": {
+              "react": "https://esm.sh/react@18.3.1",
+              "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+              "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+              "d3": "https://esm.sh/d3@7.9.0",
+              "lucide-react": "https://esm.sh/lucide-react@0.383.0?external=react"
+            }
+          }
+          </script>
+          </head>
+          <body>
+          <div id="root"></div>
+          <script type="module">
+          CABECALHO
+          cat meg.compiled.js >> notas.html
+          cat >> notas.html << 'RODAPE'
+          </script>
+          </body>
+          </html>
+          RODAPE
+
+      - name: Publicar notas.html no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add notas.html
+          git diff --quiet --cached || git commit -m "Compilar Meg.jsx -> notas.html [automático]"
+          git push
