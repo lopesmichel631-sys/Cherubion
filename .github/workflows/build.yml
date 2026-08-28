@@ -21,10 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compilar JSX com esbuild
+      - name: Instalar React, D3 e Lucide de verdade (para empacotar tudo junto)
+        run: npm install --no-save react@18.3.1 react-dom@18.3.1 d3@7.9.0 lucide-react@0.383.0
+
+      - name: Compilar tudo num único arquivo autossuficiente (sem CDN em tempo de execução)
         run: |
-          npx --yes esbuild@0.23.1 entry.jsx --bundle --format=esm --jsx=transform \
-            --external:react --external:react-dom/client --external:d3 --external:lucide-react \
+          npx --yes esbuild@0.23.1 entry.jsx --bundle --format=iife --jsx=transform \
             --outfile=meg.compiled.js
 
       - name: Montar o notas.html
@@ -40,21 +42,10 @@ jobs:
             html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; overscroll-behavior: none; }
             #root { height: 100%; }
           </style>
-          <script type="importmap">
-          {
-            "imports": {
-              "react": "https://esm.sh/react@18.3.1",
-              "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-              "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
-              "d3": "https://esm.sh/d3@7.9.0",
-              "lucide-react": "https://esm.sh/lucide-react@0.383.0?external=react"
-            }
-          }
-          </script>
           </head>
           <body>
           <div id="root"></div>
-          <script type="module">
+          <script>
           CABECALHO
           cat meg.compiled.js >> notas.html
           cat >> notas.html << 'RODAPE'
