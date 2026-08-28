@@ -41,62 +41,62 @@ jobs:
       - name: Montar o notas.html
         run: |
           cat > cabecalho.part << 'FIM_DO_CABECALHO'
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>Meg — Notas</title>
-<style>
-  html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; overscroll-behavior: none; }
-  #root { height: 100%; }
-  #meg-erro {
-    display: none;
-    padding: 20px;
-    font-family: -apple-system, monospace;
-    font-size: 14px;
-    color: #c0362c;
-    background: #fff;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-</style>
-</head>
-<body>
-<div id="root"></div>
-<pre id="meg-erro"></pre>
-<script>
-// Rede de segurança: qualquer erro que impeça o app de abrir aparece NA TELA,
-// em vez de deixar a página em branco sem explicação.
-(function () {
-  function mostrar(titulo, detalhe) {
-    var el = document.getElementById('meg-erro');
-    if (!el) return;
-    el.style.display = 'block';
-    el.textContent = 'O Meg não conseguiu abrir.\n\n' + titulo + '\n\n' + detalhe;
-  }
-  window.addEventListener('error', function (e) {
-    mostrar(
-      String((e.error && e.error.message) || e.message || 'Erro desconhecido'),
-      String((e.error && e.error.stack) || (e.filename + ':' + e.lineno + ':' + e.colno))
-    );
-  });
-  window.addEventListener('unhandledrejection', function (e) {
-    mostrar('Promessa rejeitada', String((e.reason && e.reason.stack) || e.reason));
-  });
-  // se depois de 5s nada foi renderizado e nenhum erro apareceu, avisa mesmo assim
-  setTimeout(function () {
-    var raiz = document.getElementById('root');
-    var erro = document.getElementById('meg-erro');
-    if (raiz && raiz.innerHTML.length < 10 && erro && erro.style.display !== 'block') {
-      mostrar('O app carregou sem erro, mas não renderizou nada.',
-              'Isso costuma indicar que uma biblioteca externa não foi carregada.');
-    }
-  }, 5000);
-})();
-</script>
-<script>
-FIM_DO_CABECALHO
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+          <title>Meg — Notas</title>
+          <style>
+            html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; overscroll-behavior: none; }
+            #root { height: 100%; }
+            #meg-erro {
+              display: none;
+              padding: 20px;
+              font-family: -apple-system, monospace;
+              font-size: 14px;
+              color: #c0362c;
+              background: #fff;
+              white-space: pre-wrap;
+              word-break: break-word;
+            }
+          </style>
+          </head>
+          <body>
+          <div id="root"></div>
+          <pre id="meg-erro"></pre>
+          <script>
+          // Rede de segurança: qualquer erro que impeça o app de abrir aparece NA TELA,
+          // em vez de deixar a página em branco sem explicação.
+          (function () {
+            function mostrar(titulo, detalhe) {
+              var el = document.getElementById('meg-erro');
+              if (!el) return;
+              el.style.display = 'block';
+              el.textContent = 'O Meg não conseguiu abrir.\n\n' + titulo + '\n\n' + detalhe;
+            }
+            window.addEventListener('error', function (e) {
+              mostrar(
+                String((e.error && e.error.message) || e.message || 'Erro desconhecido'),
+                String((e.error && e.error.stack) || (e.filename + ':' + e.lineno + ':' + e.colno))
+              );
+            });
+            window.addEventListener('unhandledrejection', function (e) {
+              mostrar('Promessa rejeitada', String((e.reason && e.reason.stack) || e.reason));
+            });
+            // se depois de 5s nada foi renderizado e nenhum erro apareceu, avisa mesmo assim
+            setTimeout(function () {
+              var raiz = document.getElementById('root');
+              var erro = document.getElementById('meg-erro');
+              if (raiz && raiz.innerHTML.length < 10 && erro && erro.style.display !== 'block') {
+                mostrar('O app carregou sem erro, mas não renderizou nada.',
+                        'Isso costuma indicar que uma biblioteca externa não foi carregada.');
+              }
+            }, 5000);
+          })();
+          </script>
+          <script>
+          FIM_DO_CABECALHO
           cat cabecalho.part > notas.html
           cat meg.compiled.js >> notas.html
           printf '</script>\n</body>\n</html>\n' >> notas.html
