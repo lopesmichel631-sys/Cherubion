@@ -18425,6 +18425,23 @@ const fmtData = (ts) => new Date(ts).toLocaleDateString("pt-BR", { day: "2-digit
     " · " +
     new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 const saldoDe = (lancamentos, tipo) => (lancamentos || []).reduce((soma, l) => (l.tipo === tipo ? soma + l.qtd : soma), 0);
+/* ── calendário / lembretes: datas sempre em "YYYY-MM-DD", hora local ── */
+const pad2 = (n) => String(n).padStart(2, "0");
+const isoDeData = (dt) => dt.getFullYear() + "-" + pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate());
+const hojeISO = () => isoDeData(new Date());
+const diasNoMes = (ano, mes) => new Date(ano, mes + 1, 0).getDate();
+const primeiroDiaSemana = (ano, mes) => new Date(ano, mes, 1).getDay();
+const MESES_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+const DIAS_SEMANA_PT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const fmtDataISO = (iso) => {
+    const p = String(iso || "").split("-");
+    if (p.length !== 3)
+        return iso || "";
+    return p[2] + "/" + p[1] + "/" + p[0];
+};
 /* ── comemoração: som curto e confete ──────────────────── */
 function tocarSucesso() {
     try {
@@ -18454,6 +18471,39 @@ function tocarSucesso() {
     }
 }
 const CORES_CONFETE = ["#B3122B", "#E4B23C", "#3C7DE4", "#3CB371", "#FBF7EE", "#E86A7C"];
+/* ── trava a rolagem da página por trás de um modal em tela cheia (evita
+   o efeito de "foto aparece lá embaixo" no Safari do iPhone) ── */
+const useTravarRolagem = (ativo) => {
+    (0, react_1.useEffect)(() => {
+        if (!ativo || typeof document === "undefined")
+            return;
+        const y = window.scrollY || window.pageYOffset || 0;
+        const { style } = document.body;
+        const prev = {
+            position: style.position,
+            top: style.top,
+            left: style.left,
+            right: style.right,
+            width: style.width,
+            overflow: style.overflow,
+        };
+        style.position = "fixed";
+        style.top = -y + "px";
+        style.left = "0";
+        style.right = "0";
+        style.width = "100%";
+        style.overflow = "hidden";
+        return () => {
+            style.position = prev.position;
+            style.top = prev.top;
+            style.left = prev.left;
+            style.right = prev.right;
+            style.width = prev.width;
+            style.overflow = prev.overflow;
+            window.scrollTo(0, y);
+        };
+    }, [ativo]);
+};
 const gerarConfete = () => Array.from({ length: 46 }, (_, i) => ({
     id: uid() + i,
     esq: Math.random() * 100,
@@ -18535,6 +18585,7 @@ function BaralhoDeContatos() {
     const [novaId, setNovaId] = (0, react_1.useState)(null);
     const [exportadoEm, setExportadoEm] = (0, react_1.useState)(null);
     const [r2Check, setR2Check] = (0, react_1.useState)(0);
+    const [lembretes, setLembretes] = (0, react_1.useState)([]);
     const timer = (0, react_1.useRef)(null);
     const fileRef = (0, react_1.useRef)(null);
     const dadosRef = (0, react_1.useRef)({ cards: [], sources: BASE_SOURCES, msgs: [], minhaCidade: "" });
@@ -18550,6 +18601,7 @@ function BaralhoDeContatos() {
         acoes,
         valorHoraPadrao,
         botoesInvest,
+        lembretes,
     };
     const gravar = async (dados) => {
         try {
@@ -18595,6 +18647,7 @@ function BaralhoDeContatos() {
                 setAcoes(d.acoes || []);
                 setValorHoraPadrao(d.valorHoraPadrao || "");
                 setBotoesInvest(d.botoesInvest || []);
+                setLembretes(d.lembretes || []);
                 setErro(false);
             }
             catch {
@@ -18623,6 +18676,7 @@ function BaralhoDeContatos() {
                 setAcoes(d.acoes || []);
                 setValorHoraPadrao(d.valorHoraPadrao || "");
                 setBotoesInvest(d.botoesInvest || []);
+                setLembretes(d.lembretes || []);
             }
             catch {
                 setCards([blankCard()]);
@@ -18717,6 +18771,7 @@ function BaralhoDeContatos() {
             acoes,
             valorHoraPadrao,
             botoesInvest,
+            lembretes,
         }), 700);
         return () => clearTimeout(timer.current);
     }, [
@@ -18731,6 +18786,7 @@ function BaralhoDeContatos() {
         acoes,
         valorHoraPadrao,
         botoesInvest,
+        lembretes,
         loaded,
     ]);
     /* ── salvar também ao fechar ou trocar de aba ── */
@@ -18862,6 +18918,14 @@ function BaralhoDeContatos() {
     };
     const marcarObjetivo = (id) => setObjetivos((os) => os.map((o) => o.id === id ? { ...o, feito: !o.feito, feitoEm: !o.feito ? Date.now() : null } : o));
     const removerObjetivo = (id) => setObjetivos((os) => os.filter((o) => o.id !== id));
+    const addLembrete = (data, texto) => {
+        const d = String(data || "").trim();
+        const t = String(texto || "").trim();
+        if (!d || !t)
+            return;
+        setLembretes((ls) => [...ls, { id: uid(), data: d, texto: t, criadoEm: Date.now() }]);
+    };
+    const removerLembrete = (id) => setLembretes((ls) => ls.filter((l) => l.id !== id));
     const addDesbloqueio = (texto) => {
         const t = String(texto || "").trim();
         if (!t)
@@ -18936,12 +19000,16 @@ function BaralhoDeContatos() {
                     react_1.default.createElement("button", { className: tela === "fcskill" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("fcskill") }, "FC Skill"),
                     react_1.default.createElement("button", { className: tela === "razao" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("razao") },
                         "Raz\u00E3o ",
-                        react_1.default.createElement("em", null, cards.reduce((n, c) => n + (c.fcskill || []).length, 0)))),
+                        react_1.default.createElement("em", null, cards.reduce((n, c) => n + (c.fcskill || []).length, 0))),
+                    react_1.default.createElement("button", { className: tela === "calendario" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("calendario") },
+                        "Calend\u00E1rio ",
+                        react_1.default.createElement("em", null, lembretes.filter((l) => l.data >= hojeISO()).length))),
                 react_1.default.createElement("a", { className: "bc-configbtn bc-homelink", href: "index.html", "aria-label": "Voltar para a Minha Tela" }, "\uD83C\uDFE0 Minha Tela"),
                 react_1.default.createElement("button", { className: "bc-configbtn", onClick: () => setConfigAberta(true), "aria-label": "Configura\u00E7\u00F5es" }, "\u2699 Configura\u00E7\u00F5es"))),
         nuvemAberta && (react_1.default.createElement(ModalNuvem, { status: nuvemStatus, onVerificar: () => sincronizarNuvem(true), onFechar: () => setNuvemAberta(false) })),
         configAberta && (react_1.default.createElement(ModalConfig, { minhaCidade: minhaCidade, onMudarCidade: setMinhaCidade, temCidade: temCidade, chaveMinha: chaveMinha, statusOrigem: statusOrigem, onR2Salvo: () => setR2Check((n) => n + 1), onFechar: () => setConfigAberta(false) })),
-        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
+        loaded && tela === "baralho" && (react_1.default.createElement(PainelLembretesHoje, { lembretes: lembretes, onIrCalendario: () => setTela("calendario") })),
+        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "calendario" ? (react_1.default.createElement(TelaCalendario, { lembretes: lembretes, onAdd: addLembrete, onRemover: removerLembrete })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
         react_1.default.createElement("footer", { className: "bc-footer" },
             react_1.default.createElement("span", { className: erro ? "bc-status bc-status-erro" : "bc-status" }, erro
                 ? "não foi possível salvar"
@@ -19499,13 +19567,14 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
     const [datingAberto, setDatingAberto] = (0, react_1.useState)(false);
     const [outraRaca, setOutraRaca] = (0, react_1.useState)(false);
     const [novaTag, setNovaTag] = (0, react_1.useState)("");
-    const [verFoto, setVerFoto] = (0, react_1.useState)(false);
     const [fotoErro, setFotoErro] = (0, react_1.useState)("");
     const [albumErro, setAlbumErro] = (0, react_1.useState)("");
     const [subindoAlbum, setSubindoAlbum] = (0, react_1.useState)(false);
-    const [verAlbumItem, setVerAlbumItem] = (0, react_1.useState)(null);
+    const [visIndex, setVisIndex] = (0, react_1.useState)(null);
+    const [midiaConfig, setMidiaConfig] = (0, react_1.useState)(false);
     const fotoRef = (0, react_1.useRef)(null);
     const albumRef = (0, react_1.useRef)(null);
+    const toqueX = (0, react_1.useRef)(null);
     const trocarFoto = async (e) => {
         const arquivo = e.target.files && e.target.files[0];
         e.target.value = "";
@@ -19572,7 +19641,43 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
     };
     const removerDoAlbum = (id) => {
         onPatch("album", (carta.album || []).filter((it) => it.id !== id));
+        setVisIndex(null);
     };
+    /* galeria única: foto principal (se houver) + itens do álbum, na mesma ordem exibida */
+    const midiasCarta = (0, react_1.useMemo)(() => {
+        const arr = [];
+        if (carta.foto)
+            arr.push({ id: "__principal__", tipo: "foto", url: carta.foto, principal: true });
+        (carta.album || []).forEach((it) => arr.push(it));
+        return arr;
+    }, [carta.foto, carta.album]);
+    const abrirVisualizador = (id) => {
+        const i = midiasCarta.findIndex((m) => m.id === id);
+        if (i >= 0)
+            setVisIndex(i);
+    };
+    const proximaMidia = () => setVisIndex((i) => (i == null || !midiasCarta.length ? i : (i + 1) % midiasCarta.length));
+    const midiaAnterior = () => setVisIndex((i) => i == null || !midiasCarta.length ? i : (i - 1 + midiasCarta.length) % midiasCarta.length);
+    const onToqueInicio = (e) => {
+        toqueX.current = e.touches && e.touches.length ? e.touches[0].clientX : null;
+    };
+    const onToqueFim = (e) => {
+        const inicio = toqueX.current;
+        toqueX.current = null;
+        if (inicio == null)
+            return;
+        const fim = e.changedTouches && e.changedTouches.length ? e.changedTouches[0].clientX : null;
+        if (fim == null)
+            return;
+        const delta = fim - inicio;
+        if (Math.abs(delta) < 40)
+            return;
+        if (delta < 0)
+            proximaMidia();
+        else
+            midiaAnterior();
+    };
+    useTravarRolagem(visIndex !== null);
     const temDating = CAMPOS_DATING.some(([k]) => ((carta.dating || {})[k] || "").trim());
     const registrarDating = () => {
         if (!temDating)
@@ -19602,7 +19707,7 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
             onPatch("tags", [...atuais, t]);
         setNovaTag("");
     };
-    return (react_1.default.createElement("article", { className: nova ? "bc-card bc-deal" : "bc-card" },
+    return (react_1.default.createElement("article", { className: (nova ? "bc-card bc-deal" : "bc-card") + (visIndex !== null ? " bc-card-planar" : "") },
         react_1.default.createElement("div", { className: "bc-card-inner" },
             react_1.default.createElement(Index, null),
             react_1.default.createElement(Index, { virado: true }),
@@ -19610,18 +19715,24 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                 react_1.default.createElement("button", { className: "bc-recolher", onClick: onFechar, "aria-label": "Recolher carta" }, "recolher \u25B2"),
                 react_1.default.createElement(Semaforo, { valor: carta.farol, onEscolher: (v) => onPatch("farol", v) })),
             react_1.default.createElement("div", { className: "bc-body" },
+                react_1.default.createElement("div", { className: "bc-midiacfg-row" },
+                    react_1.default.createElement("button", { type: "button", className: midiaConfig ? "bc-midiacfg-btn bc-midiacfg-btn-on" : "bc-midiacfg-btn", onClick: () => setMidiaConfig((v) => !v), "aria-pressed": midiaConfig },
+                        "\u2699 ",
+                        midiaConfig ? "concluir" : "configurar fotos e vídeos")),
                 react_1.default.createElement("div", { className: "bc-foto-wrap" },
-                    react_1.default.createElement("button", { type: "button", className: "bc-foto", onClick: () => (carta.foto ? setVerFoto(true) : fotoRef.current && fotoRef.current.click()), "aria-label": carta.foto ? "Ver foto" : "Adicionar foto" }, carta.foto ? (react_1.default.createElement("img", { className: "bc-foto-img", src: carta.foto, alt: "" })) : (react_1.default.createElement("span", { className: "bc-foto-placeholder" }, "\u25C9 foto"))),
-                    react_1.default.createElement("div", { className: "bc-foto-acoes" }, carta.foto ? (react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatch("foto", "") }, "remover")) : (react_1.default.createElement("button", { className: "bc-link", onClick: () => fotoRef.current && fotoRef.current.click() }, "adicionar foto"))),
+                    react_1.default.createElement("button", { type: "button", className: "bc-foto", onClick: () => (carta.foto ? abrirVisualizador("__principal__") : fotoRef.current && fotoRef.current.click()), "aria-label": carta.foto ? "Ver foto" : "Adicionar foto" }, carta.foto ? (react_1.default.createElement("img", { className: "bc-foto-img", src: carta.foto, alt: "" })) : (react_1.default.createElement("span", { className: "bc-foto-placeholder" }, "\u25C9 foto"))),
+                    react_1.default.createElement("div", { className: "bc-foto-acoes" }, carta.foto ? (react_1.default.createElement(react_1.default.Fragment, null,
+                        !midiaConfig && react_1.default.createElement("span", { className: "bc-mini" }, "foto principal"),
+                        midiaConfig && (react_1.default.createElement("button", { className: "bc-link", onClick: () => onPatch("foto", "") }, "remover foto principal")))) : (react_1.default.createElement("button", { className: "bc-link", onClick: () => fotoRef.current && fotoRef.current.click() }, "adicionar foto"))),
                     fotoErro && react_1.default.createElement("p", { className: "bc-ocrstatus bc-ocrstatus-erro" }, fotoErro),
                     react_1.default.createElement("input", { ref: fotoRef, type: "file", accept: "image/*", className: "bc-file", onChange: trocarFoto, "aria-label": "Escolher foto do perfil" })),
                 react_1.default.createElement("div", { className: "bc-album-wrap" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "\u00C1lbum de fotos"),
                     (carta.album || []).length > 0 && (react_1.default.createElement("div", { className: "bc-album-grade" }, (carta.album || []).map((item) => (react_1.default.createElement("div", { key: item.id, className: "bc-album-item" },
-                        react_1.default.createElement("button", { type: "button", className: "bc-album-thumb", onClick: () => setVerAlbumItem(item), "aria-label": item.tipo === "video" ? "Ver vídeo do álbum" : "Ver foto do álbum" }, item.tipo === "video" ? (react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("button", { type: "button", className: "bc-album-thumb", onClick: () => abrirVisualizador(item.id), "aria-label": item.tipo === "video" ? "Ver vídeo do álbum" : "Ver foto do álbum" }, item.tipo === "video" ? (react_1.default.createElement(react_1.default.Fragment, null,
                             react_1.default.createElement("video", { className: "bc-album-img", src: item.url, muted: true, playsInline: true }),
                             react_1.default.createElement("span", { className: "bc-album-play" }, "\u25B6"))) : (react_1.default.createElement("img", { className: "bc-album-img", src: item.url, alt: "" }))),
-                        react_1.default.createElement("button", { type: "button", className: "bc-album-x", onClick: () => removerDoAlbum(item.id), "aria-label": "Remover do \u00E1lbum" }, "\u00D7")))))),
+                        midiaConfig && (react_1.default.createElement("button", { type: "button", className: "bc-album-x", onClick: () => removerDoAlbum(item.id), "aria-label": "Remover do \u00E1lbum" }, "\u00D7"))))))),
                     react_1.default.createElement("button", { type: "button", className: "bc-link", onClick: () => albumRef.current && albumRef.current.click(), disabled: subindoAlbum }, subindoAlbum ? "enviando…" : "+ adicionar fotos/vídeos"),
                     albumErro && react_1.default.createElement("p", { className: "bc-ocrstatus bc-ocrstatus-erro" }, albumErro),
                     react_1.default.createElement("input", { ref: albumRef, type: "file", accept: "image/*,video/*", multiple: true, className: "bc-file", onChange: adicionarAlbum, "aria-label": "Adicionar fotos ou v\u00EDdeos ao \u00E1lbum" })),
@@ -19724,12 +19835,22 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                     react_1.default.createElement("button", { className: confirma ? "bc-remover bc-remover-on" : "bc-remover", onClick: () => (confirma ? onRemove() : setConfirma(true)), onBlur: () => setConfirma(false) }, confirma ? "confirmar remoção" : "remover carta")))),
         fcAberto && (react_1.default.createElement(PainelFC, { carta: carta, acoes: acoes, onCriarAcao: onCriarAcao, onRemoverAcao: onRemoverAcao, onFechar: () => setFcAberto(false), onRegistrar: onRegistrarFC, onRemover: onRemoverFC, onEditar: onEditarFC })),
         nextAberto && (react_1.default.createElement(PainelNext, { carta: carta, acoes: acoes, onPatch: onPatch, onFechar: () => setNextAberto(false) })),
-        verFoto && carta.foto && (react_1.default.createElement("div", { className: "bc-fotoview", role: "dialog", "aria-label": "Foto", onClick: () => setVerFoto(false) },
-            react_1.default.createElement("img", { src: carta.foto, alt: "", onClick: (e) => e.stopPropagation() }),
-            react_1.default.createElement("button", { className: "bc-modalx bc-fotoview-x", onClick: () => setVerFoto(false), "aria-label": "Fechar" }, "\u00D7"))),
-        verAlbumItem && (react_1.default.createElement("div", { className: "bc-fotoview", role: "dialog", "aria-label": verAlbumItem.tipo === "video" ? "Vídeo do álbum" : "Foto do álbum", onClick: () => setVerAlbumItem(null) },
-            verAlbumItem.tipo === "video" ? (react_1.default.createElement("video", { src: verAlbumItem.url, controls: true, playsInline: true, autoPlay: true, onClick: (e) => e.stopPropagation() })) : (react_1.default.createElement("img", { src: verAlbumItem.url, alt: "", onClick: (e) => e.stopPropagation() })),
-            react_1.default.createElement("button", { className: "bc-modalx bc-fotoview-x", onClick: () => setVerAlbumItem(null), "aria-label": "Fechar" }, "\u00D7")))));
+        visIndex !== null && midiasCarta[visIndex] && (react_1.default.createElement("div", { className: "bc-fotoview", role: "dialog", "aria-label": midiasCarta[visIndex].tipo === "video" ? "Vídeo" : "Foto", onClick: () => setVisIndex(null), onTouchStart: onToqueInicio, onTouchEnd: onToqueFim },
+            midiasCarta[visIndex].tipo === "video" ? (react_1.default.createElement("video", { key: midiasCarta[visIndex].id, src: midiasCarta[visIndex].url, controls: true, playsInline: true, autoPlay: true, onClick: (e) => e.stopPropagation() })) : (react_1.default.createElement("img", { key: midiasCarta[visIndex].id, src: midiasCarta[visIndex].url, alt: "", onClick: (e) => e.stopPropagation() })),
+            midiasCarta.length > 1 && (react_1.default.createElement(react_1.default.Fragment, null,
+                react_1.default.createElement("button", { type: "button", className: "bc-fotoview-seta bc-fotoview-seta-esq", onClick: (e) => {
+                        e.stopPropagation();
+                        midiaAnterior();
+                    }, "aria-label": "Foto anterior" }, "\u2039"),
+                react_1.default.createElement("button", { type: "button", className: "bc-fotoview-seta bc-fotoview-seta-dir", onClick: (e) => {
+                        e.stopPropagation();
+                        proximaMidia();
+                    }, "aria-label": "Pr\u00F3xima foto" }, "\u203A"),
+                react_1.default.createElement("span", { className: "bc-fotoview-contador" },
+                    visIndex + 1,
+                    " / ",
+                    midiasCarta.length))),
+            react_1.default.createElement("button", { className: "bc-modalx bc-fotoview-x", onClick: () => setVisIndex(null), "aria-label": "Fechar" }, "\u00D7")))));
 }
 /* ── painel Next Date ──────────────────────────────────── */
 function PainelNext({ carta, acoes = [], onPatch, onFechar }) {
@@ -20004,6 +20125,110 @@ function TelaObjetivos({ objetivos, onAdd, onMarcar, onRemover }) {
                 react_1.default.createElement("span", { className: "bc-desbtexto" }, o.texto),
                 o.feito && o.feitoEm && react_1.default.createElement("span", { className: "bc-desbdata" }, fmtData(o.feitoEm)),
                 react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemover(o.id), "aria-label": "Excluir tarefa" }, "\u00D7")))))))));
+}
+/* ── painel: lembretes de hoje (aparece na tela inicial/Cartas) ── */
+function PainelLembretesHoje({ lembretes, onIrCalendario }) {
+    const hoje = hojeISO();
+    const doDia = lembretes.filter((l) => l.data === hoje).sort((a, b) => a.criadoEm - b.criadoEm);
+    const hojeLabel = new Date().toLocaleDateString("pt-BR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+    });
+    return (react_1.default.createElement("div", { className: "bc-hoje" },
+        react_1.default.createElement("div", { className: "bc-hojehead" },
+            react_1.default.createElement("h2", { className: "bc-hojetitulo" }, "\uD83D\uDCC5 Lembretes de hoje"),
+            react_1.default.createElement("span", { className: "bc-hojedata" }, hojeLabel),
+            react_1.default.createElement("button", { className: "bc-link", onClick: onIrCalendario }, "abrir calend\u00E1rio")),
+        doDia.length === 0 ? (react_1.default.createElement("p", { className: "bc-hojevazio" }, "Nenhum lembrete para hoje.")) : (react_1.default.createElement("ul", { className: "bc-hojelista" }, doDia.map((l) => (react_1.default.createElement("li", { key: l.id, className: "bc-hojeitem" }, l.texto)))))));
+}
+/* ── tela: calendário ─────────────────────────────────────── */
+function TelaCalendario({ lembretes, onAdd, onRemover }) {
+    const hoje = hojeISO();
+    const agora = new Date();
+    const [mesAtual, setMesAtual] = (0, react_1.useState)(new Date(agora.getFullYear(), agora.getMonth(), 1));
+    const [diaSel, setDiaSel] = (0, react_1.useState)(hoje);
+    const [texto, setTexto] = (0, react_1.useState)("");
+    const ano = mesAtual.getFullYear();
+    const mes = mesAtual.getMonth();
+    const totalDias = diasNoMes(ano, mes);
+    const offset = primeiroDiaSemana(ano, mes);
+    const porDia = (0, react_1.useMemo)(() => {
+        const mapa = {};
+        lembretes.forEach((l) => {
+            (mapa[l.data] = mapa[l.data] || []).push(l);
+        });
+        return mapa;
+    }, [lembretes]);
+    const celulas = [];
+    for (let i = 0; i < offset; i++)
+        celulas.push(null);
+    for (let d = 1; d <= totalDias; d++)
+        celulas.push(d);
+    const irMes = (delta) => setMesAtual(new Date(ano, mes + delta, 1));
+    const irHoje = () => {
+        setMesAtual(new Date(agora.getFullYear(), agora.getMonth(), 1));
+        setDiaSel(hoje);
+    };
+    const adicionar = () => {
+        if (!texto.trim() || !diaSel)
+            return;
+        onAdd(diaSel, texto);
+        setTexto("");
+    };
+    const doDiaSel = (porDia[diaSel] || []).slice().sort((a, b) => a.criadoEm - b.criadoEm);
+    const proximos = lembretes
+        .filter((l) => l.data >= hoje)
+        .sort((a, b) => (a.data === b.data ? a.criadoEm - b.criadoEm : a.data < b.data ? -1 : 1))
+        .slice(0, 30);
+    return (react_1.default.createElement("div", { className: "bc-fctela" },
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Calend\u00E1rio"),
+                react_1.default.createElement("button", { className: "bc-link", onClick: irHoje }, "ir para hoje")),
+            react_1.default.createElement("div", { className: "bc-calnav" },
+                react_1.default.createElement("button", { className: "bc-calseta", onClick: () => irMes(-1), "aria-label": "M\u00EAs anterior" }, "\u2039"),
+                react_1.default.createElement("span", { className: "bc-calmestitulo" },
+                    MESES_PT[mes],
+                    " ",
+                    ano),
+                react_1.default.createElement("button", { className: "bc-calseta", onClick: () => irMes(1), "aria-label": "Pr\u00F3ximo m\u00EAs" }, "\u203A")),
+            react_1.default.createElement("div", { className: "bc-calsemana" }, DIAS_SEMANA_PT.map((d) => (react_1.default.createElement("span", { key: d, className: "bc-calsemanadia" }, d)))),
+            react_1.default.createElement("div", { className: "bc-calgrade" }, celulas.map((d, i) => {
+                if (d == null)
+                    return react_1.default.createElement("span", { key: "vazio" + i, className: "bc-caldia bc-caldia-vazio" });
+                const iso = ano + "-" + pad2(mes + 1) + "-" + pad2(d);
+                const qtd = (porDia[iso] || []).length;
+                const classes = "bc-caldia" +
+                    (iso === hoje ? " bc-caldia-hoje" : "") +
+                    (iso === diaSel ? " bc-caldia-sel" : "") +
+                    (qtd > 0 ? " bc-caldia-marcado" : "");
+                return (react_1.default.createElement("button", { key: iso, className: classes, onClick: () => setDiaSel(iso) },
+                    react_1.default.createElement("span", { className: "bc-caldianum" }, d),
+                    qtd > 0 && react_1.default.createElement("span", { className: "bc-calponto" })));
+            })),
+            diaSel && (react_1.default.createElement("div", { className: "bc-caldetalhe" },
+                react_1.default.createElement("div", { className: "bc-colhead" },
+                    react_1.default.createElement("h3", { className: "bc-calDiaTitulo" },
+                        "Lembretes de ",
+                        fmtDataISO(diaSel),
+                        diaSel === hoje ? " · hoje" : "")),
+                react_1.default.createElement("div", { className: "bc-catrow bc-desbrow" },
+                    react_1.default.createElement("input", { className: "bc-desbinput", value: texto, onChange: (e) => setTexto(e.target.value), onKeyDown: (e) => e.key === "Enter" && adicionar(), placeholder: "Novo lembrete para esse dia", "aria-label": "Novo lembrete" }),
+                    react_1.default.createElement("button", { className: "bc-catbtn", onClick: adicionar }, "Adicionar")),
+                doDiaSel.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhum lembrete nesse dia.")) : (react_1.default.createElement("div", { className: "bc-desblista" }, doDiaSel.map((l) => (react_1.default.createElement("div", { className: "bc-desb", key: l.id },
+                    react_1.default.createElement("span", { className: "bc-desbtexto" }, l.texto),
+                    react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemover(l.id), "aria-label": "Excluir lembrete" }, "\u00D7"))))))))),
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Pr\u00F3ximos lembretes"),
+                react_1.default.createElement("span", { className: "bc-status" }, proximos.length)),
+            proximos.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhum lembrete futuro.")) : (react_1.default.createElement("div", { className: "bc-desblista" }, proximos.map((l) => (react_1.default.createElement("div", { className: "bc-desb", key: l.id },
+                react_1.default.createElement("span", { className: "bc-desbdata" },
+                    fmtDataISO(l.data),
+                    l.data === hoje ? " · hoje" : ""),
+                react_1.default.createElement("span", { className: "bc-desbtexto" }, l.texto),
+                react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemover(l.id), "aria-label": "Excluir lembrete" }, "\u00D7")))))))));
 }
 /* ── tela: FC Skill ────────────────────────────────────── */
 function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloqueios, conhecimento, onAddDesbloqueio, onMarcarDesbloqueio, onRemoverDesbloqueio, onAddConhecimento, onRemoverConhecimento, onRemoverFC, onEditarFC, }) {
@@ -20717,6 +20942,10 @@ const CSS = `
   box-shadow:0 18px 34px rgba(0,0,0,.42),0 2px 0 rgba(255,255,255,.06);
   transition:transform .18s ease,box-shadow .18s ease;}
 .bc-card:hover{transform:translateY(-3px);box-shadow:0 26px 44px rgba(0,0,0,.5);}
+/* com o visualizador aberto a carta não pode ter transform: qualquer transform cria
+   um bloco de contenção e faz o position:fixed do visualizador se ancorar na carta
+   (foto aparecia lá embaixo, obrigando a rolar a página no Safari do iPhone) */
+.bc-card-planar,.bc-card-planar:hover{transform:none;transition:none;animation:none;}
 .bc-card-inner{position:relative;border:1px solid var(--edge);border-radius:6px;padding:26px 20px 20px;height:100%;}
 .bc-card-inner::before{content:"";position:absolute;inset:4px;border:1px solid rgba(205,194,170,.45);border-radius:3px;pointer-events:none;}
 @keyframes bc-deal{from{opacity:0;transform:translateY(10px) rotate(-.6deg);}to{opacity:1;transform:none;}}
@@ -20764,11 +20993,67 @@ const CSS = `
   cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
 .bc-album-x:hover{filter:brightness(1.15);}
 
+.bc-midiacfg-row{display:flex;justify-content:flex-end;margin-bottom:2px;}
+.bc-midiacfg-btn{font-family:inherit;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:6px 11px;cursor:pointer;border-radius:2px;color:var(--soft);background:transparent;
+  border:1px solid var(--edge);}
+.bc-midiacfg-btn:hover{color:var(--ink);border-color:var(--ink);}
+.bc-midiacfg-btn-on{background:var(--red);border-color:var(--red);color:${C.card};}
+
 .bc-fotoview{position:fixed;inset:0;z-index:80;background:rgba(8,6,5,.92);display:flex;
-  align-items:center;justify-content:center;padding:24px;cursor:zoom-out;}
+  align-items:center;justify-content:center;padding:24px;cursor:zoom-out;
+  height:100dvh;overscroll-behavior:contain;touch-action:pan-y;}
 .bc-fotoview img,.bc-fotoview video{max-width:100%;max-height:100%;border-radius:6px;cursor:default;
   box-shadow:0 20px 60px rgba(0,0,0,.5);}
 .bc-fotoview-x{position:fixed;top:18px;right:18px;color:var(--card);font-size:22px;}
+.bc-fotoview-seta{position:fixed;top:50%;transform:translateY(-50%);font-family:inherit;
+  font-size:30px;line-height:1;color:var(--card);background:rgba(8,6,5,.45);border:none;
+  width:44px;height:44px;border-radius:50%;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;}
+.bc-fotoview-seta:hover{background:rgba(8,6,5,.7);}
+.bc-fotoview-seta-esq{left:12px;}
+.bc-fotoview-seta-dir{right:12px;}
+.bc-fotoview-contador{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+  font-size:11px;letter-spacing:.1em;color:rgba(251,247,238,.75);
+  background:rgba(8,6,5,.45);padding:4px 10px;border-radius:10px;}
+
+/* painel de lembretes de hoje (tela inicial) */
+.bc-hoje{max-width:1200px;margin:22px auto 0;background:rgba(251,247,238,.05);
+  border:1px solid rgba(251,247,238,.12);border-radius:4px;padding:16px 20px;}
+.bc-hojehead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.bc-hojetitulo{margin:0;font-family:'Bodoni Moda',serif;font-size:18px;font-weight:600;
+  color:rgba(251,247,238,.92);}
+.bc-hojedata{flex:1;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(251,247,238,.45);}
+.bc-hojevazio{margin:10px 0 0;font-size:12.5px;color:rgba(251,247,238,.4);}
+.bc-hojelista{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.bc-hojeitem{background:var(--card);color:var(--ink);border-radius:3px;padding:9px 12px;
+  font-size:13px;line-height:1.4;box-shadow:0 6px 14px rgba(0,0,0,.26);}
+
+/* calendário */
+.bc-calnav{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:6px;}
+.bc-calseta{font-family:inherit;font-size:16px;cursor:pointer;background:none;border:none;
+  color:rgba(251,247,238,.75);padding:4px 10px;border-radius:2px;}
+.bc-calseta:hover{color:${C.card};background:rgba(251,247,238,.08);}
+.bc-calmestitulo{font-family:'Bodoni Moda',serif;font-size:17px;font-weight:600;min-width:150px;
+  text-align:center;color:rgba(251,247,238,.92);}
+.bc-calsemana{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:14px;}
+.bc-calsemanadia{text-align:center;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(251,247,238,.4);}
+.bc-calgrade{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:4px;}
+.bc-caldia{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+  font-family:inherit;font-size:12.5px;cursor:pointer;border-radius:3px;color:rgba(251,247,238,.75);
+  background:rgba(251,247,238,.04);border:1px solid transparent;}
+.bc-caldia:hover{background:rgba(251,247,238,.1);}
+.bc-caldia-vazio{visibility:hidden;cursor:default;background:none;}
+.bc-caldia-hoje{border-color:rgba(251,247,238,.4);color:${C.card};font-weight:600;}
+.bc-caldia-sel{background:var(--red);border-color:var(--red);color:${C.card};}
+.bc-calponto{position:absolute;bottom:4px;width:5px;height:5px;border-radius:50%;background:var(--red);}
+.bc-caldia-sel .bc-calponto{background:${C.card};}
+.bc-caldetalhe{margin-top:18px;padding-top:14px;border-top:1px solid rgba(251,247,238,.14);}
+.bc-calDiaTitulo{margin:0;font-family:'Bodoni Moda',serif;font-size:15px;font-weight:600;
+  color:rgba(251,247,238,.92);}
+
 .bc-nome{width:100%;font-family:'Bodoni Moda',serif;font-size:25px;font-weight:600;color:var(--ink);
   background:transparent;border:none;border-bottom:1px solid var(--rule);padding:2px 0 5px;}
 .bc-row{display:flex;gap:12px;}
