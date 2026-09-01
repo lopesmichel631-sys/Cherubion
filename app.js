@@ -1,13 +1,12 @@
-// ============================================================
-// Cherubion - miolo do app. Este é o ÚNICO arquivo que você
-// substitui no GitHub a cada atualização. O index.html é uma
-// casca fixa e nunca precisa ser trocado de novo.
-// ============================================================
-window.__CHERUBION_VERSAO__ = '2026-08-29 20:28';
+// Cherubion — miolo do app (gerado a partir do App.jsx, JSX já compilado para JS puro)
+// build: 2026-08-31 21:42 UTC
+window.__CHERUBION_VERSAO__ = "2026-08-31 21:42 UTC";
+const useState = React.useState;
+const useEffect = React.useEffect;
+const useRef = React.useRef;
+const useMemo = React.useMemo;
 
-const useState = React.useState, useEffect = React.useEffect,
-      useRef = React.useRef, useMemo = React.useMemo;
-
+"use strict";
 // ===== constantes =====
 // ======================================================================
 // Constantes de configuração do app: cores, listas de checklists, abas do Livro Razão,
@@ -34,7 +33,6 @@ const CORTE_SESSAO = '__corte';
 // id reservado da "sessão" que abre o painel de Medidas corporais dentro da aba Development
 const MEDIDAS_SESSAO = '__medidas';
 // id reservado da "sessão" que abre o painel 🧴 Face (foto/vídeo + comentário) dentro da aba Development
-// id reservado da "sessão" que abre o painel 🧴 Face (foto/vídeo + comentário) dentro da aba Development
 const FACE_SESSAO = '__face';
 // id reservado da "sessão" que abre o painel 💰 Bank dentro da aba Finanças
 // id reservado da "sessão" que abre o painel 💰 Bank dentro da aba Finanças
@@ -42,13 +40,13 @@ const BANK_SESSAO = '__bank';
 // id reservado da "sessão" que abre o painel 💰 Bank do Snat — mesmo molde do Saldo B.E.S.T.
 // (saldo + extrato de gastos + adicionar fundos + corrigir saldo), mas com estado próprio,
 // separado do Saldo B.E.S.T. e do Bank de Finanças
-// id reservado da "sessão" que abre o painel 💰 Bank do Snat — mesmo molde do Saldo B.E.S.T.
-// (saldo + extrato de gastos + adicionar fundos + corrigir saldo), mas com estado próprio,
-// separado do Saldo B.E.S.T. e do Bank de Finanças
 const SNAT_BANK_SESSAO = '__snatbank';
 // id reservado da "sessão" que abre o painel Ganhos (notas por ano) dentro da aba Atividades
 // id reservado da "sessão" que abre o painel Ganhos (notas por ano) dentro da aba Atividades
 const GANHOS_SESSAO = '__ganhos';
+// id reservado da "sessão" que abre o painel Era de Ouro (registro por ano, mesmo molde do
+// painel Ganhos) dentro da aba Atividades
+const ERA_DE_OURO_SESSAO = '__eradeouro';
 // id reservado da "sessão" que abre o painel ⚔️ Batalha (Brasil x Estados Unidos) dentro da aba Atividades
 // id reservado da "sessão" que abre o painel ⚔️ Batalha (Brasil x Estados Unidos) dentro da aba Atividades
 const BATALHA_SESSAO = '__batalha';
@@ -57,18 +55,16 @@ const BATALHA_SESSAO = '__batalha';
 const CONTADOR_SESSAO = '__contador';
 // id reservado da "sessão" que abre o painel Momentum (livro de registro com separação
 // mensal) dentro da aba Atividades
-// id reservado da "sessão" que abre o painel Momentum (livro de registro com separação
-// mensal) dentro da aba Atividades
 const MOMENTUM_SESSAO = '__momentum';
 // id reservado da sessão fixa "Programa" — disponível nas abas Snat, PE, Skill e B.E.S.T.
 // É uma sessão de tarefas normal (checklist de verdade), só que os itens dela mostram o
 // mesmo botão "Programa" (janela de texto livre por tarefa) que já existe na aba Realidade,
 // em vez do botão "Priority" padrão
-// id reservado da sessão fixa "Programa" — disponível nas abas Snat, PE, Skill e B.E.S.T.
-// É uma sessão de tarefas normal (checklist de verdade), só que os itens dela mostram o
-// mesmo botão "Programa" (janela de texto livre por tarefa) que já existe na aba Realidade,
-// em vez do botão "Priority" padrão
 const PROGRAMA_SESSAO = '__programa';
+// id reservado da sessão fixa "Já Tenho" — disponível na aba Skill. É uma sessão de
+// tarefas normal (checklist de verdade, botão "Priority" padrão), só que fixa: sempre
+// aparece e não pode ser apagada pelo ⚙️.
+const JA_TENHO_SESSAO = '__jatenho';
 // id reservado da "sessão" que abre o painel 🚗 Car dentro da aba Prefeituras — botão de
 // atalho que manda "Lavar carro" direto para os Prioritários
 // id reservado da "sessão" que abre o painel 🚗 Car dentro da aba Prefeituras — botão de
@@ -239,7 +235,7 @@ const formatBH = (s) => {
         return `${m}min ${String(sec).padStart(2, '0')}s`;
     return `${sec}s`;
 };
-const formatCF = (s, valorHora) => `$ ${((s / 3600) * (valorHora !== null && valorHora !== void 0 ? valorHora : VALOR_HORA_PADRAO)).toFixed(2)}`;
+const formatCF = (s, valorHora) => `$ ${((s / 3600) * (valorHora ?? VALOR_HORA_PADRAO)).toFixed(2)}`;
 const formatMoeda = (v) => '$ ' + (Number(v) || 0).toFixed(2);
 // ---- Contador de prazo das tarefas fixas ----
 // prazoISO guarda a DATA-LIMITE (não o número de dias), assim a contagem cai sozinha a cada dia.
@@ -599,9 +595,14 @@ const DESTAQUE_AGENDA_INFO = {
 // Toda pasta das Notas Rápidas vira um link "[[Nome]]" numa nota do Cofre de Notas, e
 // vice-versa: todo link dentro da nota "Bem-vindo" (a página inicial fixa do Cofre) vira
 // uma pasta de primeiro nível aqui; todo link dentro da nota de UMA pasta vira uma subpasta
-// dela. Apagar em qualquer um dos dois lados apaga no outro. Renomear só é possível hoje do
-// lado do Cofre de Notas (mudando o título da nota) — o Cherubion ainda não tem tela de
-// renomear pasta, então esse sentido nunca acontece na prática.
+// dela. Renomear só é possível hoje do lado do Cofre de Notas (mudando o título da nota) —
+// o Cherubion ainda não tem tela de renomear pasta, então esse sentido nunca acontece na prática.
+//
+// EXCLUSÃO — só de um lado pra outro (a pedido do Michel):
+// apagar uma pasta no Cofre de Notas ainda apaga a pasta correspondente aqui no Cherubion.
+// Mas apagar uma pasta AQUI (Notas Rápidas) NÃO apaga mais nada no Cofre de Notas — só
+// desliga o link dela na página de cima. A nota e o conteúdo dela (e das subpastas)
+// continuam existindo intactos no Cofre, só deixam de aparecer encaixados ali.
 //
 // Os dois apps moram no mesmo domínio (GitHub Pages), então dá pra ler e escrever direto no
 // localStorage do outro — não precisa de nenhum servidor no meio. Essa sincronização roda
@@ -846,8 +847,10 @@ const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsi
         }
         else if (!emL && emR) {
             if (emA) {
-                // existia nos dois antes, sumiu do Cherubion agora -> apaga a nota espelhada
-                notes = apagarSubarvoreDoObsidian(notes, id);
+                // existia nos dois antes, sumiu do Cherubion agora -> ANTES apagava a nota espelhada
+                // também. Agora só desliga o link dela aqui na página de cima; a nota e o conteúdo
+                // dela (e das subpastas) continuam intactos no Cofre de Notas, só deixam de aparecer
+                // encaixados nesta posição. (apagarSubarvoreDoObsidian fica sem uso, de propósito.)
                 conteudoContainer = removerLinkDoConteudo(conteudoContainer, emR.nome);
                 mudouObsidian = true;
             }
@@ -885,9 +888,6 @@ const storageExiste = () => typeof window !== 'undefined' && window.storage && t
 // Fica FORA do backup em JSON de propósito — é credencial do dispositivo,
 // não dado do usuário — do mesmo jeito que o token do Gist dos Contatos.
 // ═══════════════════════════════════════════════════════════════════════
-// carimbo de versão gravado pelo build.py no topo do app.js. Serve para você conferir
-// de relance, dentro do app, se a atualização que subiu no GitHub realmente entrou.
-const APP_VERSAO = (typeof window !== 'undefined' && window.__CHERUBION_VERSAO__) || 'dev';
 const R2_URL_KEY = 'cherubion:r2workerurl';
 const R2_TOKEN_KEY = 'cherubion:r2token';
 const lerConfigR2 = () => {
@@ -1130,6 +1130,11 @@ function App() {
     const [ganhosNovoTexto, setGanhosNovoTexto] = useState('');
     const [ganhosAnoSelecionado, setGanhosAnoSelecionado] = useState(new Date().getFullYear());
     const [ganhosAnoAberto, setGanhosAnoAberto] = useState({}); // { [ano]: bool } — controla a seta de expandir cada ano
+    // Era de Ouro: mesmo molde do painel Ganhos (registro agrupado por ano) dentro da aba Atividades
+    const [eraDeOuroRegistro, setEraDeOuroRegistro] = useState([]); // [{id, ano, texto, data, dataISO}]
+    const [eraDeOuroNovoTexto, setEraDeOuroNovoTexto] = useState('');
+    const [eraDeOuroAnoSelecionado, setEraDeOuroAnoSelecionado] = useState(new Date().getFullYear());
+    const [eraDeOuroAnoAberto, setEraDeOuroAnoAberto] = useState({}); // { [ano]: bool } — controla a seta de expandir cada ano
     // ---- Momentum (aba Atividades): caixa de entrada simples — cada registro carimba a data
     // do dia sozinho (sem escolha de ano/categoria) e o livro de registro fica separado por mês.
     const [momentumRegistro, setMomentumRegistro] = useState([]); // [{id, texto, mesChave, data, dataISO}]
@@ -1313,9 +1318,9 @@ function App() {
     // por padrão nenhuma aba do histórico fica marcada: todos os botões ficam brancos
     const [historicoAba, setHistoricoAba] = useState(null);
     const [historicoExpandido, setHistoricoExpandido] = useState(false);
-    // Histórico foi unificado dentro da janela "Tarefas fixas": este botão troca a lista de
-    // tarefas pelos botões de frequência (mensal/trimestral/semestral etc.) que abrem a tabela
-    // de histórico, em vez de uma janela própria separada.
+    // Histórico vive dentro da janela "Gráficos" (ex-Quadro de Medalhas): este botão troca o
+    // quadro de medalhas pelos botões de frequência (mensal/trimestral/semestral etc.) que abrem
+    // a tabela de histórico. Começa desligado para o quadro de medalhas ficar em primeiro plano.
     const [historicoModoAtivo, setHistoricoModoAtivo] = useState(false);
     // ---- contador de aberturas do app por dia: { 'AAAA-MM-DD': quantidade } ----
     const [aberturasApp, setAberturasApp] = useState({});
@@ -1421,6 +1426,7 @@ function App() {
                     setChecklistSessoes(chk.sessoes);
                 }
                 setGanhosRegistro(Array.isArray(dados.ganhosRegistro) ? dados.ganhosRegistro : []);
+                setEraDeOuroRegistro(Array.isArray(dados.eraDeOuroRegistro) ? dados.eraDeOuroRegistro : []);
                 setMomentumRegistro(Array.isArray(dados.momentumRegistro) ? dados.momentumRegistro : []);
                 setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
                 setContadoresRegressivos(Array.isArray(dados.contadoresRegressivos) ? dados.contadoresRegressivos : []);
@@ -1593,7 +1599,7 @@ function App() {
         }
         setStatus('Salvando…');
         try {
-            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (ok) {
                 setSujo(false);
                 marcarQueJaUsou(); // a partir daqui, storage vazio = dados apagados, não estreia
@@ -1607,7 +1613,7 @@ function App() {
         catch (e) {
             // window.storage falhou (comum no preview do Claude.ai). Grava no localStorage real:
             // os dados ficam salvos e não mostramos alarme falso.
-            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (salvouLocal) {
                 setSujo(false);
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1932,6 +1938,15 @@ function App() {
                 break;
             case 'notaRapida':
                 restaurarEmLista(setNotasRapidas, item.valor, item.idx);
+                break;
+            case 'pastaNota':
+                setNotasPastas((ps) => inserirNoEm(ps, item.paiId, item.idx, item.no));
+                setNotasRapidas((ns) => ns.map((n) => {
+                    const original = item.notasAfetadas.find((x) => x.id === n.id);
+                    return original ? { ...n, pastaId: original.pastaId } : n;
+                }));
+                setNotasPastasUsos(item.usosAntes);
+                setNotaCaminhoSel(item.caminhoSelAntes);
                 break;
             case 'frase':
                 restaurarEmLista(setFrases, item.valor, item.idx);
@@ -2378,7 +2393,7 @@ function App() {
         setFixas((fs) => {
             if (fs.some((x) => x.freq === grupoId && x.texto === t.texto))
                 return fs; // evita duplicar
-            return [...fs, { id: genId(), texto: t.texto, freq: grupoId, feitoEm: null, historico: [false] }];
+            return [{ id: genId(), texto: t.texto, freq: grupoId, feitoEm: null, historico: [false] }, ...fs];
         });
         // feedback visual: o botão daquela tarefa confirma "✓ Adicionado" por 1,2s
         setPrioritarioFeito((m) => ({ ...m, [t.id]: true }));
@@ -2538,7 +2553,7 @@ function App() {
         // se já está na lista aguardando com tempo, retoma
         const existente = itemAguardandoNaLista(revealTexto);
         if (existente && existente.tempoGasto) {
-            iniciarTimerDoItem(existente, revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor);
+            iniciarTimerDoItem(existente, revealCat?.cor);
             return;
         }
         if (intervalRef.current)
@@ -2585,7 +2600,7 @@ function App() {
         // nunca duplica: remove existente antes de adicionar
         setLista((l) => {
             const semDup = l.filter((i) => i.texto !== revealTexto || i.status !== 'aguardando');
-            return [...semDup, { id: genId(), texto: revealTexto, cor: (revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor) || CORES[0], status: 'aguardando', tempoGasto: decorridos, premiacao: revealPremiacao }];
+            return [...semDup, { id: genId(), texto: revealTexto, cor: revealCat?.cor || CORES[0], status: 'aguardando', tempoGasto: decorridos, premiacao: revealPremiacao }];
         });
         marcarSujo();
         fecharReveal();
@@ -2600,7 +2615,7 @@ function App() {
         }
         setLista((l) => {
             const semDup = l.filter((i) => i.texto !== revealTexto || i.status !== 'aguardando');
-            return [...semDup, { id: genId(), texto: revealTexto, cor: (revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor) || CORES[0], status: 'feito', feitoEm: new Date().toISOString(), tempoGasto: decorridos, premiacao: revealPremiacao }];
+            return [...semDup, { id: genId(), texto: revealTexto, cor: revealCat?.cor || CORES[0], status: 'feito', feitoEm: new Date().toISOString(), tempoGasto: decorridos, premiacao: revealPremiacao }];
         });
         marcarSujo();
         fecharReveal();
@@ -2629,7 +2644,7 @@ function App() {
             fecharReveal();
             return;
         } // já está, não duplica
-        setLista((l) => [...l, { id: genId(), texto: revealTexto, cor: (revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor) || CORES[0], status: 'aguardando', premiacao: revealPremiacao }]);
+        setLista((l) => [...l, { id: genId(), texto: revealTexto, cor: revealCat?.cor || CORES[0], status: 'aguardando', premiacao: revealPremiacao }]);
         marcarSujo();
         fecharReveal();
     };
@@ -3351,8 +3366,10 @@ function App() {
         ...(chkId === 'development' ? [{ id: CORTE_SESSAO, nome: '💇 Cabelo' }, { id: MEDIDAS_SESSAO, nome: '📏 Medidas' }, { id: FACE_SESSAO, nome: '🧴 Face' }] : []),
         ...(chkId === 'financas' ? [{ id: BANK_SESSAO, nome: '💰 Bank' }] : []),
         ...(chkId === 'snat' ? [{ id: SNAT_BANK_SESSAO, nome: '💰 Bank' }] : []),
-        ...(chkId === 'atividades' ? [{ id: GANHOS_SESSAO, nome: 'Ganhos' }, { id: BATALHA_SESSAO, nome: '⚔️ Batalha' }, { id: CONTADOR_SESSAO, nome: '⏳ Contador' }, { id: MOMENTUM_SESSAO, nome: 'Momentum' }] : []),
+        ...(chkId === 'atividades' ? [{ id: GANHOS_SESSAO, nome: 'Ganhos' }, { id: ERA_DE_OURO_SESSAO, nome: 'Era de Ouro' }, { id: BATALHA_SESSAO, nome: '⚔️ Batalha' }, { id: CONTADOR_SESSAO, nome: '⏳ Contador' }, { id: MOMENTUM_SESSAO, nome: 'Momentum' }] : []),
         ...(chkId === 'prefeituras' ? [{ id: CAR_SESSAO, nome: '🚗 Car' }] : []),
+        // sessão fixa "Já Tenho" (checklist normal, botão "Priority" padrão) — só na aba Skill
+        ...(chkId === 'skill' ? [{ id: JA_TENHO_SESSAO, nome: 'Já Tenho' }] : []),
         // sessão fixa "Programa" (checklist normal, mas com o botão "Programa" em vez do "Priority")
         ...(['snat', 'pe', 'skill', 'best'].includes(chkId) ? [{ id: PROGRAMA_SESSAO, nome: 'Programa' }] : []),
         { id: 'geral', nome: 'Geral' },
@@ -3402,7 +3419,7 @@ function App() {
     const removerSessaoChk = (chkId, sid) => {
         if (!sid || sid === 'geral')
             return;
-        if (sid === SALDO_SESSAO || sid === CORTE_SESSAO || sid === MEDIDAS_SESSAO || sid === FACE_SESSAO || sid === BANK_SESSAO || sid === SNAT_BANK_SESSAO || sid === CAR_SESSAO || sid === PROGRAMA_SESSAO) {
+        if (sid === SALDO_SESSAO || sid === CORTE_SESSAO || sid === MEDIDAS_SESSAO || sid === FACE_SESSAO || sid === BANK_SESSAO || sid === SNAT_BANK_SESSAO || sid === CAR_SESSAO || sid === PROGRAMA_SESSAO || sid === JA_TENHO_SESSAO) {
             msgChk(chkId, 'Esta sessão é fixa do sistema e não pode ser apagada.');
             setChkMapa(setChkConfirmRemoverSessao, chkId, false);
             return;
@@ -3476,11 +3493,11 @@ function App() {
             setGruposCustom((gs) => [...gs, { id: grupoId, nome: 'Prioritários' }]);
         }
         const novaFixaId = genId();
-        setFixas((fs) => [...fs, {
+        setFixas((fs) => [{
                 id: novaFixaId, texto: item.texto, freq: grupoId,
                 feitoEm: item.feito ? hoje() : null, feitoDia: item.feito ? hoje() : null,
                 historico: [!!item.feito], origemChk: { chkId, itemId: id },
-            }]);
+            }, ...fs]);
         setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, prioridade: true, fixaId: novaFixaId } : i)));
         marcarSujo();
     };
@@ -3493,7 +3510,7 @@ function App() {
             grupoId = genId();
             setGruposCustom((gs) => [...gs, { id: grupoId, nome: 'Prioritários' }]);
         }
-        setFixas((fs) => [...fs, { id: genId(), texto, freq: grupoId, feitoEm: null, feitoDia: null, historico: [false] }]);
+        setFixas((fs) => [{ id: genId(), texto, freq: grupoId, feitoEm: null, feitoDia: null, historico: [false] }, ...fs]);
         msgChk('prefeituras', `🚗 "${texto}" adicionado aos Prioritários!`);
         marcarSujo();
     };
@@ -3506,13 +3523,13 @@ function App() {
     // Botão "Programa" (aba Realidade): abre a janela de texto livre ligada à tarefa.
     const abrirPrograma = (chkId, id) => {
         const item = chkItensDe(chkId).find((i) => i.id === id);
-        setProgramaTextoEdit((item === null || item === void 0 ? void 0 : item.programa) || '');
+        setProgramaTextoEdit(item?.programa || '');
         setProgramaAberto({ fonte: 'checklist', chkId, itemId: id });
     };
     // Mesmo botão "Programa", agora também disponível nos itens do ⏳ Contador Regressivo.
     const abrirProgramaContador = (id) => {
         const item = contadoresRegressivos.find((c) => c.id === id);
-        setProgramaTextoEdit((item === null || item === void 0 ? void 0 : item.programa) || '');
+        setProgramaTextoEdit(item?.programa || '');
         setProgramaAberto({ fonte: 'contador', id });
     };
     const salvarPrograma = () => {
@@ -3744,6 +3761,20 @@ function App() {
         setGanhosRegistro((l) => l.filter((r) => r.id !== id));
         marcarSujo();
     };
+    // Era de Ouro: mesmo padrão de agrupamento por ano do Ganhos (mesma lógica de add/remover)
+    const adicionarRegistroEraDeOuro = () => {
+        const texto = eraDeOuroNovoTexto.trim();
+        if (!texto)
+            return;
+        const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        setEraDeOuroRegistro((l) => [{ id: genId(), ano: eraDeOuroAnoSelecionado, texto, data: dataHoje, dataISO: hoje() }, ...l]);
+        setEraDeOuroNovoTexto('');
+        marcarSujo();
+    };
+    const removerRegistroEraDeOuro = (id) => {
+        setEraDeOuroRegistro((l) => l.filter((r) => r.id !== id));
+        marcarSujo();
+    };
     // Painel "Momentum": mora dentro da aba Atividades, no botão "Momentum" ao lado das sessões.
     // Caixa de entrada simples — cada registro carimba sozinho a data do dia (sem escolha de
     // ano/categoria) e o livro de registro fica agrupado por mês (mesChave no formato YYYY-MM).
@@ -3817,6 +3848,58 @@ function App() {
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto)),
                             React.createElement("button", { className: "mt-del", onClick: () => removerRegistroGanhos(r.id) }, "\u00D7"))))))));
+            })));
+    };
+    // Painel "Era de Ouro": idêntico ao Ganhos (registro agrupado por ano), mas sem o grupo
+    // especial "Lary" — aqui só existe "Indefinido" no fim da lista, já que é uma memória própria.
+    // eraDeOuroRegistro é totalmente separado de ganhosRegistro.
+    const renderEraDeOuro = () => {
+        const anoAtual = new Date().getFullYear();
+        const ANO_INICIO_ERA_DE_OURO = 1982;
+        const anos = Array.from({ length: anoAtual - ANO_INICIO_ERA_DE_OURO + 1 }, (_, i) => anoAtual - i);
+        const grupos = [...anos, 'indefinido'];
+        const corRotuloAno = (ano) => (typeof ano === 'number' && ano >= 2019 ? '#C0492E' : '#232323');
+        const rotuloDe = (ano) => (ano === 'indefinido' ? 'Indefinido' : ano);
+        return (React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "mt-premio-secao" },
+                React.createElement("p", { className: "mt-premio-secao-titulo" }, "Era de Ouro"),
+                React.createElement("p", { style: { fontSize: 12, color: '#999', marginTop: -4, marginBottom: 10 } },
+                    "Registre uma entrada e escolha o ano \u2014 de ",
+                    ANO_INICIO_ERA_DE_OURO,
+                    " at\u00E9 ",
+                    anoAtual,
+                    ", ou Indefinido."),
+                React.createElement("div", { className: "mt-premio-saque-row" },
+                    React.createElement("select", { value: eraDeOuroAnoSelecionado, onChange: (e) => setEraDeOuroAnoSelecionado(e.target.value === 'indefinido' ? e.target.value : parseInt(e.target.value, 10)), style: { flexShrink: 0, fontSize: 13, padding: '9px 8px', borderRadius: 9, border: '1.5px solid #ddd8c9', background: '#FBFAF6', color: '#232323' } },
+                        anos.map((ano) => React.createElement("option", { key: ano, value: ano, style: { color: corRotuloAno(ano) } }, ano)),
+                        React.createElement("option", { value: "indefinido" }, "Indefinido")),
+                    React.createElement("input", { className: "mt-nota-input", placeholder: "Nova entrada\u2026", value: eraDeOuroNovoTexto, onChange: (e) => setEraDeOuroNovoTexto(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarRegistroEraDeOuro() }),
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarRegistroEraDeOuro }, "Adicionar"))),
+            grupos.map((ano) => {
+                const doAno = eraDeOuroRegistro.filter((r) => r.ano === ano);
+                const aberto = !!eraDeOuroAnoAberto[ano];
+                const rotulo = rotuloDe(ano);
+                return (React.createElement("div", { key: ano, style: { marginBottom: 8 } },
+                    React.createElement("button", { onClick: () => setEraDeOuroAnoAberto((m) => ({ ...m, [ano]: !m[ano] })), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            fontSize: 13, fontWeight: 700, color: corRotuloAno(ano), padding: '8px 2px',
+                            border: 'none', borderBottom: '1.5px solid #ddd8c9', background: 'none', cursor: 'pointer',
+                        } },
+                        React.createElement("span", { style: { fontSize: 11, color: '#999' } }, aberto ? '▲' : '▼'),
+                        React.createElement("span", null, rotulo),
+                        React.createElement("span", { style: { fontSize: 11, color: '#999', fontWeight: 400 } },
+                            "(",
+                            doAno.length,
+                            ")")),
+                    aberto && (React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 6 } },
+                        doAno.length === 0 && React.createElement("p", { className: "mt-empty" },
+                            "Nenhuma entrada em ",
+                            rotulo,
+                            "."),
+                        doAno.map((r) => (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto)),
+                            React.createElement("button", { className: "mt-del", onClick: () => removerRegistroEraDeOuro(r.id) }, "\u00D7"))))))));
             })));
     };
     // Painel "Momentum": mesmo padrão de agrupamento do Ganhos, mas por mês em vez de ano —
@@ -4107,6 +4190,13 @@ function App() {
     };
     // ---- reordenar categorias ----
     // ---- tarefas fixas ----
+    // Prioritários: todo item novo entra no TOPO da lista, não no fim — os demais grupos
+    // (diária, semanal, etc.) continuam entrando no fim, sem mudar nada pra eles.
+    const ehGrupoPrioritarios = (freqId) => {
+        const g = gruposCustom.find((gr) => gr.id === freqId);
+        return !!(g && g.nome.toLowerCase().includes('priorit'));
+    };
+    const inserirNovasFixas = (fs, novasFixas, freqId) => ehGrupoPrioritarios(freqId) ? [...novasFixas, ...fs] : [...fs, ...novasFixas];
     // cria uma tarefa fixa direto num freq específico — usada pelo painel discreto (+) de cada card,
     // sem precisar passar pelo formulário grande da janela única
     const adicionarFixaDireto = (freq, textoBruto) => {
@@ -4116,7 +4206,7 @@ function App() {
         const slots = { diaria: 7, semanal: 5, mensal: 12, trimestral: 4, semestral: 2, anual: 1 };
         const isCustomFreq = gruposCustom.some((g) => g.id === freq);
         const historico = Array(isCustomFreq ? 1 : (slots[freq] || 7)).fill(false);
-        setFixas((fs) => [...fs, { id: genId(), texto, freq, feitoEm: null, historico }]);
+        setFixas((fs) => inserirNovasFixas(fs, [{ id: genId(), texto, freq, feitoEm: null, historico }], freq));
         setFixasCardNovoTexto((m) => ({ ...m, [freq]: '' }));
         marcarSujo();
     };
@@ -4147,7 +4237,7 @@ function App() {
         const freq = gruposValidos.includes(reserva.freq) ? reserva.freq : 'diaria';
         const isCustomFreq = gruposCustom.some((g) => g.id === freq);
         const historico = Array(isCustomFreq ? 1 : (slots[freq] || 7)).fill(false);
-        setFixas((fs) => [...fs, { id: genId(), texto: reserva.texto, freq, feitoEm: null, historico }]);
+        setFixas((fs) => inserirNovasFixas(fs, [{ id: genId(), texto: reserva.texto, freq, feitoEm: null, historico }], freq));
         setReservas((rs) => rs.filter((r) => r.id !== id));
         marcarSujo();
     };
@@ -4160,7 +4250,7 @@ function App() {
         const historico = Array(isCustomFreq ? 1 : (slots[novaFixaFreq] || 7)).fill(false);
         const dias = parseInt(novaFixaPrazoDias, 10);
         const prazoISO = Number.isFinite(dias) && dias > 0 ? dataMaisDias(dias) : null;
-        setFixas((fs) => [...fs, ...textos.map((texto) => ({ id: genId(), texto, freq: novaFixaFreq, feitoEm: null, historico, prazoISO }))]);
+        setFixas((fs) => inserirNovasFixas(fs, textos.map((texto) => ({ id: genId(), texto, freq: novaFixaFreq, feitoEm: null, historico, prazoISO })), novaFixaFreq));
         setNovaFixaTextos(['']);
         setNovaFixaPrazoDias('');
         marcarSujo();
@@ -4776,6 +4866,32 @@ function App() {
     // aplica fn no nó de id indicado, preservando o resto da árvore
     const atualizarNo = (nos, id, fn) => (Array.isArray(nos) ? nos : []).map((n) => (n.id === id ? fn(n) : { ...n, subpastas: atualizarNo(n.subpastas, id, fn) }));
     const removerNo = (nos, id) => (Array.isArray(nos) ? nos : []).filter((n) => n.id !== id).map((n) => ({ ...n, subpastas: removerNo(n.subpastas, id) }));
+    // acha em que pai (null = raiz) e em que posição um nó está, pra poder devolvê-lo no desfazer
+    const acharPosicaoNo = (nos, id, paiId = null) => {
+        const lista = Array.isArray(nos) ? nos : [];
+        const i = lista.findIndex((n) => n.id === id);
+        if (i !== -1)
+            return { paiId, idx: i };
+        for (const n of lista) {
+            const achado = acharPosicaoNo(n.subpastas, id, n.id);
+            if (achado)
+                return achado;
+        }
+        return null;
+    };
+    // reinsere um nó (com toda a subárvore) na posição original — na raiz ou dentro do pai indicado
+    const inserirNoEm = (nos, paiId, idx, novoNo) => {
+        if (paiId === null) {
+            const copia = [...(Array.isArray(nos) ? nos : [])];
+            copia.splice(Math.max(0, Math.min(idx, copia.length)), 0, novoNo);
+            return copia;
+        }
+        return atualizarNo(nos, paiId, (n) => {
+            const subs = [...(n.subpastas || [])];
+            subs.splice(Math.max(0, Math.min(idx, subs.length)), 0, novoNo);
+            return { ...n, subpastas: subs };
+        });
+    };
     // procura em qualquer profundidade uma pasta cuja palavra-chave seja exatamente o texto digitado
     const acharPorPalavraChave = (texto) => {
         const alvo = normalizarChave(texto);
@@ -4884,11 +5000,24 @@ function App() {
         marcarSujo();
     };
     // apagar uma pasta manda as notas dela E as de todas as descendentes para a Geral — nada é perdido
+    // e a exclusão inteira (pasta/subpasta + notas que voltaram pra Geral) pode ser desfeita.
     const removerPastaNota = (id) => {
         if (id === 'geral')
             return;
         const alvo = noPorId(notasPastas, id);
-        const afetados = new Set(alvo ? todosIdsPastas([alvo]) : [id]);
+        if (!alvo)
+            return;
+        const posicao = acharPosicaoNo(notasPastas, id);
+        const afetados = new Set(todosIdsPastas([alvo]));
+        const notasAfetadas = notasRapidas.filter((n) => afetados.has(n.pastaId)).map((n) => ({ id: n.id, pastaId: n.pastaId }));
+        registrarDesfazer('notasRapidas', 'pastaNota', {
+            no: alvo,
+            paiId: posicao ? posicao.paiId : null,
+            idx: posicao ? posicao.idx : 0,
+            notasAfetadas,
+            usosAntes: notasPastasUsos,
+            caminhoSelAntes: notaCaminhoSel,
+        });
         setNotasPastas((ps) => removerNo(ps, id));
         setNotasRapidas((ns) => ns.map((n) => (afetados.has(n.pastaId) ? { ...n, pastaId: 'geral' } : n)));
         // tira do histórico de uso as pastas que deixaram de existir, para não ocupar as 15 vagas à toa
@@ -5150,7 +5279,7 @@ function App() {
         }
         setSwipeAnim(direcao === 'right' ? 'sair-esq' : 'sair-dir');
         setTimeout(() => {
-            const candidatos = pool.filter((f) => f.id !== (fraseExibida === null || fraseExibida === void 0 ? void 0 : fraseExibida.id));
+            const candidatos = pool.filter((f) => f.id !== fraseExibida?.id);
             const escolhida = (candidatos.length ? candidatos : pool)[Math.floor(Math.random() * (candidatos.length || pool.length))];
             setFraseExibida(escolhida);
             setSwipeAnim('entrar');
@@ -5204,7 +5333,7 @@ function App() {
             registrarDesfazer('notaDoDia', 'frase', { valor: frases[idxDesfazer], idx: idxDesfazer });
         setFrases((fs) => {
             const novo = fs.filter((f) => f.id !== id);
-            if ((fraseExibida === null || fraseExibida === void 0 ? void 0 : fraseExibida.id) === id) {
+            if (fraseExibida?.id === id) {
                 const pool = novo.filter((f) => notaCat === 'aleatorio' || f.cat === notaCat);
                 setFraseExibida(pool.length ? pool[Math.floor(Math.random() * pool.length)] : null);
             }
@@ -5569,7 +5698,7 @@ function App() {
         catch (e) { /* localStorage indisponível: backup segue só com os dados do Minha Tela */ }
         return dados;
     };
-    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos(), configR2: lerConfigR2() }, null, 2);
+    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
     const copiarBackup = () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -5646,12 +5775,6 @@ function App() {
     const restaurarBackupDeTexto = (texto) => {
         try {
             const dados = JSON.parse(texto);
-            // credenciais do Cloudflare R2 voltam junto com o backup — evita ter de
-            // recolar Worker/chave à mão a cada restauração ou troca de aparelho
-            if (dados.configR2 && typeof dados.configR2 === 'object'
-                && (dados.configR2.url || dados.configR2.token)) {
-                salvarConfigR2(dados.configR2.url || '', dados.configR2.token || '');
-            }
             setCategorias(Array.isArray(dados.categorias) ? normalizarCategorias(dados.categorias) : []);
             setFixas(Array.isArray(dados.fixas) ? dados.fixas : []);
             setLista(Array.isArray(dados.lista) ? dados.lista : []);
@@ -5715,6 +5838,7 @@ function App() {
                 setChecklistSessoes(chk.sessoes);
             }
             setGanhosRegistro(Array.isArray(dados.ganhosRegistro) ? dados.ganhosRegistro : []);
+            setEraDeOuroRegistro(Array.isArray(dados.eraDeOuroRegistro) ? dados.eraDeOuroRegistro : []);
             setMomentumRegistro(Array.isArray(dados.momentumRegistro) ? dados.momentumRegistro : []);
             setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
             setContadoresRegressivos(Array.isArray(dados.contadoresRegressivos) ? dados.contadoresRegressivos : []);
@@ -6484,7 +6608,6 @@ function App() {
                     renderJanelaHandle('tarefasFixas'),
                     React.createElement("h2", { className: "mt-section-title" }, "Tarefas fixas"),
                     (() => {
-                        var _a;
                         const ordemCompleta = normalizarOrdemGruposFixas(fixasGruposOrdem, gruposCustom);
                         const todosGrupos = ordemCompleta.map((id) => ({
                             freq: id,
@@ -6497,56 +6620,6 @@ function App() {
                         const gruposAba = gruposVisiveis.filter((g) => !fixasGruposComoCard.includes(g.freq));
                         // sem fallback para gruposAba[0]: se nada foi tocado, nenhum grupo fica selecionado
                         const atual = gruposAba.find((o) => o.freq === fixaOutrasAba) || null;
-                        // ---- Histórico unificado: mesmas opções de frequência que existiam na janela própria,
-                        // agora vivendo dentro da janela de Tarefas fixas (troca de lugar com o botão 📊) ----
-                        const opcoesHist = [
-                            { freq: 'diaria', label: 'Diário', cols: DIAS_SEMANA, items: diarias },
-                            { freq: 'semanal', label: 'Semanal', cols: SEMANAS_MES, items: semanais },
-                            { freq: 'mensal', label: 'Mensal', cols: MESES, items: mensais },
-                            { freq: 'trimestral', label: 'Trimestral', cols: TRIMESTRES, items: fixas.filter((t) => t.freq === 'trimestral') },
-                            { freq: 'semestral', label: 'Semestral', cols: SEMESTRES, items: fixas.filter((t) => t.freq === 'semestral') },
-                            { freq: 'anual', label: 'Anual', cols: [new Date().getFullYear().toString()], items: fixas.filter((t) => t.freq === 'anual') },
-                            ...gruposCustom.map((g) => ({
-                                freq: g.id, label: g.nome, cols: ['Registro'], items: fixas.filter((t) => t.freq === g.id),
-                            })),
-                        ];
-                        // sem fallback para opcoesHist[0]: se nada foi tocado, nenhum botão fica preto
-                        const atualHist = opcoesHist.find((o) => o.freq === historicoAba) || null;
-                        const { freq: freqHist, label: labelHist, cols: colsHist, items: itemsHist } = atualHist || { freq: null, label: '', cols: [], items: [] };
-                        const editandoHist = freqHist ? !!historicoEditando[freqHist] : false;
-                        const colunasOcultasHist = (freqHist && historicoColunasOcultas[freqHist]) || [];
-                        const colsVisiveisHist = colsHist.map((c, i) => ({ col: c, idx: i, oculta: colunasOcultasHist.includes(i) }));
-                        // Prioritários não é baseado num ciclo (dia da semana / semana do mês / etc.) como
-                        // as outras listas — então o histórico dele não usa a tabela de colunas: mostra só
-                        // o nome da tarefa e o dia em que foi concluída, no formato dia/mês (sem dia da
-                        // semana, sem ano).
-                        const ehHistPriorit = freqHist ? String(nomeGrupoFixa(freqHist) || '').toLowerCase().includes('priorit') : false;
-                        const formatarDiaMesHist = (iso) => {
-                            if (!iso)
-                                return null;
-                            const [, mes, dia] = iso.split('-');
-                            return `${dia}/${mes}`;
-                        };
-                        // cálculo de porcentagem até a data corrente (sem contar datas futuras)
-                        const hoje2Hist = new Date();
-                        const maxIdxHojeHist = (_a = {
-                            diaria: hoje2Hist.getDay(),
-                            semanal: Math.min(Math.floor((hoje2Hist.getDate() - 1) / 7), 4),
-                            mensal: hoje2Hist.getMonth(),
-                            trimestral: Math.floor(hoje2Hist.getMonth() / 3),
-                            semestral: hoje2Hist.getMonth() < 6 ? 0 : 1,
-                            anual: 0,
-                        }[freqHist]) !== null && _a !== void 0 ? _a : (colsHist.length - 1);
-                        const colsElegiveisHist = colsVisiveisHist.filter((c) => !c.oculta && c.idx <= maxIdxHojeHist);
-                        let totalFeitasHist = 0, totalPossivelHist = 0;
-                        itemsHist.forEach((t) => {
-                            colsElegiveisHist.forEach(({ idx }) => {
-                                totalPossivelHist++;
-                                if (t.historico && t.historico[idx])
-                                    totalFeitasHist++;
-                            });
-                        });
-                        const pctHist = totalPossivelHist > 0 ? Math.round((totalFeitasHist / totalPossivelHist) * 100) : 0;
                         const renderItemFixa = (t, freq) => {
                             const feita = tarefaFeitaHoje(t);
                             const dias = diasRestantes(t);
@@ -6614,7 +6687,7 @@ function App() {
                                 return null;
                             const doGrupo = fixas.filter((t) => t.freq === freq);
                             const comContador = doGrupo.filter((t) => t.prazoISO);
-                            const ordenadas = [...comContador].sort((a, b) => { var _a, _b; return ((_a = diasRestantes(a)) !== null && _a !== void 0 ? _a : 0) - ((_b = diasRestantes(b)) !== null && _b !== void 0 ? _b : 0); });
+                            const ordenadas = [...comContador].sort((a, b) => (diasRestantes(a) ?? 0) - (diasRestantes(b) ?? 0));
                             return (React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0efe9' } },
                                 React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginTop: 0, marginBottom: 4 } },
                                     "\u23F3 CONTADOR DE DIAS",
@@ -6760,7 +6833,7 @@ function App() {
                                     renderMetaDoDia(freq)));
                             }),
                             React.createElement("div", { className: "mt-card", "data-fixas-unica": "1" },
-                                !historicoModoAtivo && gruposAba.length > 0 && (React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 } }, gruposAba.map((o) => (React.createElement("button", { key: o.freq, onClick: () => {
+                                gruposAba.length > 0 && (React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 } }, gruposAba.map((o) => (React.createElement("button", { key: o.freq, onClick: () => {
                                         // tocar num botão já preto fecha a janela e devolve todos ao branco
                                         const fechando = fixaOutrasAba === o.freq;
                                         setFixaOutrasAba(fechando ? null : o.freq);
@@ -6775,162 +6848,32 @@ function App() {
                                         color: fixaOutrasAba === o.freq ? '#fff' : '#777',
                                         borderColor: fixaOutrasAba === o.freq ? '#232323' : '#ddd8c9',
                                     } }, o.label))))),
-                                historicoModoAtivo && (React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 } }, opcoesHist.map((o) => (React.createElement("button", { key: o.freq, onClick: () => {
-                                        // tocar num botão já preto fecha a tabela e devolve todos ao branco
-                                        const fechando = historicoAba === o.freq;
-                                        setHistoricoAba(fechando ? null : o.freq);
-                                        setHistoricoExpandido(!fechando);
-                                    }, style: {
-                                        fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20,
-                                        border: '1.5px solid', cursor: 'pointer',
-                                        background: historicoAba === o.freq ? '#232323' : '#fff',
-                                        color: historicoAba === o.freq ? '#fff' : '#777',
-                                        borderColor: historicoAba === o.freq ? '#232323' : '#ddd8c9',
-                                    } }, o.label))))),
                                 React.createElement("div", { className: "mt-fixa-grupo-head" },
                                     React.createElement("div", { style: { display: 'flex', gap: 10, alignItems: 'center' } },
-                                        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0 } }, historicoModoAtivo
-                                            ? (atualHist ? `📊 ${labelHist}` : '📊 HISTÓRICO')
-                                            : (atual ? atual.label : (gruposAba.length > 0 ? 'TOQUE NUMA LISTA' : 'NENHUMA ABA VISÍVEL')))),
+                                        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0 } }, atual ? atual.label : (gruposAba.length > 0 ? 'TOQUE NUMA LISTA' : 'NENHUMA ABA VISÍVEL'))),
                                     React.createElement("div", { style: { display: 'flex', gap: 6, alignItems: 'center' } },
-                                        !historicoModoAtivo && atual && atual.custom && fixasEdicaoAtiva && (React.createElement("button", { className: "mt-del", onClick: () => removerGrupoCustom(atual.freq), title: "Excluir lista" }, "\u00D7")),
-                                        !historicoModoAtivo && (React.createElement(React.Fragment, null,
-                                            React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
-                                                    const abrindo = !mostrarAdicionarFixa;
-                                                    setMostrarAdicionarFixa(abrindo);
-                                                    // ‼️ ao abrir o painel, expande a janela junto — senão o + parecia não fazer nada
-                                                    if (abrindo)
-                                                        setFixasUnicaExpandida(true);
-                                                    if (atual)
-                                                        setFixasCardAberto((m) => ({ ...m, [atual.freq]: !m[atual.freq] }));
-                                                }, title: mostrarAdicionarFixa ? 'Fechar' : 'Adicionar ou remover tarefas' }, mostrarAdicionarFixa ? '×' : '+'),
-                                            React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
-                                                    const abrindo = !mostrarConfigFixas;
-                                                    setMostrarConfigFixas(abrindo);
-                                                    if (abrindo)
-                                                        setFixasUnicaExpandida(true);
-                                                    // fechando o ⚙ sem nenhuma lista marcada, a janela volta a encolher
-                                                    else if (!fixaOutrasAba) {
-                                                        setFixasUnicaExpandida(false);
-                                                        setMostrarAdicionarFixa(false);
-                                                    }
-                                                }, title: mostrarConfigFixas ? 'Fechar configurações' : 'Configurações' }, "\u2699\uFE0F"))),
+                                        atual && atual.custom && fixasEdicaoAtiva && (React.createElement("button", { className: "mt-del", onClick: () => removerGrupoCustom(atual.freq), title: "Excluir lista" }, "\u00D7")),
                                         React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
-                                                const ligando = !historicoModoAtivo;
-                                                setHistoricoModoAtivo(ligando);
-                                                if (ligando) {
+                                                const abrindo = !mostrarAdicionarFixa;
+                                                setMostrarAdicionarFixa(abrindo);
+                                                // ‼️ ao abrir o painel, expande a janela junto — senão o + parecia não fazer nada
+                                                if (abrindo)
+                                                    setFixasUnicaExpandida(true);
+                                                if (atual)
+                                                    setFixasCardAberto((m) => ({ ...m, [atual.freq]: !m[atual.freq] }));
+                                            }, title: mostrarAdicionarFixa ? 'Fechar' : 'Adicionar ou remover tarefas' }, mostrarAdicionarFixa ? '×' : '+'),
+                                        React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
+                                                const abrindo = !mostrarConfigFixas;
+                                                setMostrarConfigFixas(abrindo);
+                                                if (abrindo)
+                                                    setFixasUnicaExpandida(true);
+                                                // fechando o ⚙ sem nenhuma lista marcada, a janela volta a encolher
+                                                else if (!fixaOutrasAba) {
+                                                    setFixasUnicaExpandida(false);
                                                     setMostrarAdicionarFixa(false);
-                                                    setMostrarConfigFixas(false);
                                                 }
-                                                else {
-                                                    setHistoricoAba(null);
-                                                    setHistoricoExpandido(false);
-                                                }
-                                            }, title: historicoModoAtivo ? 'Voltar às tarefas fixas' : 'Ver histórico' }, historicoModoAtivo ? '📋' : '📊'))),
-                                historicoModoAtivo && historicoExpandido && atualHist && (React.createElement(React.Fragment, null,
-                                    (() => {
-                                        const dias = [];
-                                        for (let i = 6; i >= 0; i--) {
-                                            const d = new Date();
-                                            d.setDate(d.getDate() - i);
-                                            const chave = d.toLocaleDateString('en-CA');
-                                            dias.push({
-                                                chave,
-                                                rotulo: d.toLocaleDateString('en-US', { weekday: 'long' }),
-                                                qtd: aberturasApp[chave] || 0,
-                                                hojeMesmo: i === 0,
-                                            });
-                                        }
-                                        const maior = Math.max(1, ...dias.map((d) => d.qtd));
-                                        const total7 = dias.reduce((s, d) => s + d.qtd, 0);
-                                        return (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
-                                            React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 } }, "\uD83D\uDCF1 Aberturas do app"),
-                                            React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 } },
-                                                React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: '#232323' } }, aberturasApp[hoje()] || 0),
-                                                React.createElement("span", { style: { fontSize: 12, color: '#999' } },
-                                                    "hoje \u00B7 ",
-                                                    total7,
-                                                    " nos \u00FAltimos 7 dias")),
-                                            React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6, height: 46 } }, dias.map((d) => (React.createElement("div", { key: d.chave, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 } },
-                                                React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: d.hojeMesmo ? '#232323' : '#a8a293' } }, d.qtd),
-                                                React.createElement("div", { style: {
-                                                        width: '100%',
-                                                        height: Math.max(3, Math.round((d.qtd / maior) * 24)),
-                                                        background: d.hojeMesmo ? '#5B7C99' : '#ddd8c9',
-                                                        borderRadius: 3,
-                                                    } }),
-                                                React.createElement("span", { style: { fontSize: 9.5, color: '#a8a293' } }, d.rotulo)))))));
-                                    })(),
-                                    React.createElement("div", { className: "mt-fixa-grupo-head", style: { marginBottom: 10 } },
-                                        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0, textTransform: 'uppercase' } }, labelHist),
-                                        React.createElement("div", { style: { display: 'flex', gap: 6, alignItems: 'center' } },
-                                            React.createElement("button", { className: "mt-gear-btn", title: editandoHist ? 'Sair da edição' : 'Editar', onClick: () => setHistoricoEditando((h) => ({ ...h, [freqHist]: !h[freqHist] })) }, editandoHist ? '×' : '+'),
-                                            React.createElement("button", { className: "mt-recarregar-btn", onClick: () => arquivarTabela(freqHist), title: "Recarregar" }, "\uD83D\uDD04"))),
-                                    itemsHist.length > 0 && (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
-                                        React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 } }, "Rela\u00E7\u00E3o de tarefas completas"),
-                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
-                                            React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: '#232323' } },
-                                                totalFeitasHist,
-                                                "/",
-                                                totalPossivelHist),
-                                            React.createElement("span", { style: { fontSize: 15, color: corPct(pctHist), fontWeight: 700 } },
-                                                pctHist,
-                                                "%"),
-                                            React.createElement("div", { style: { flex: 1, height: 6, background: '#e7e5df', borderRadius: 3, overflow: 'hidden' } },
-                                                React.createElement("div", { style: { width: `${pctHist}%`, height: '100%', background: corPct(pctHist), borderRadius: 3, transition: 'width 0.4s' } }))))),
-                                    itemsHist.length === 0 ? (React.createElement("p", { className: "mt-empty" },
-                                        "Nenhuma tarefa ",
-                                        labelHist.toLowerCase(),
-                                        " ainda.")) : ehHistPriorit ? (React.createElement("div", { className: "mt-fixas-scroll" }, itemsHist.map((t) => (React.createElement("div", { key: t.id, className: "mt-fixa-item" },
-                                        React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#232323' } }, t.texto),
-                                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: t.feitoDia ? '#3E8E5A' : '#a8a293', flexShrink: 0 } }, formatarDiaMesHist(t.feitoDia) || 'não concluído')))))) : (React.createElement("div", { className: "mt-tabela-wrap" },
-                                        React.createElement("table", { className: "mt-tabela-historico" },
-                                            React.createElement("thead", null,
-                                                React.createElement("tr", null,
-                                                    React.createElement("th", null),
-                                                    colsVisiveisHist.map(({ col, idx, oculta }) => (!oculta || editandoHist) && (React.createElement("th", { key: idx }, editandoHist ? (React.createElement("button", { onClick: () => toggleColunaOculta(freqHist, idx), style: { background: oculta ? '#f0ede6' : 'transparent', border: oculta ? '1px solid #ddd' : 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: oculta ? '#aaa' : 'inherit', padding: '2px 4px', textDecoration: oculta ? 'line-through' : 'none' }, title: oculta ? 'Mostrar' : 'Ocultar' }, col)) : col))))),
-                                            React.createElement("tbody", null, itemsHist.map((t) => (React.createElement("tr", { key: t.id },
-                                                React.createElement("td", { className: "mt-tabela-nome" }, t.texto),
-                                                colsVisiveisHist.map(({ idx, oculta }) => (!oculta || editandoHist) && (React.createElement("td", { key: idx, style: oculta ? { opacity: 0.3 } : {} }, editandoHist ? ((t.historico && t.historico[idx])
-                                                    ? React.createElement("span", { className: "mt-tabela-marcada-edit", onClick: () => toggleHistoricoCell(t.id, idx) }, "\u2713")
-                                                    : React.createElement("span", { className: "mt-tabela-vazia", onClick: () => toggleHistoricoCell(t.id, idx) })) : ((t.historico && t.historico[idx]) ? React.createElement("span", { className: "mt-tabela-marca" }, "\u2713") : null))))))))))),
-                                    (() => {
-                                        const comsFreq = comentariosFixas.filter((c) => c.freq === freqHist);
-                                        return (React.createElement("div", { style: { marginTop: 16, paddingTop: 14, borderTop: '1px solid #f0efe9' } },
-                                            React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '0 0 6px', textTransform: 'uppercase' } }, "\uD83D\uDCAC Coment\u00E1rios"),
-                                            comsFreq.length === 0 ? (React.createElement("p", { className: "mt-empty", style: { margin: 0 } }, "Nenhum coment\u00E1rio registrado neste per\u00EDodo.")) : comsFreq.map((c) => (React.createElement("div", { className: "mt-fixa-item", key: c.id },
-                                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                                    React.createElement("span", { style: { display: 'block', fontSize: 13, color: '#232323', whiteSpace: 'pre-wrap' } }, c.texto),
-                                                    c.solucao && (React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#6E8C82', whiteSpace: 'pre-wrap', marginTop: 2 } },
-                                                        "\uD83D\uDCA1 Solu\u00E7\u00E3o: ",
-                                                        c.solucao)),
-                                                    React.createElement("span", { style: { fontSize: 11.5, color: '#999' } },
-                                                        rotuloPeriodo(freqHist, c.chave),
-                                                        " \u00B7 ",
-                                                        c.data)),
-                                                React.createElement("button", { className: "mt-del", onClick: () => removerComentario(c.id) }, "\u00D7"))))));
-                                    })(),
-                                    React.createElement("div", { style: { marginTop: 20, paddingTop: 16, borderTop: '1px solid #e7e5df' } },
-                                        React.createElement("h2", { className: "mt-section-title" }, "\uD83D\uDCD6 Livro das mem\u00F3rias"),
-                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                                            React.createElement("button", { className: "mt-backup-toggle", style: { marginTop: 0 }, onClick: () => { setMsgLivro(''); setLivroAberto((v) => !v); } }, livroAberto ? '▲ Esconder' : `▼ Ver registros (${livro.length})`),
-                                            React.createElement("button", { className: "mt-config-fixas-btn", onClick: () => setMostrarConfigLivroMemorias((v) => !v), title: mostrarConfigLivroMemorias ? 'Fechar configurações' : 'Configurações do livro das memórias' }, mostrarConfigLivroMemorias ? '×' : '⚙️')),
-                                        mostrarConfigLivroMemorias && (React.createElement("div", { style: { margin: '10px 0' } },
-                                            React.createElement(BotaoDesfazer, { janela: "livro" }))),
-                                        livroAberto && (React.createElement(React.Fragment, null,
-                                            React.createElement("div", { className: "mt-livro-lista" },
-                                                livro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nada registrado ainda. Toque em \"Recarregar\" nas tabelas acima pra arquivar a semana aqui."),
-                                                livro.map((r) => (React.createElement("div", { className: "mt-livro-item", key: r.id },
-                                                    React.createElement("span", { className: "mt-livro-texto" }, r.tarefa),
-                                                    React.createElement("span", { className: "mt-tempo-badge" },
-                                                        r.dia,
-                                                        " \u00B7 ",
-                                                        r.data))))),
-                                            React.createElement("div", { className: "mt-backup-actions", style: { marginTop: 12 } },
-                                                React.createElement("button", { className: "mt-btn-sm primary", onClick: copiarLivro }, "Copiar"),
-                                                confirmApagarLivro ? (React.createElement("button", { className: "mt-btn-sm", style: { borderColor: '#E8633D', color: '#E8633D' }, onClick: apagarLivro }, "Confirmar apagar?")) : (React.createElement("button", { className: "mt-btn-sm", onClick: () => setConfirmApagarLivro(true) }, "Apagar"))),
-                                            React.createElement("p", { className: "mt-backup-msg" }, msgLivro)))))),
-                                !historicoModoAtivo && fixasUnicaExpandida && (React.createElement(React.Fragment, null,
+                                            }, title: mostrarConfigFixas ? 'Fechar configurações' : 'Configurações' }, "\u2699\uFE0F"))),
+                                fixasUnicaExpandida && (React.createElement(React.Fragment, null,
                                     atual ? (() => {
                                         const items = atual.items;
                                         const feitas = items.filter((t) => tarefaFeitaHoje(t)).length;
@@ -7027,7 +6970,7 @@ function App() {
                                                 isCustom && fixasEdicaoAtiva && (React.createElement("button", { className: "mt-del", onClick: () => removerGrupoCustom(id), title: "Apagar esta lista" }, "\uD83D\uDDD1\uFE0F"))));
                                         }),
                                         atual && renderComentarioGrupo(atual.freq))))),
-                                !historicoModoAtivo && atual && renderMetaDoDia(atual.freq))));
+                                atual && renderMetaDoDia(atual.freq))));
                     })()),
                 React.createElement("div", { className: `mt-janela-wrap ${draggingJanelaId === 'livroRazao' ? 'dragging' : ''} ${dragOverJanelaId === 'livroRazao' && draggingJanelaId !== 'livroRazao' ? 'drag-over' : ''}`, "data-janela-id": "livroRazao", style: { order: ordemJanelas.indexOf('livroRazao') } },
                     renderJanelaHandle('livroRazao'),
@@ -7358,15 +7301,16 @@ function App() {
                             const ehBank = c.id === 'financas' && sid === BANK_SESSAO;
                             const ehSnatBank = c.id === 'snat' && sid === SNAT_BANK_SESSAO;
                             const ehGanhos = c.id === 'atividades' && sid === GANHOS_SESSAO;
+                            const ehEraDeOuro = c.id === 'atividades' && sid === ERA_DE_OURO_SESSAO;
                             const ehBatalha = c.id === 'atividades' && sid === BATALHA_SESSAO;
                             const ehContador = c.id === 'atividades' && sid === CONTADOR_SESSAO;
                             const ehMomentum = c.id === 'atividades' && sid === MOMENTUM_SESSAO;
                             const ehCar = c.id === 'prefeituras' && sid === CAR_SESSAO;
-                            // painéis embutidos (Saldo, Cabelo, Medidas, Face, Bank, Bank Snat, Ganhos, Batalha, Contador, Momentum, Car)
-                            const ehPainel = ehSaldo || ehCorte || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehBatalha || ehContador || ehMomentum || ehCar;
+                            // painéis embutidos (Saldo, Cabelo, Medidas, Face, Bank, Bank Snat, Ganhos, Era de Ouro, Batalha, Contador, Momentum, Car)
+                            const ehPainel = ehSaldo || ehCorte || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehEraDeOuro || ehBatalha || ehContador || ehMomentum || ehCar;
                             // o Cabelo é o único painel que mantém a lista de tarefas embaixo dele;
                             // os outros substituem a lista por completo
-                            const escondeTarefas = ehSaldo || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehBatalha || ehContador || ehMomentum || ehCar;
+                            const escondeTarefas = ehSaldo || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehEraDeOuro || ehBatalha || ehContador || ehMomentum || ehCar;
                             if (razaoTabSelecionada !== c.id)
                                 return null;
                             return (React.createElement(React.Fragment, { key: c.id },
@@ -7378,7 +7322,7 @@ function App() {
                                     React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 10 } },
                                         abas.map((s) => {
                                             const ativo = sid === s.id;
-                                            const fixa = s.id === 'geral' || s.id === SALDO_SESSAO || s.id === CORTE_SESSAO || s.id === MEDIDAS_SESSAO || s.id === FACE_SESSAO || s.id === BANK_SESSAO || s.id === SNAT_BANK_SESSAO || s.id === GANHOS_SESSAO || s.id === BATALHA_SESSAO || s.id === CONTADOR_SESSAO || s.id === MOMENTUM_SESSAO || s.id === CAR_SESSAO || s.id === PROGRAMA_SESSAO;
+                                            const fixa = s.id === 'geral' || s.id === SALDO_SESSAO || s.id === CORTE_SESSAO || s.id === MEDIDAS_SESSAO || s.id === FACE_SESSAO || s.id === BANK_SESSAO || s.id === SNAT_BANK_SESSAO || s.id === GANHOS_SESSAO || s.id === ERA_DE_OURO_SESSAO || s.id === BATALHA_SESSAO || s.id === CONTADOR_SESSAO || s.id === MOMENTUM_SESSAO || s.id === CAR_SESSAO || s.id === PROGRAMA_SESSAO || s.id === JA_TENHO_SESSAO;
                                             return (React.createElement(React.Fragment, { key: s.id },
                                                 React.createElement("button", { onClick: () => { setChkMapa(setChkSessaoSel, c.id, s.id); setChkMapa(setChkConfirmRemoverSessao, c.id, false); msgChk(c.id, ''); }, style: {
                                                         fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20,
@@ -7409,6 +7353,7 @@ function App() {
                                     ehBank && renderBank(),
                                     ehSnatBank && renderSnatBank(),
                                     ehGanhos && renderGanhos(),
+                                    ehEraDeOuro && renderEraDeOuro(),
                                     ehBatalha && renderBatalha(),
                                     ehContador && renderContadores(),
                                     ehMomentum && renderMomentum(),
@@ -7442,15 +7387,14 @@ function App() {
                                                     borderColor: it.prioridade ? '#C0492E' : '#C9A227',
                                                 } }, "Priority")),
                                             React.createElement("button", { className: "mt-del", onClick: () => removerItemChk(c.id, it.id) }, "\u00D7")))))),
-                                    sid !== 'geral' && !ehPainel && (React.createElement("div", { style: { marginTop: 8 } }, chkConfirmRemoverSessao[c.id] ? (React.createElement("button", { className: "mt-btn-sm", style: { borderColor: '#E8633D', color: '#E8633D' }, onClick: () => removerSessaoChk(c.id, sid) }, "Confirmar apagar sess\u00E3o? (as tarefas voltam para a Geral)")) : (React.createElement("button", { className: "mt-btn-sm", onClick: () => setChkMapa(setChkConfirmRemoverSessao, c.id, true) }, "Apagar esta sess\u00E3o")))),
+                                    mostrarConfigLivroRazao && sid !== 'geral' && !ehPainel && sid !== PROGRAMA_SESSAO && sid !== JA_TENHO_SESSAO && (React.createElement("div", { style: { marginTop: 8 } }, chkConfirmRemoverSessao[c.id] ? (React.createElement("button", { className: "mt-btn-sm", style: { borderColor: '#E8633D', color: '#E8633D' }, onClick: () => removerSessaoChk(c.id, sid) }, "Confirmar apagar sess\u00E3o? (as tarefas voltam para a Geral)")) : (React.createElement("button", { className: "mt-btn-sm", onClick: () => setChkMapa(setChkConfirmRemoverSessao, c.id, true) }, "Apagar esta sess\u00E3o")))),
                                     chkMsg[c.id] && React.createElement("p", { className: "mt-premio-msg" }, chkMsg[c.id]))));
                         }),
                         razaoTabSelecionada === 'categorias' && (() => {
-                            var _a;
                             const cats = categorias;
                             const tabId = catTabSelecionada && cats.find((c) => c.id === catTabSelecionada)
                                 ? catTabSelecionada
-                                : ((_a = cats[0]) === null || _a === void 0 ? void 0 : _a.id) || null;
+                                : cats[0]?.id || null;
                             const catAtiva = cats.find((c) => c.id === tabId) || null;
                             const renderCatConteudo = (cat) => (React.createElement(React.Fragment, null,
                                 React.createElement("div", { className: "mt-cat-head", style: { marginBottom: 8 } }, renamingCat === cat.id ? (React.createElement("div", { className: "mt-rename-row" },
@@ -7595,11 +7539,24 @@ function App() {
                         })())),
                 React.createElement("div", { className: `mt-janela-wrap ${draggingJanelaId === 'medalhas' ? 'dragging' : ''} ${dragOverJanelaId === 'medalhas' && draggingJanelaId !== 'medalhas' ? 'drag-over' : ''}`, "data-janela-id": "medalhas", style: { order: ordemJanelas.indexOf('medalhas') } },
                     renderJanelaHandle('medalhas'),
-                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-                        React.createElement("h2", { className: "mt-section-title", style: { margin: 0 } }, "Quadro de Medalhas"),
-                        React.createElement("button", { className: "mt-config-fixas-btn", onClick: () => { setMedalhasEdicaoAtiva((v) => !v); setMedalhaEditando(null); }, title: medalhasEdicaoAtiva ? 'Fechar edição' : 'Editar medalhas manualmente' }, medalhasEdicaoAtiva ? '×' : '✏️')),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '8px 10px' } },
+                        React.createElement("h2", { className: "mt-section-title", style: { margin: 0 } }, "Gr\u00E1ficos"),
+                        React.createElement("div", { style: { display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 } },
+                            React.createElement("button", { className: "mt-btn-sm", style: { fontSize: 12.5, padding: '6px 11px', whiteSpace: 'nowrap' }, onClick: () => {
+                                    const ligando = !historicoModoAtivo;
+                                    setHistoricoModoAtivo(ligando);
+                                    if (!ligando) {
+                                        setHistoricoAba(null);
+                                        setHistoricoExpandido(false);
+                                    }
+                                    else {
+                                        setMedalhasEdicaoAtiva(false);
+                                        setMedalhaEditando(null);
+                                    }
+                                }, title: historicoModoAtivo ? 'Voltar ao quadro de medalhas' : 'Ver histórico' }, historicoModoAtivo ? '🏅 Medalhas' : '📊 Histórico'),
+                            !historicoModoAtivo && (React.createElement("button", { className: "mt-config-fixas-btn", style: { flexShrink: 0 }, onClick: () => { setMedalhasEdicaoAtiva((v) => !v); setMedalhaEditando(null); }, title: medalhasEdicaoAtiva ? 'Fechar edição' : 'Editar medalhas manualmente' }, medalhasEdicaoAtiva ? '×' : '✏️')))),
                     React.createElement("div", { className: "mt-card" },
-                        (() => {
+                        !historicoModoAtivo && (() => {
                             const NOME_FILHO = { diaria: 'dia', semanal: 'semana', mensal: 'mês', trimestral: 'trimestre', semestral: 'semestre' };
                             const renderGrupo = ({ freq, titulo, labels }) => (React.createElement("div", { key: freq, style: { marginBottom: 16 } },
                                 React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '0 0 8px' } }, titulo.toUpperCase()),
@@ -7660,7 +7617,175 @@ function App() {
                                 React.createElement("button", { className: "mt-backup-toggle", style: { marginTop: 0, marginBottom: medalhasExpandido ? 12 : 0 }, onClick: () => setMedalhasExpandido((v) => !v) }, medalhasExpandido ? '▲ Esconder' : '▼ Ver quadro completo'),
                                 medalhasExpandido && gruposExpansiveis.map(renderGrupo)));
                         })(),
-                        React.createElement("p", { className: "mt-premio-sub", style: { marginTop: 4 } }, "\uD83E\uDD49 Bronze (at\u00E9 33%) \u00B7 \uD83E\uDD48 Prata (34\u201360%) \u00B7 \uD83E\uDD47 Ouro (61\u201399%) \u00B7 \uD83D\uDC8E Diamante (100%)"))),
+                        !historicoModoAtivo && (React.createElement("p", { className: "mt-premio-sub", style: { marginTop: 4 } }, "\uD83E\uDD49 Bronze (at\u00E9 33%) \u00B7 \uD83E\uDD48 Prata (34\u201360%) \u00B7 \uD83E\uDD47 Ouro (61\u201399%) \u00B7 \uD83D\uDC8E Diamante (100%)")),
+                        historicoModoAtivo && (() => {
+                            // ---- Histórico: mesmas opções de frequência que existiam na janela própria,
+                            // agora vivendo dentro de Gráficos, atrás do botão 📊 Histórico no cabeçalho. ----
+                            const opcoesHist = [
+                                { freq: 'diaria', label: 'Diário', cols: DIAS_SEMANA, items: diarias },
+                                { freq: 'semanal', label: 'Semanal', cols: SEMANAS_MES, items: semanais },
+                                { freq: 'mensal', label: 'Mensal', cols: MESES, items: mensais },
+                                { freq: 'trimestral', label: 'Trimestral', cols: TRIMESTRES, items: fixas.filter((t) => t.freq === 'trimestral') },
+                                { freq: 'semestral', label: 'Semestral', cols: SEMESTRES, items: fixas.filter((t) => t.freq === 'semestral') },
+                                { freq: 'anual', label: 'Anual', cols: [new Date().getFullYear().toString()], items: fixas.filter((t) => t.freq === 'anual') },
+                                ...gruposCustom.map((g) => ({
+                                    freq: g.id, label: g.nome, cols: ['Registro'], items: fixas.filter((t) => t.freq === g.id),
+                                })),
+                            ];
+                            // sem fallback para opcoesHist[0]: se nada foi tocado, nenhum botão fica preto
+                            const atualHist = opcoesHist.find((o) => o.freq === historicoAba) || null;
+                            const { freq: freqHist, label: labelHist, cols: colsHist, items: itemsHist } = atualHist || { freq: null, label: '', cols: [], items: [] };
+                            const editandoHist = freqHist ? !!historicoEditando[freqHist] : false;
+                            const colunasOcultasHist = (freqHist && historicoColunasOcultas[freqHist]) || [];
+                            const colsVisiveisHist = colsHist.map((c, i) => ({ col: c, idx: i, oculta: colunasOcultasHist.includes(i) }));
+                            // Prioritários não é baseado num ciclo (dia da semana / semana do mês / etc.) como
+                            // as outras listas — então o histórico dele não usa a tabela de colunas: mostra só
+                            // o nome da tarefa e o dia em que foi concluída, no formato dia/mês (sem dia da
+                            // semana, sem ano).
+                            const ehHistPriorit = freqHist ? String(nomeGrupoFixa(freqHist) || '').toLowerCase().includes('priorit') : false;
+                            const formatarDiaMesHist = (iso) => {
+                                if (!iso)
+                                    return null;
+                                const [, mes, dia] = iso.split('-');
+                                return `${dia}/${mes}`;
+                            };
+                            // cálculo de porcentagem até a data corrente (sem contar datas futuras)
+                            const hoje2Hist = new Date();
+                            const maxIdxHojeHist = {
+                                diaria: hoje2Hist.getDay(),
+                                semanal: Math.min(Math.floor((hoje2Hist.getDate() - 1) / 7), 4),
+                                mensal: hoje2Hist.getMonth(),
+                                trimestral: Math.floor(hoje2Hist.getMonth() / 3),
+                                semestral: hoje2Hist.getMonth() < 6 ? 0 : 1,
+                                anual: 0,
+                            }[freqHist] ?? (colsHist.length - 1);
+                            const colsElegiveisHist = colsVisiveisHist.filter((c) => !c.oculta && c.idx <= maxIdxHojeHist);
+                            let totalFeitasHist = 0, totalPossivelHist = 0;
+                            itemsHist.forEach((t) => {
+                                colsElegiveisHist.forEach(({ idx }) => {
+                                    totalPossivelHist++;
+                                    if (t.historico && t.historico[idx])
+                                        totalFeitasHist++;
+                                });
+                            });
+                            const pctHist = totalPossivelHist > 0 ? Math.round((totalFeitasHist / totalPossivelHist) * 100) : 0;
+                            return (React.createElement(React.Fragment, null,
+                                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 } }, opcoesHist.map((o) => (React.createElement("button", { key: o.freq, onClick: () => {
+                                        // tocar num botão já preto fecha a tabela e devolve todos ao branco
+                                        const fechando = historicoAba === o.freq;
+                                        setHistoricoAba(fechando ? null : o.freq);
+                                        setHistoricoExpandido(!fechando);
+                                    }, style: {
+                                        fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20,
+                                        border: '1.5px solid', cursor: 'pointer',
+                                        background: historicoAba === o.freq ? '#232323' : '#fff',
+                                        color: historicoAba === o.freq ? '#fff' : '#777',
+                                        borderColor: historicoAba === o.freq ? '#232323' : '#ddd8c9',
+                                    } }, o.label)))),
+                                historicoExpandido && atualHist && (React.createElement(React.Fragment, null,
+                                    (() => {
+                                        const dias = [];
+                                        for (let i = 6; i >= 0; i--) {
+                                            const d = new Date();
+                                            d.setDate(d.getDate() - i);
+                                            const chave = d.toLocaleDateString('en-CA');
+                                            dias.push({
+                                                chave,
+                                                rotulo: d.toLocaleDateString('en-US', { weekday: 'long' }),
+                                                qtd: aberturasApp[chave] || 0,
+                                                hojeMesmo: i === 0,
+                                            });
+                                        }
+                                        const maior = Math.max(1, ...dias.map((d) => d.qtd));
+                                        const total7 = dias.reduce((s, d) => s + d.qtd, 0);
+                                        return (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
+                                            React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 } }, "\uD83D\uDCF1 Aberturas do app"),
+                                            React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 } },
+                                                React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: '#232323' } }, aberturasApp[hoje()] || 0),
+                                                React.createElement("span", { style: { fontSize: 12, color: '#999' } },
+                                                    "hoje \u00B7 ",
+                                                    total7,
+                                                    " nos \u00FAltimos 7 dias")),
+                                            React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6, height: 46 } }, dias.map((d) => (React.createElement("div", { key: d.chave, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 } },
+                                                React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: d.hojeMesmo ? '#232323' : '#a8a293' } }, d.qtd),
+                                                React.createElement("div", { style: {
+                                                        width: '100%',
+                                                        height: Math.max(3, Math.round((d.qtd / maior) * 24)),
+                                                        background: d.hojeMesmo ? '#5B7C99' : '#ddd8c9',
+                                                        borderRadius: 3,
+                                                    } }),
+                                                React.createElement("span", { style: { fontSize: 9.5, color: '#a8a293' } }, d.rotulo)))))));
+                                    })(),
+                                    React.createElement("div", { className: "mt-fixa-grupo-head", style: { marginBottom: 10 } },
+                                        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0, textTransform: 'uppercase' } }, labelHist),
+                                        React.createElement("div", { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+                                            React.createElement("button", { className: "mt-gear-btn", title: editandoHist ? 'Sair da edição' : 'Editar', onClick: () => setHistoricoEditando((h) => ({ ...h, [freqHist]: !h[freqHist] })) }, editandoHist ? '×' : '+'),
+                                            React.createElement("button", { className: "mt-recarregar-btn", onClick: () => arquivarTabela(freqHist), title: "Recarregar" }, "\uD83D\uDD04"))),
+                                    itemsHist.length > 0 && (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
+                                        React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 } }, "Rela\u00E7\u00E3o de tarefas completas"),
+                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                                            React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: '#232323' } },
+                                                totalFeitasHist,
+                                                "/",
+                                                totalPossivelHist),
+                                            React.createElement("span", { style: { fontSize: 15, color: corPct(pctHist), fontWeight: 700 } },
+                                                pctHist,
+                                                "%"),
+                                            React.createElement("div", { style: { flex: 1, height: 6, background: '#e7e5df', borderRadius: 3, overflow: 'hidden' } },
+                                                React.createElement("div", { style: { width: `${pctHist}%`, height: '100%', background: corPct(pctHist), borderRadius: 3, transition: 'width 0.4s' } }))))),
+                                    itemsHist.length === 0 ? (React.createElement("p", { className: "mt-empty" },
+                                        "Nenhuma tarefa ",
+                                        labelHist.toLowerCase(),
+                                        " ainda.")) : ehHistPriorit ? (React.createElement("div", { className: "mt-fixas-scroll" }, itemsHist.map((t) => (React.createElement("div", { key: t.id, className: "mt-fixa-item" },
+                                        React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#232323' } }, t.texto),
+                                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: t.feitoDia ? '#3E8E5A' : '#a8a293', flexShrink: 0 } }, formatarDiaMesHist(t.feitoDia) || 'não concluído')))))) : (React.createElement("div", { className: "mt-tabela-wrap" },
+                                        React.createElement("table", { className: "mt-tabela-historico" },
+                                            React.createElement("thead", null,
+                                                React.createElement("tr", null,
+                                                    React.createElement("th", null),
+                                                    colsVisiveisHist.map(({ col, idx, oculta }) => (!oculta || editandoHist) && (React.createElement("th", { key: idx }, editandoHist ? (React.createElement("button", { onClick: () => toggleColunaOculta(freqHist, idx), style: { background: oculta ? '#f0ede6' : 'transparent', border: oculta ? '1px solid #ddd' : 'none', borderRadius: 5, cursor: 'pointer', fontSize: 11, color: oculta ? '#aaa' : 'inherit', padding: '2px 4px', textDecoration: oculta ? 'line-through' : 'none' }, title: oculta ? 'Mostrar' : 'Ocultar' }, col)) : col))))),
+                                            React.createElement("tbody", null, itemsHist.map((t) => (React.createElement("tr", { key: t.id },
+                                                React.createElement("td", { className: "mt-tabela-nome" }, t.texto),
+                                                colsVisiveisHist.map(({ idx, oculta }) => (!oculta || editandoHist) && (React.createElement("td", { key: idx, style: oculta ? { opacity: 0.3 } : {} }, editandoHist ? ((t.historico && t.historico[idx])
+                                                    ? React.createElement("span", { className: "mt-tabela-marcada-edit", onClick: () => toggleHistoricoCell(t.id, idx) }, "\u2713")
+                                                    : React.createElement("span", { className: "mt-tabela-vazia", onClick: () => toggleHistoricoCell(t.id, idx) })) : ((t.historico && t.historico[idx]) ? React.createElement("span", { className: "mt-tabela-marca" }, "\u2713") : null))))))))))),
+                                    (() => {
+                                        const comsFreq = comentariosFixas.filter((c) => c.freq === freqHist);
+                                        return (React.createElement("div", { style: { marginTop: 16, paddingTop: 14, borderTop: '1px solid #f0efe9' } },
+                                            React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '0 0 6px', textTransform: 'uppercase' } }, "\uD83D\uDCAC Coment\u00E1rios"),
+                                            comsFreq.length === 0 ? (React.createElement("p", { className: "mt-empty", style: { margin: 0 } }, "Nenhum coment\u00E1rio registrado neste per\u00EDodo.")) : comsFreq.map((c) => (React.createElement("div", { className: "mt-fixa-item", key: c.id },
+                                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                                    React.createElement("span", { style: { display: 'block', fontSize: 13, color: '#232323', whiteSpace: 'pre-wrap' } }, c.texto),
+                                                    c.solucao && (React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#6E8C82', whiteSpace: 'pre-wrap', marginTop: 2 } },
+                                                        "\uD83D\uDCA1 Solu\u00E7\u00E3o: ",
+                                                        c.solucao)),
+                                                    React.createElement("span", { style: { fontSize: 11.5, color: '#999' } },
+                                                        rotuloPeriodo(freqHist, c.chave),
+                                                        " \u00B7 ",
+                                                        c.data)),
+                                                React.createElement("button", { className: "mt-del", onClick: () => removerComentario(c.id) }, "\u00D7"))))));
+                                    })(),
+                                    React.createElement("div", { style: { marginTop: 20, paddingTop: 16, borderTop: '1px solid #e7e5df' } },
+                                        React.createElement("h2", { className: "mt-section-title" }, "\uD83D\uDCD6 Livro das mem\u00F3rias"),
+                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                                            React.createElement("button", { className: "mt-backup-toggle", style: { marginTop: 0 }, onClick: () => { setMsgLivro(''); setLivroAberto((v) => !v); } }, livroAberto ? '▲ Esconder' : `▼ Ver registros (${livro.length})`),
+                                            React.createElement("button", { className: "mt-config-fixas-btn", onClick: () => setMostrarConfigLivroMemorias((v) => !v), title: mostrarConfigLivroMemorias ? 'Fechar configurações' : 'Configurações do livro das memórias' }, mostrarConfigLivroMemorias ? '×' : '⚙️')),
+                                        mostrarConfigLivroMemorias && (React.createElement("div", { style: { margin: '10px 0' } },
+                                            React.createElement(BotaoDesfazer, { janela: "livro" }))),
+                                        livroAberto && (React.createElement(React.Fragment, null,
+                                            React.createElement("div", { className: "mt-livro-lista" },
+                                                livro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nada registrado ainda. Toque em \"Recarregar\" nas tabelas acima pra arquivar a semana aqui."),
+                                                livro.map((r) => (React.createElement("div", { className: "mt-livro-item", key: r.id },
+                                                    React.createElement("span", { className: "mt-livro-texto" }, r.tarefa),
+                                                    React.createElement("span", { className: "mt-tempo-badge" },
+                                                        r.dia,
+                                                        " \u00B7 ",
+                                                        r.data))))),
+                                            React.createElement("div", { className: "mt-backup-actions", style: { marginTop: 12 } },
+                                                React.createElement("button", { className: "mt-btn-sm primary", onClick: copiarLivro }, "Copiar"),
+                                                confirmApagarLivro ? (React.createElement("button", { className: "mt-btn-sm", style: { borderColor: '#E8633D', color: '#E8633D' }, onClick: apagarLivro }, "Confirmar apagar?")) : (React.createElement("button", { className: "mt-btn-sm", onClick: () => setConfirmApagarLivro(true) }, "Apagar"))),
+                                            React.createElement("p", { className: "mt-backup-msg" }, msgLivro))))))));
+                        })())),
                 React.createElement("div", { style: { order: 998 } },
                     React.createElement("button", { className: "mt-backup-toggle", onClick: () => { setMsgBackup(''); setMostrarBackup((v) => !v); } }, mostrarBackup ? '▲ Esconder backup' : '▼ Backup manual (copiar / restaurar)'),
                     mostrarBackup && (React.createElement("div", { className: "mt-backup-panel" },
@@ -7677,10 +7802,7 @@ function App() {
                         React.createElement("div", { className: "mt-backup-actions" },
                             React.createElement("button", { className: "mt-btn-sm primary", onClick: colarRestaurar }, "Colar"),
                             React.createElement("button", { className: "mt-btn-sm", onClick: restaurarBackup, disabled: !textoRestaurar.trim() }, "Restaurar deste texto")),
-                        React.createElement("p", { className: "mt-backup-msg" }, msgBackup),
-                        React.createElement("p", { className: "mt-backup-label", style: { marginTop: 10, opacity: 0.65 } },
-                            "vers\u00E3o instalada: ",
-                            APP_VERSAO)))),
+                        React.createElement("p", { className: "mt-backup-msg" }, msgBackup)))),
                 React.createElement("div", { style: { order: 999, marginTop: 10 } },
                     React.createElement("button", { className: "mt-config-gear-btn", onClick: () => setMostrarConfiguracoes((v) => !v), title: "Configura\u00E7\u00F5es gerais" }, "\u2699\uFE0F"),
                     mostrarConfiguracoes && (React.createElement("div", { className: "mt-config-panel" },
@@ -7717,30 +7839,30 @@ function App() {
                     React.createElement("button", { className: "mt-btn-sm", onClick: fecharPrograma }, "Cancelar"),
                     React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#4A7FD9', color: '#fff' }, onClick: salvarPrograma }, "Salvar"))))),
         revealStage && (React.createElement("div", { className: "mt-backdrop", onClick: revealStage === 'contando' ? undefined : fecharReveal },
-            React.createElement("div", { className: `mt-reveal-card ${revealStage === 'contando' ? '' : revealStage}`, style: { '--cor': revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor }, onClick: (e) => e.stopPropagation() },
+            React.createElement("div", { className: `mt-reveal-card ${revealStage === 'contando' ? '' : revealStage}`, style: { '--cor': revealCat?.cor }, onClick: (e) => e.stopPropagation() },
                 revealStage !== 'contando' && (React.createElement("button", { className: "mt-reveal-close", onClick: fecharReveal, "aria-label": "fechar" }, "\u00D7")),
                 (revealStage === 'shuffling' || revealStage === 'result') && (React.createElement(React.Fragment, null,
-                    React.createElement("p", { className: "mt-reveal-eyebrow" }, revealCat === null || revealCat === void 0 ? void 0 : revealCat.nome),
+                    React.createElement("p", { className: "mt-reveal-eyebrow" }, revealCat?.nome),
                     React.createElement("p", { className: "mt-reveal-texto" }, revealStage === 'shuffling' ? 'embaralhando…' : revealTexto),
                     revealStage === 'result' && revealMinutos && (React.createElement("p", { className: "mt-meta-label", style: { marginBottom: 14 } },
                         "\u23F1 ",
                         revealMinutos < 60 ? `${revealMinutos} min` : '1 hora')),
                     revealStage === 'result' && (React.createElement("div", { className: "mt-reveal-actions" },
-                        React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor, color: '#fff' }, onClick: sortearOutra }, "Sortear outra"),
-                        ((revealCat === null || revealCat === void 0 ? void 0 : revealCat.tipo) === 'tempo' || revealMinutos) ? (React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#F2C94C', color: '#5a4a10' }, onClick: iniciarContador }, "\u23F1 Iniciar")) : (React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#F2C94C', color: '#5a4a10' }, onClick: vouFazer }, "Vou fazer")),
+                        React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: revealCat?.cor, color: '#fff' }, onClick: sortearOutra }, "Sortear outra"),
+                        (revealCat?.tipo === 'tempo' || revealMinutos) ? (React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#F2C94C', color: '#5a4a10' }, onClick: iniciarContador }, "\u23F1 Iniciar")) : (React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#F2C94C', color: '#5a4a10' }, onClick: vouFazer }, "Vou fazer")),
                         React.createElement("button", { className: "mt-btn-sm", onClick: fecharReveal }, "Fechar"))))),
                 revealStage === 'contando' && (React.createElement(React.Fragment, null,
                     React.createElement("p", { className: "mt-reveal-eyebrow" },
                         revealTexto,
                         pausado ? ' · pausado' : ''),
-                    React.createElement("p", { className: "mt-contador-digitos", style: { color: revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor } }, formatTempo(segundosDecorridos)),
+                    React.createElement("p", { className: "mt-contador-digitos", style: { color: revealCat?.cor } }, formatTempo(segundosDecorridos)),
                     revealMinutos && React.createElement("p", { className: "mt-meta-label" },
                         "meta: ",
                         revealMinutos,
                         " min"),
                     React.createElement("div", { className: "mt-reveal-actions" },
                         React.createElement("button", { className: "mt-btn-sm", onClick: pausarOuContinuar }, pausado ? '▶ Continuar' : '⏸ Pausa'),
-                        React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor, color: '#fff' }, onClick: pararContador }, "\u23F9 Parar")),
+                        React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: revealCat?.cor, color: '#fff' }, onClick: pararContador }, "\u23F9 Parar")),
                     React.createElement("div", { className: "mt-reveal-actions", style: { marginTop: 8 } },
                         React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#6E8C82', color: '#fff' }, onClick: marcarDone }, "\u2713 Done"))))))),
         confettiAtivo && (React.createElement("div", { className: "mt-confetti-overlay" }, confettiPecas.map((p) => (React.createElement("span", { key: p.id, className: "mt-confetti-piece", style: {
@@ -7754,5 +7876,4 @@ function App() {
             } })))))));
 }
 
-ReactDOM.createRoot(document.getElementById('root'))
-  .render(React.createElement(App));
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
