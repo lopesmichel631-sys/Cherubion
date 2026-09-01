@@ -1,6 +1,6 @@
 // Cherubion — miolo do app (gerado a partir do App.jsx, JSX já compilado para JS puro)
-// build: 2026-08-31 21:42 UTC
-window.__CHERUBION_VERSAO__ = "2026-08-31 21:42 UTC";
+// build: 2026-09-01 00:51 UTC
+window.__CHERUBION_VERSAO__ = "2026-09-01 00:51 UTC";
 const useState = React.useState;
 const useEffect = React.useEffect;
 const useRef = React.useRef;
@@ -969,6 +969,11 @@ const subirArquivoParaR2 = async (blob, nomeOriginal) => {
     return dados.url;
 };
 // ===== App =====
+// Carimbo do build. O montador grava window.__CHERUBION_VERSAO__ na primeira linha do
+// app.js; aqui só lemos. É o que aparece no rodapé do Backup e permite confirmar, de olho,
+// que a versão nova realmente entrou depois de substituir o app.js no GitHub.
+// 'dev' = rodando fora do app.js montado (ex: teste direto no artifact do Claude.ai).
+const APP_VERSAO = (typeof window !== 'undefined' && window.__CHERUBION_VERSAO__) || 'dev';
 function App() {
     const [categorias, setCategorias] = useState([]);
     const [fixas, setFixas] = useState([]);
@@ -5698,7 +5703,7 @@ function App() {
         catch (e) { /* localStorage indisponível: backup segue só com os dados do Minha Tela */ }
         return dados;
     };
-    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
+    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos(), configR2: lerConfigR2() }, null, 2);
     const copiarBackup = () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -5874,6 +5879,20 @@ function App() {
                     window.localStorage.setItem(CHAVE_STORAGE_CONTATOS, dados.baralhoDeContatos);
                 }
                 catch (e) { /* idem: não impede a restauração do resto */ }
+            }
+            // restaura a configuração do Cloudflare R2 (URL do Worker + token), se o backup tiver.
+            // Isso é o que evita ter de recolher URL e token do bloco de notas depois de uma
+            // limpeza do Safari ou troca de aparelho. Só sobrescreve quando o backup traz valor
+            // preenchido — um backup antigo (sem esse campo) ou com campo vazio não apaga uma
+            // configuração boa que já esteja no aparelho.
+            if (dados.configR2 && typeof dados.configR2 === 'object') {
+                const urlR2 = String(dados.configR2.url || '').trim();
+                const tokenR2 = String(dados.configR2.token || '').trim();
+                if (urlR2 && tokenR2) {
+                    salvarConfigR2(urlR2, tokenR2);
+                    setR2UrlDraft(urlR2);
+                    setR2TokenDraft(tokenR2);
+                }
             }
             setMsgBackup('Restaurado! Agora toque em "Salvar" no topo para guardar.');
             setSujo(true);
@@ -7802,7 +7821,10 @@ function App() {
                         React.createElement("div", { className: "mt-backup-actions" },
                             React.createElement("button", { className: "mt-btn-sm primary", onClick: colarRestaurar }, "Colar"),
                             React.createElement("button", { className: "mt-btn-sm", onClick: restaurarBackup, disabled: !textoRestaurar.trim() }, "Restaurar deste texto")),
-                        React.createElement("p", { className: "mt-backup-msg" }, msgBackup)))),
+                        React.createElement("p", { className: "mt-backup-msg" }, msgBackup),
+                        React.createElement("p", { style: { margin: '10px 0 0', fontSize: 11.5, color: '#a8a293', textAlign: 'center' } },
+                            "vers\u00E3o instalada: ",
+                            APP_VERSAO)))),
                 React.createElement("div", { style: { order: 999, marginTop: 10 } },
                     React.createElement("button", { className: "mt-config-gear-btn", onClick: () => setMostrarConfiguracoes((v) => !v), title: "Configura\u00E7\u00F5es gerais" }, "\u2699\uFE0F"),
                     mostrarConfiguracoes && (React.createElement("div", { className: "mt-config-panel" },
@@ -7822,6 +7844,19 @@ function App() {
                                         width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
                                         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                                     } }))),
+                        React.createElement("div", { style: { padding: '4px 0 14px', borderBottom: '1px solid #f0efe9', marginBottom: 12 } },
+                            React.createElement("p", { className: "mt-config-item-label", style: { marginBottom: 2 } }, "\uD83D\uDD04 Buscar atualiza\u00E7\u00E3o"),
+                            React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 8 } },
+                                "Recarrega o app agora, buscando o app.js mais novo do GitHub. Serve porque o iPhone suspende o app em vez de fechar: tocar no \u00EDcone \u00E0s vezes retoma a sess\u00E3o antiga sem procurar vers\u00E3o nova. Seus dados n\u00E3o s\u00E3o afetados \u2014 ficam guardados no aparelho, n\u00E3o no arquivo. Vers\u00E3o em uso agora: ",
+                                APP_VERSAO,
+                                "."),
+                            React.createElement("button", { className: "mt-btn-sm primary", onClick: () => {
+                                    // salva o que estiver pendente antes de recarregar, pra não perder
+                                    // nada que ainda não tenha passado pelo salvamento automático
+                                    if (salvarRef.current)
+                                        salvarRef.current();
+                                    setTimeout(() => { window.location.reload(); }, 400);
+                                } }, "\uD83D\uDD04 Buscar atualiza\u00E7\u00E3o agora")),
                         React.createElement("div", { style: { padding: '4px 0 0' } },
                             React.createElement("p", { className: "mt-config-item-label", style: { marginBottom: 2 } }, "\u2601\uFE0F Armazenamento de m\u00EDdia (Cloudflare R2)"),
                             React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 8 } }, "Endere\u00E7o e senha do Worker que guarda fotos e v\u00EDdeos. \u00C9 o mesmo Worker usado pelo Cofre de Notas e pelo Baralho de Contatos \u2014 configure uma vez aqui e os tr\u00EAs apps j\u00E1 enxergam (mesmo localStorage, mesma origem do GitHub Pages)."),
