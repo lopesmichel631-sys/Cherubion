@@ -1,12 +1,12 @@
-// Cherubion — miolo do app (gerado a partir do App.jsx, JSX já compilado para JS puro)
-// build: 2026-09-01 00:51 UTC
-window.__CHERUBION_VERSAO__ = "2026-09-01 00:51 UTC";
-const useState = React.useState;
-const useEffect = React.useEffect;
-const useRef = React.useRef;
-const useMemo = React.useMemo;
-
 "use strict";
+// ══════════════════════════════════════════════════════════════════
+// MIOLO DO CHERUBION (app.js) — gerado a partir do App.jsx.
+// Carimbo de versão gravado em horário da Califórnia (America/Los_Angeles,
+// já considera horário de verão automaticamente).
+// ══════════════════════════════════════════════════════════════════
+window.__CHERUBION_VERSAO__ = "2026-09-01 10:36";
+const { useState, useEffect, useRef, useMemo } = React;
+
 // ===== constantes =====
 // ======================================================================
 // Constantes de configuração do app: cores, listas de checklists, abas do Livro Razão,
@@ -44,6 +44,8 @@ const SNAT_BANK_SESSAO = '__snatbank';
 // id reservado da "sessão" que abre o painel Ganhos (notas por ano) dentro da aba Atividades
 // id reservado da "sessão" que abre o painel Ganhos (notas por ano) dentro da aba Atividades
 const GANHOS_SESSAO = '__ganhos';
+const DESBLOQUEIOS_SESSAO = '__desbloqueios';
+const ANTES_DE_IR_SESSAO = '__antesdeir';
 // id reservado da "sessão" que abre o painel Era de Ouro (registro por ano, mesmo molde do
 // painel Ganhos) dentro da aba Atividades
 const ERA_DE_OURO_SESSAO = '__eradeouro';
@@ -103,6 +105,13 @@ const ABAS_RAZAO_FIXAS = [
     { id: 'pump', nome: 'Pump', emoji: '💪', cor: '#6E8C82' },
     { id: 'pso', nome: 'Pso', emoji: '🧭', cor: '#8E6BAE' },
     { id: 'premiacao', nome: 'Premiação', emoji: '🏆', cor: '#BFA23A' },
+    { id: 'historia', nome: 'História', emoji: '📜', cor: '#8A6D3B' },
+];
+// tipos de evento padrão da aba História — protegidos (não podem ser apagados),
+// os demais que o Michel criar pelo ⚙️ entram soltos, sem essa marca
+const HIST_TIPOS_PADRAO = [
+    { id: 'geral', nome: 'Geral', fixo: true },
+    { id: 'civilizacoes', nome: 'Civilizações e Culturas', fixo: true },
 ];
 const ABAS_RAZAO = [...ABAS_RAZAO_FIXAS, ...CHECKLISTS];
 const ORDEM_ABAS_RAZAO_PADRAO = ABAS_RAZAO.map((a) => a.id);
@@ -235,8 +244,39 @@ const formatBH = (s) => {
         return `${m}min ${String(sec).padStart(2, '0')}s`;
     return `${sec}s`;
 };
-const formatCF = (s, valorHora) => `$ ${((s / 3600) * (valorHora ?? VALOR_HORA_PADRAO)).toFixed(2)}`;
+const formatCF = (s, valorHora) => `$ ${((s / 3600) * (valorHora !== null && valorHora !== void 0 ? valorHora : VALOR_HORA_PADRAO)).toFixed(2)}`;
 const formatMoeda = (v) => '$ ' + (Number(v) || 0).toFixed(2);
+// formata um ano interno (inteiro, pode ser negativo ou zero) da linha do tempo da aba
+// História em rótulo legível: negativo = a.C., positivo = d.C., zero = "Ano 0"
+const formatAnoHistoria = (ano) => {
+    const n = Number(ano) || 0;
+    if (n === 0)
+        return 'Ano 0';
+    return n < 0 ? `${Math.abs(n)} a.C.` : `${n} d.C.`;
+};
+// ---- badge de lembretes de hoje no atalho do Baralho de Contatos (📇) ----
+// lê o localStorage do app Contatos (chave 'baralho:v1') e conta quantos itens de
+// lembretes[] têm data === hoje. Data local (não toISOString, que é UTC e erra perto
+// da meia-noite).
+const pad2 = (n) => String(n).padStart(2, '0');
+const hojeISO = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+};
+const contarLembretesHoje = () => {
+    try {
+        const bruto = window.localStorage.getItem('baralho:v1');
+        if (!bruto)
+            return 0;
+        const dados = JSON.parse(bruto);
+        const lembretes = dados.lembretes || [];
+        const hoje = hojeISO();
+        return lembretes.filter((l) => l && l.data === hoje).length;
+    }
+    catch {
+        return 0;
+    }
+};
 // ---- Contador de prazo das tarefas fixas ----
 // prazoISO guarda a DATA-LIMITE (não o número de dias), assim a contagem cai sozinha a cada dia.
 // ---- Contador de prazo das tarefas fixas ----
@@ -968,12 +1008,85 @@ const subirArquivoParaR2 = async (blob, nomeOriginal) => {
         throw new Error('resposta do Worker sem url');
     return dados.url;
 };
+// ===== Visualizador de mídia em tela cheia =====
+// Abre foto/vídeo de qualquer registro em tamanho real, com zoom por pinça (dois dedos),
+// arrastar quando ampliado e duplo toque pra alternar entre 1x e 2.5x. Roda de mouse (scroll)
+// cobre o uso via trackpad/desktop. Reseta o zoom sempre que uma mídia nova é aberta.
+function VisualizadorMidia({ midia, onFechar }) {
+    const [escala, setEscala] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const pinchRef = useRef({ dist: 0, escalaInicial: 1 });
+    const panRef = useRef({ ativo: false, inicioX: 0, inicioY: 0, panInicial: { x: 0, y: 0 } });
+    const ultimoTapRef = useRef(0);
+    useEffect(() => {
+        setEscala(1);
+        setPan({ x: 0, y: 0 });
+    }, [midia]);
+    if (!midia)
+        return null;
+    const distanciaToques = (touches) => {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+    };
+    const onTouchStart = (e) => {
+        if (midia.tipo !== 'foto')
+            return; // vídeo usa os controles nativos, sem zoom próprio
+        if (e.touches.length === 2) {
+            pinchRef.current = { dist: distanciaToques(e.touches), escalaInicial: escala };
+        }
+        else if (e.touches.length === 1) {
+            const agora = Date.now();
+            if (agora - ultimoTapRef.current < 280) {
+                setEscala((s) => (s > 1 ? 1 : 2.5));
+                setPan({ x: 0, y: 0 });
+            }
+            ultimoTapRef.current = agora;
+            panRef.current = {
+                ativo: escala > 1,
+                inicioX: e.touches[0].clientX,
+                inicioY: e.touches[0].clientY,
+                panInicial: pan,
+            };
+        }
+    };
+    const onTouchMove = (e) => {
+        if (midia.tipo !== 'foto')
+            return;
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const novaDist = distanciaToques(e.touches);
+            const fator = novaDist / (pinchRef.current.dist || novaDist);
+            setEscala(Math.min(4, Math.max(1, pinchRef.current.escalaInicial * fator)));
+        }
+        else if (e.touches.length === 1 && panRef.current.ativo) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - panRef.current.inicioX;
+            const dy = e.touches[0].clientY - panRef.current.inicioY;
+            setPan({ x: panRef.current.panInicial.x + dx, y: panRef.current.panInicial.y + dy });
+        }
+    };
+    const onTouchEnd = () => {
+        panRef.current.ativo = false;
+        if (escala <= 1)
+            setPan({ x: 0, y: 0 });
+    };
+    const onWheel = (e) => {
+        if (midia.tipo !== 'foto')
+            return;
+        e.preventDefault();
+        const novaEscala = Math.min(4, Math.max(1, escala - e.deltaY * 0.01));
+        setEscala(novaEscala);
+        if (novaEscala <= 1)
+            setPan({ x: 0, y: 0 });
+    };
+    return (React.createElement("div", { className: "mt-lightbox-backdrop", onClick: (e) => { if (e.target === e.currentTarget)
+            onFechar(); } },
+        React.createElement("button", { className: "mt-lightbox-close", onClick: onFechar, title: "Fechar" }, "\u00D7"),
+        React.createElement("div", { className: "mt-lightbox-media-wrap", onTouchStart: onTouchStart, onTouchMove: onTouchMove, onTouchEnd: onTouchEnd, onWheel: onWheel }, midia.tipo === 'foto' ? (React.createElement("img", { src: midia.url, alt: "", className: "mt-lightbox-media", style: { transform: `translate(${pan.x}px, ${pan.y}px) scale(${escala})` }, draggable: false })) : (React.createElement("video", { src: midia.url, className: "mt-lightbox-media", controls: true, playsInline: true, autoPlay: false }))),
+        midia.tipo === 'foto' && React.createElement("p", { className: "mt-lightbox-dica" }, "Belisque ou d\u00EA duplo toque para dar zoom")));
+}
 // ===== App =====
-// Carimbo do build. O montador grava window.__CHERUBION_VERSAO__ na primeira linha do
-// app.js; aqui só lemos. É o que aparece no rodapé do Backup e permite confirmar, de olho,
-// que a versão nova realmente entrou depois de substituir o app.js no GitHub.
-// 'dev' = rodando fora do app.js montado (ex: teste direto no artifact do Claude.ai).
-const APP_VERSAO = (typeof window !== 'undefined' && window.__CHERUBION_VERSAO__) || 'dev';
 function App() {
     const [categorias, setCategorias] = useState([]);
     const [fixas, setFixas] = useState([]);
@@ -984,6 +1097,14 @@ function App() {
     const [comentarioRascunho, setComentarioRascunho] = useState({}); // { freq: texto sendo digitado }
     const [comentarioSolucao, setComentarioSolucao] = useState({}); // { freq: solução sendo digitada }
     const autoSalvarTimerRef = useRef(null); // temporizador do salvamento automático (debounce após cada ação)
+    // ---- salvamento automático (Configurações gerais): liga/desliga + intervalo em segundos ----
+    const [autoSalvarAtivo, setAutoSalvarAtivo] = useState(true);
+    const [autoSalvarSegundos, setAutoSalvarSegundos] = useState(1);
+    const [msgSalvarManual, setMsgSalvarManual] = useState('');
+    // ---- Notas Rápidas: contagem regressiva que salva a nota sozinha quando você para de
+    // digitar/ditar (é o "contador" separado do salvamento automático do app inteiro) ----
+    const [notaAutoSalvarAtivo, setNotaAutoSalvarAtivo] = useState(true);
+    const [notaAutoSalvarSegundos, setNotaAutoSalvarSegundos] = useState(4);
     // ‼️ espelho sempre atualizado da função salvar(). O rollover automático roda dentro de um
     // setInterval/useEffect criado uma única vez, então a salvar() capturada ali fica congelada no
     // primeiro render — salvava o estado ANTIGO por cima do rollover recém-feito. Usando o ref,
@@ -1015,6 +1136,29 @@ function App() {
     // ---- livro razão: saldo + lançamentos de gastos (extrato) ----
     const [razaoTabSelecionada, setRazaoTabSelecionada] = useState('best'); // aba ativa no card unificado do Livro Razão
     const [ordemAbasRazao, setOrdemAbasRazao] = useState(ORDEM_ABAS_RAZAO_PADRAO); // ordem dos botões das abas
+    // ---- livro razão: aba História — linha do tempo com pontos por ano, filtrável por tipo ----
+    const [histEventos, setHistEventos] = useState([]); // [{id, tipo, ano, texto}]
+    const [histTipos, setHistTipos] = useState(HIST_TIPOS_PADRAO); // [{id, nome, fixo?}]
+    const [histTipoSelecionado, setHistTipoSelecionado] = useState('geral'); // tipo ativo: filtra a linha do tempo e é o tipo do próximo evento registrado
+    const [histEscala, setHistEscala] = useState('anos'); // 'anos' | 'seculo' — densidade da linha do tempo
+    const [histConfigAberto, setHistConfigAberto] = useState(false); // com o ⚙️ aberto: textos editáveis, × de apagar e criação de novo tipo
+    const [histNovoTexto, setHistNovoTexto] = useState('');
+    const [histNovoAno, setHistNovoAno] = useState('');
+    const [histNovoEra, setHistNovoEra] = useState('dC'); // 'dC' | 'aC'
+    const [histNovoTipoNome, setHistNovoTipoNome] = useState('');
+    const [msgHistoria, setMsgHistoria] = useState('');
+    // ---- badge do atalho do Baralho de Contatos: quantos lembretes vencem hoje ----
+    const [lembretesHoje, setLembretesHoje] = useState(0);
+    useEffect(() => {
+        const atualizarLembretesHoje = () => setLembretesHoje(contarLembretesHoje());
+        atualizarLembretesHoje();
+        document.addEventListener('visibilitychange', atualizarLembretesHoje);
+        window.addEventListener('focus', atualizarLembretesHoje);
+        return () => {
+            document.removeEventListener('visibilitychange', atualizarLembretesHoje);
+            window.removeEventListener('focus', atualizarLembretesHoje);
+        };
+    }, []);
     const [saldoLivroRazao, setSaldoLivroRazao] = useState(0);
     const [livroRazao, setLivroRazao] = useState([]); // [{id, valor, descricao, data, dataISO}]
     const [novoGastoValor, setNovoGastoValor] = useState('');
@@ -1062,6 +1206,9 @@ function App() {
     const faceVideoInputRef = useRef(null);
     const [faceExpandido, setFaceExpandido] = useState(false);
     const [confirmApagarFace, setConfirmApagarFace] = useState(false);
+    // com o ⚙️ fechado, o × de apagar some do Registro de Face (evita apagar sem querer);
+    // abre o mesmo padrão já usado no Livro Razão
+    const [faceRegistroConfigAberto, setFaceRegistroConfigAberto] = useState(false);
     const [msgFace, setMsgFace] = useState('');
     // ---- 💰 Bank (aba Finanças): saldo + registro de lançamentos com % vs. o lançamento anterior ----
     const [bankSaldo, setBankSaldo] = useState(0);
@@ -1135,6 +1282,18 @@ function App() {
     const [ganhosNovoTexto, setGanhosNovoTexto] = useState('');
     const [ganhosAnoSelecionado, setGanhosAnoSelecionado] = useState(new Date().getFullYear());
     const [ganhosAnoAberto, setGanhosAnoAberto] = useState({}); // { [ano]: bool } — controla a seta de expandir cada ano
+    // ---- sessão "Desbloqueios" (Atividades): valor em US$ + nota curta, sempre ordenado do menor pro maior ----
+    const [desbloqueiosRegistro, setDesbloqueiosRegistro] = useState([]); // [{id, valor, nota}]
+    const [desbloqueiosNovoValor, setDesbloqueiosNovoValor] = useState('');
+    const [desbloqueiosNovoNota, setDesbloqueiosNovoNota] = useState('');
+    const [desbloqueiosEditandoId, setDesbloqueiosEditandoId] = useState(null);
+    const [desbloqueiosEditValor, setDesbloqueiosEditValor] = useState('');
+    const [desbloqueiosEditNota, setDesbloqueiosEditNota] = useState('');
+    // ---- sessão "Antes de ir" (Atividades): checklist de última hora, com um botão "Programa"
+    // por item (mesmo padrão do Contador/Realidade) e um "Feito" que move o item pra Concluídos ----
+    const [antesDeIrPendentes, setAntesDeIrPendentes] = useState([]); // [{id, texto, programa}]
+    const [antesDeIrConcluidos, setAntesDeIrConcluidos] = useState([]); // [{id, texto, programa}]
+    const [antesDeIrNovoTexto, setAntesDeIrNovoTexto] = useState('');
     // Era de Ouro: mesmo molde do painel Ganhos (registro agrupado por ano) dentro da aba Atividades
     const [eraDeOuroRegistro, setEraDeOuroRegistro] = useState([]); // [{id, ano, texto, data, dataISO}]
     const [eraDeOuroNovoTexto, setEraDeOuroNovoTexto] = useState('');
@@ -1330,6 +1489,9 @@ function App() {
     // ---- contador de aberturas do app por dia: { 'AAAA-MM-DD': quantidade } ----
     const [aberturasApp, setAberturasApp] = useState({});
     const aberturaContadaRef = useRef(false); // garante 1 contagem por abertura, não por render
+    // ---- visualizador de mídia em tela cheia: clicar numa miniatura de foto/vídeo de
+    // qualquer registro (Face, Notas, Pso) abre em tamanho real, com zoom ----
+    const [midiaAmpliada, setMidiaAmpliada] = useState(null); // { tipo: 'foto' | 'video', url } | null
     // ---- celebração de 100% (confetti + fanfarra) ----
     const [confettiAtivo, setConfettiAtivo] = useState(false);
     const [confettiPecas, setConfettiPecas] = useState([]);
@@ -1395,6 +1557,10 @@ function App() {
                 setNotasPastaCmeeSeed(true);
                 setBancoDeHoras(dados.bancoDeHoras || 0);
                 setValorHora(typeof dados.valorHora === 'number' ? dados.valorHora : VALOR_HORA_PADRAO);
+                setAutoSalvarAtivo(typeof dados.autoSalvarAtivo === 'boolean' ? dados.autoSalvarAtivo : true);
+                setAutoSalvarSegundos(typeof dados.autoSalvarSegundos === 'number' ? dados.autoSalvarSegundos : 1);
+                setNotaAutoSalvarAtivo(typeof dados.notaAutoSalvarAtivo === 'boolean' ? dados.notaAutoSalvarAtivo : true);
+                setNotaAutoSalvarSegundos(typeof dados.notaAutoSalvarSegundos === 'number' ? dados.notaAutoSalvarSegundos : 4);
                 setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? { ...REGRAS_ESTRELAS_PADRAO, ...dados.regrasEstrelas } : REGRAS_ESTRELAS_PADRAO);
                 setGruposCustom(dados.gruposCustom || []);
                 {
@@ -1410,6 +1576,8 @@ function App() {
                 setCorteDeCabeloRegistro(Array.isArray(dados.corteDeCabeloRegistro) ? dados.corteDeCabeloRegistro : []);
                 setMedidasRegistro(Array.isArray(dados.medidasRegistro) ? dados.medidasRegistro : []);
                 setFaceRegistro(Array.isArray(dados.faceRegistro) ? dados.faceRegistro : []);
+                setHistEventos(Array.isArray(dados.histEventos) ? dados.histEventos : []);
+                setHistTipos(Array.isArray(dados.histTipos) && dados.histTipos.length ? dados.histTipos : HIST_TIPOS_PADRAO);
                 setBankSaldo(typeof dados.bankSaldo === 'number' ? dados.bankSaldo : 0);
                 setBankRegistro(Array.isArray(dados.bankRegistro) ? dados.bankRegistro : []);
                 setSnatBankSaldo(typeof dados.snatBankSaldo === 'number' ? dados.snatBankSaldo : 0);
@@ -1431,6 +1599,9 @@ function App() {
                     setChecklistSessoes(chk.sessoes);
                 }
                 setGanhosRegistro(Array.isArray(dados.ganhosRegistro) ? dados.ganhosRegistro : []);
+                setDesbloqueiosRegistro(Array.isArray(dados.desbloqueiosRegistro) ? dados.desbloqueiosRegistro : []);
+                setAntesDeIrPendentes(Array.isArray(dados.antesDeIrPendentes) ? dados.antesDeIrPendentes : []);
+                setAntesDeIrConcluidos(Array.isArray(dados.antesDeIrConcluidos) ? dados.antesDeIrConcluidos : []);
                 setEraDeOuroRegistro(Array.isArray(dados.eraDeOuroRegistro) ? dados.eraDeOuroRegistro : []);
                 setMomentumRegistro(Array.isArray(dados.momentumRegistro) ? dados.momentumRegistro : []);
                 setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
@@ -1604,7 +1775,7 @@ function App() {
         }
         setStatus('Salvando…');
         try {
-            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (ok) {
                 setSujo(false);
                 marcarQueJaUsou(); // a partir daqui, storage vazio = dados apagados, não estreia
@@ -1618,7 +1789,7 @@ function App() {
         catch (e) {
             // window.storage falhou (comum no preview do Claude.ai). Grava no localStorage real:
             // os dados ficam salvos e não mostramos alarme falso.
-            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (salvouLocal) {
                 setSujo(false);
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -1870,6 +2041,9 @@ function App() {
             case 'faceRegistro':
                 restaurarEmLista(setFaceRegistro, item.valor, item.idx);
                 break;
+            case 'eventoHistoria':
+                restaurarEmLista(setHistEventos, item.valor, item.idx);
+                break;
             case 'lancamentoBank':
                 restaurarEmLista(setBankRegistro, item.valor, item.idx);
                 setBankSaldo((s) => s + item.valor.valor); // refaz o efeito do lançamento no saldo
@@ -1978,20 +2152,22 @@ function App() {
                 opacity: ativo ? 1 : 0.6,
             }, onClick: () => desfazerNaJanela(janela) }, "\u21A9 Desfazer exclus\u00E3o"));
     };
-    // Salvamento automático: 1 segundo depois de qualquer ação (toque, adição, edição, etc.),
-    // salva sozinho — sem precisar tocar em "Salvar" manualmente.
+    // Salvamento automático: X segundos depois de qualquer ação (toque, adição, edição, etc.),
+    // salva sozinho — sem precisar tocar em "Salvar" manualmente. Pode ser desligado e o intervalo
+    // ajustado em ⚙️ Configurações gerais; com ele desligado, use o botão "💾 Salvar agora" lá mesmo.
     useEffect(() => {
-        if (sujo) {
+        if (sujo && autoSalvarAtivo) {
             if (autoSalvarTimerRef.current)
                 clearTimeout(autoSalvarTimerRef.current);
-            autoSalvarTimerRef.current = setTimeout(() => { salvar(); }, 1000);
+            const ms = Math.max(1, Number(autoSalvarSegundos) || 1) * 1000;
+            autoSalvarTimerRef.current = setTimeout(() => { salvar(); }, ms);
         }
         return () => {
             if (autoSalvarTimerRef.current)
                 clearTimeout(autoSalvarTimerRef.current);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sujo]);
+    }, [sujo, autoSalvarAtivo, autoSalvarSegundos]);
     // valor de % representativo de cada medalha manual — usado só para manter a cascata de cálculo
     // (soma/divide) coerente quando o usuário troca uma medalha manualmente
     const PCT_REPRESENTATIVO_MEDALHA = { bronze: 33, prata: 60, ouro: 99, diamante: 100 };
@@ -2558,7 +2734,7 @@ function App() {
         // se já está na lista aguardando com tempo, retoma
         const existente = itemAguardandoNaLista(revealTexto);
         if (existente && existente.tempoGasto) {
-            iniciarTimerDoItem(existente, revealCat?.cor);
+            iniciarTimerDoItem(existente, revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor);
             return;
         }
         if (intervalRef.current)
@@ -2605,7 +2781,7 @@ function App() {
         // nunca duplica: remove existente antes de adicionar
         setLista((l) => {
             const semDup = l.filter((i) => i.texto !== revealTexto || i.status !== 'aguardando');
-            return [...semDup, { id: genId(), texto: revealTexto, cor: revealCat?.cor || CORES[0], status: 'aguardando', tempoGasto: decorridos, premiacao: revealPremiacao }];
+            return [...semDup, { id: genId(), texto: revealTexto, cor: (revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor) || CORES[0], status: 'aguardando', tempoGasto: decorridos, premiacao: revealPremiacao }];
         });
         marcarSujo();
         fecharReveal();
@@ -2620,7 +2796,7 @@ function App() {
         }
         setLista((l) => {
             const semDup = l.filter((i) => i.texto !== revealTexto || i.status !== 'aguardando');
-            return [...semDup, { id: genId(), texto: revealTexto, cor: revealCat?.cor || CORES[0], status: 'feito', feitoEm: new Date().toISOString(), tempoGasto: decorridos, premiacao: revealPremiacao }];
+            return [...semDup, { id: genId(), texto: revealTexto, cor: (revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor) || CORES[0], status: 'feito', feitoEm: new Date().toISOString(), tempoGasto: decorridos, premiacao: revealPremiacao }];
         });
         marcarSujo();
         fecharReveal();
@@ -2649,7 +2825,7 @@ function App() {
             fecharReveal();
             return;
         } // já está, não duplica
-        setLista((l) => [...l, { id: genId(), texto: revealTexto, cor: revealCat?.cor || CORES[0], status: 'aguardando', premiacao: revealPremiacao }]);
+        setLista((l) => [...l, { id: genId(), texto: revealTexto, cor: (revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor) || CORES[0], status: 'aguardando', premiacao: revealPremiacao }]);
         marcarSujo();
         fecharReveal();
     };
@@ -3360,6 +3536,56 @@ function App() {
         setConfirmApagarPso(false);
         marcarSujo();
     };
+    // ---- livro razão: aba História — CRUD de eventos e tipos ----
+    const genIdHistoria = () => 'h' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const adicionarEventoHistoria = () => {
+        const texto = histNovoTexto.trim();
+        if (!texto) {
+            setMsgHistoria('Escreva o texto do evento.');
+            return;
+        }
+        if (histNovoAno.trim() === '') {
+            setMsgHistoria('Informe o ano.');
+            return;
+        }
+        const magnitude = Math.abs(parseInt(histNovoAno, 10));
+        if (Number.isNaN(magnitude)) {
+            setMsgHistoria('Ano inválido.');
+            return;
+        }
+        const ano = magnitude === 0 ? 0 : (histNovoEra === 'aC' ? -magnitude : magnitude);
+        setHistEventos((prev) => [...prev, { id: genIdHistoria(), tipo: histTipoSelecionado, ano, texto }]);
+        setHistNovoTexto('');
+        setHistNovoAno('');
+        setMsgHistoria('');
+    };
+    const removerEventoHistoria = (id) => {
+        const idx = histEventos.findIndex((x) => x.id === id);
+        if (idx !== -1)
+            registrarDesfazer('livroRazao', 'eventoHistoria', { valor: histEventos[idx], idx });
+        setHistEventos((prev) => prev.filter((x) => x.id !== id));
+    };
+    const editarTextoEventoHistoria = (id, novoTexto) => {
+        setHistEventos((prev) => prev.map((x) => (x.id === id ? { ...x, texto: novoTexto } : x)));
+    };
+    const adicionarTipoHistoria = () => {
+        const nome = histNovoTipoNome.trim();
+        if (!nome)
+            return;
+        const id = 'custom_' + genIdHistoria();
+        setHistTipos((prev) => [...prev, { id, nome, fixo: false }]);
+        setHistNovoTipoNome('');
+        setHistTipoSelecionado(id);
+    };
+    const removerTipoHistoria = (id) => {
+        const tipo = histTipos.find((t) => t.id === id);
+        if (!tipo || tipo.fixo)
+            return; // tipos padrão (Geral, Civilizações e Culturas) não podem ser apagados
+        setHistTipos((prev) => prev.filter((t) => t.id !== id));
+        setHistEventos((prev) => prev.filter((e) => e.tipo !== id));
+        if (histTipoSelecionado === id)
+            setHistTipoSelecionado('geral');
+    };
     // ---- checklists do Livro Razão (Prefeituras, Development, Skill, Snat, PE, B.E.S.T.) ----
     // Tudo aqui é genérico: recebe o id do checklist e trabalha só dentro dele.
     const chkItensDe = (chkId) => checklistItens[chkId] || [];
@@ -3371,7 +3597,7 @@ function App() {
         ...(chkId === 'development' ? [{ id: CORTE_SESSAO, nome: '💇 Cabelo' }, { id: MEDIDAS_SESSAO, nome: '📏 Medidas' }, { id: FACE_SESSAO, nome: '🧴 Face' }] : []),
         ...(chkId === 'financas' ? [{ id: BANK_SESSAO, nome: '💰 Bank' }] : []),
         ...(chkId === 'snat' ? [{ id: SNAT_BANK_SESSAO, nome: '💰 Bank' }] : []),
-        ...(chkId === 'atividades' ? [{ id: GANHOS_SESSAO, nome: 'Ganhos' }, { id: ERA_DE_OURO_SESSAO, nome: 'Era de Ouro' }, { id: BATALHA_SESSAO, nome: '⚔️ Batalha' }, { id: CONTADOR_SESSAO, nome: '⏳ Contador' }, { id: MOMENTUM_SESSAO, nome: 'Momentum' }] : []),
+        ...(chkId === 'atividades' ? [{ id: GANHOS_SESSAO, nome: 'Ganhos' }, { id: DESBLOQUEIOS_SESSAO, nome: 'Desbloqueios' }, { id: ANTES_DE_IR_SESSAO, nome: 'Antes de ir' }, { id: ERA_DE_OURO_SESSAO, nome: 'Era de Ouro' }, { id: BATALHA_SESSAO, nome: '⚔️ Batalha' }, { id: CONTADOR_SESSAO, nome: '⏳ Contador' }, { id: MOMENTUM_SESSAO, nome: 'Momentum' }] : []),
         ...(chkId === 'prefeituras' ? [{ id: CAR_SESSAO, nome: '🚗 Car' }] : []),
         // sessão fixa "Já Tenho" (checklist normal, botão "Priority" padrão) — só na aba Skill
         ...(chkId === 'skill' ? [{ id: JA_TENHO_SESSAO, nome: 'Já Tenho' }] : []),
@@ -3528,14 +3754,20 @@ function App() {
     // Botão "Programa" (aba Realidade): abre a janela de texto livre ligada à tarefa.
     const abrirPrograma = (chkId, id) => {
         const item = chkItensDe(chkId).find((i) => i.id === id);
-        setProgramaTextoEdit(item?.programa || '');
+        setProgramaTextoEdit((item === null || item === void 0 ? void 0 : item.programa) || '');
         setProgramaAberto({ fonte: 'checklist', chkId, itemId: id });
     };
     // Mesmo botão "Programa", agora também disponível nos itens do ⏳ Contador Regressivo.
     const abrirProgramaContador = (id) => {
         const item = contadoresRegressivos.find((c) => c.id === id);
-        setProgramaTextoEdit(item?.programa || '');
+        setProgramaTextoEdit((item === null || item === void 0 ? void 0 : item.programa) || '');
         setProgramaAberto({ fonte: 'contador', id });
+    };
+    // Mesmo botão "Programa", agora também disponível nos itens de Antes de ir (pendentes ou já concluídos).
+    const abrirProgramaAntesDeIr = (id) => {
+        const item = antesDeIrPendentes.find((i) => i.id === id) || antesDeIrConcluidos.find((i) => i.id === id);
+        setProgramaTextoEdit((item === null || item === void 0 ? void 0 : item.programa) || '');
+        setProgramaAberto({ fonte: 'antesdeir', id });
     };
     const salvarPrograma = () => {
         if (!programaAberto)
@@ -3543,6 +3775,11 @@ function App() {
         if (programaAberto.fonte === 'contador') {
             const { id } = programaAberto;
             setContadoresRegressivos((l) => l.map((c) => (c.id === id ? { ...c, programa: programaTextoEdit } : c)));
+        }
+        else if (programaAberto.fonte === 'antesdeir') {
+            const { id } = programaAberto;
+            setAntesDeIrPendentes((l) => l.map((i) => (i.id === id ? { ...i, programa: programaTextoEdit } : i)));
+            setAntesDeIrConcluidos((l) => l.map((i) => (i.id === id ? { ...i, programa: programaTextoEdit } : i)));
         }
         else {
             const { chkId, itemId } = programaAberto;
@@ -3766,6 +4003,63 @@ function App() {
         setGanhosRegistro((l) => l.filter((r) => r.id !== id));
         marcarSujo();
     };
+    // Desbloqueios: valor em US$ (número) + nota curta, sem agrupamento — a lista inteira
+    // é sempre reordenada do menor valor pro maior na hora de exibir.
+    const adicionarRegistroDesbloqueio = () => {
+        const valor = parseFloat(String(desbloqueiosNovoValor).replace(',', '.'));
+        const nota = desbloqueiosNovoNota.trim();
+        if (Number.isNaN(valor) || !nota)
+            return;
+        setDesbloqueiosRegistro((l) => [...l, { id: genId(), valor, nota }]);
+        setDesbloqueiosNovoValor('');
+        setDesbloqueiosNovoNota('');
+        marcarSujo();
+    };
+    const removerRegistroDesbloqueio = (id) => {
+        setDesbloqueiosRegistro((l) => l.filter((r) => r.id !== id));
+        if (desbloqueiosEditandoId === id)
+            setDesbloqueiosEditandoId(null);
+        marcarSujo();
+    };
+    const iniciarEdicaoDesbloqueio = (r) => {
+        setDesbloqueiosEditandoId(r.id);
+        setDesbloqueiosEditValor(String(r.valor));
+        setDesbloqueiosEditNota(r.nota);
+    };
+    const salvarEdicaoDesbloqueio = () => {
+        const valor = parseFloat(String(desbloqueiosEditValor).replace(',', '.'));
+        const nota = desbloqueiosEditNota.trim();
+        if (Number.isNaN(valor) || !nota)
+            return;
+        setDesbloqueiosRegistro((l) => l.map((r) => (r.id === desbloqueiosEditandoId ? { ...r, valor, nota } : r)));
+        setDesbloqueiosEditandoId(null);
+        marcarSujo();
+    };
+    // Antes de ir: adiciona na lista de pendentes; "Feito" move pra Concluídos; × remove sem completar.
+    const adicionarAntesDeIr = () => {
+        const texto = antesDeIrNovoTexto.trim();
+        if (!texto)
+            return;
+        setAntesDeIrPendentes((l) => [...l, { id: genId(), texto, programa: '' }]);
+        setAntesDeIrNovoTexto('');
+        marcarSujo();
+    };
+    const marcarAntesDeIrFeito = (id) => {
+        const item = antesDeIrPendentes.find((i) => i.id === id);
+        if (!item)
+            return;
+        setAntesDeIrPendentes((l) => l.filter((i) => i.id !== id));
+        setAntesDeIrConcluidos((l) => [item, ...l]);
+        marcarSujo();
+    };
+    const removerAntesDeIrPendente = (id) => {
+        setAntesDeIrPendentes((l) => l.filter((i) => i.id !== id));
+        marcarSujo();
+    };
+    const removerAntesDeIrConcluido = (id) => {
+        setAntesDeIrConcluidos((l) => l.filter((i) => i.id !== id));
+        marcarSujo();
+    };
     // Era de Ouro: mesmo padrão de agrupamento por ano do Ganhos (mesma lógica de add/remover)
     const adicionarRegistroEraDeOuro = () => {
         const texto = eraDeOuroNovoTexto.trim();
@@ -3855,6 +4149,67 @@ function App() {
                             React.createElement("button", { className: "mt-del", onClick: () => removerRegistroGanhos(r.id) }, "\u00D7"))))))));
             })));
     };
+    // Painel "Desbloqueios": valor em US$ + nota curta, lista plana (sem agrupar por ano),
+    // sempre ordenada do menor valor pro maior — o menor aparece no topo.
+    const renderDesbloqueios = () => {
+        const ordenado = desbloqueiosRegistro.slice().sort((a, b) => a.valor - b.valor);
+        return (React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "mt-premio-secao" },
+                React.createElement("p", { className: "mt-premio-secao-titulo" }, "Desbloqueios"),
+                React.createElement("p", { style: { fontSize: 12, color: '#999', marginTop: -4, marginBottom: 10 } }, "Registre um valor em d\u00F3lares e uma nota curta. A lista fica sempre ordenada do menor valor (topo) pro maior (embaixo)."),
+                React.createElement("div", { className: "mt-premio-saque-row" },
+                    React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "decimal", placeholder: "Valor (US$)", value: desbloqueiosNovoValor, onChange: (e) => setDesbloqueiosNovoValor(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarRegistroDesbloqueio(), style: { flex: '0 0 110px' } }),
+                    React.createElement("input", { className: "mt-nota-input", placeholder: "Nota curta\u2026", value: desbloqueiosNovoNota, onChange: (e) => setDesbloqueiosNovoNota(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarRegistroDesbloqueio() }),
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarRegistroDesbloqueio }, "Adicionar"))),
+            React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 6 } },
+                ordenado.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum desbloqueio registrado ainda."),
+                ordenado.map((r) => (React.createElement("div", { key: r.id, className: "mt-fixa-item" }, desbloqueiosEditandoId === r.id ? (React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { flex: 1, display: 'flex', gap: 8, minWidth: 0 } },
+                        React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "decimal", value: desbloqueiosEditValor, onChange: (e) => setDesbloqueiosEditValor(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoDesbloqueio(), style: { flex: '0 0 90px' } }),
+                        React.createElement("input", { className: "mt-nota-input", value: desbloqueiosEditNota, onChange: (e) => setDesbloqueiosEditNota(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoDesbloqueio() })),
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarEdicaoDesbloqueio }, "Salvar"),
+                    React.createElement("button", { className: "mt-btn-sm", onClick: () => setDesbloqueiosEditandoId(null) }, "Cancelar"))) : (React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 } },
+                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: '#57A773', flexShrink: 0 } }, formatMoeda(r.valor)),
+                        React.createElement("span", { style: { fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.nota)),
+                    React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoDesbloqueio(r), title: "Editar" }, "\u270E"),
+                    React.createElement("button", { className: "mt-del", onClick: () => removerRegistroDesbloqueio(r.id) }, "\u00D7")))))))));
+    };
+    // Painel "Antes de ir": checklist de última hora — caixa de texto + Adicionar; cada item
+    // pendente ganha um botão "Programa" (igual ao do Contador/Realidade, texto livre por item)
+    // e um "Feito", que tira o item daqui e manda pra lista de Concluídos logo abaixo.
+    const renderAntesDeIr = () => (React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "mt-premio-secao" },
+            React.createElement("p", { className: "mt-premio-secao-titulo" }, "\uD83E\uDDF3 Antes de ir"),
+            React.createElement("div", { className: "mt-premio-saque-row" },
+                React.createElement("input", { className: "mt-nota-input", placeholder: "O que n\u00E3o pode esquecer\u2026", value: antesDeIrNovoTexto, onChange: (e) => setAntesDeIrNovoTexto(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarAntesDeIr() }),
+                React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarAntesDeIr }, "Adicionar"))),
+        React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 6 } },
+            antesDeIrPendentes.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nada pendente \u2014 adicione algo acima."),
+            antesDeIrPendentes.map((it) => (React.createElement("div", { key: it.id, className: "mt-fixa-item", style: { alignItems: 'center' } },
+                React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, it.texto),
+                React.createElement("button", { onClick: () => abrirProgramaAntesDeIr(it.id), title: it.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
+                        flexShrink: 0, fontSize: 10.5, fontWeight: 700, padding: '4px 9px',
+                        borderRadius: 20, border: '1.5px solid', cursor: 'pointer',
+                        background: it.programa ? '#4A7FD9' : '#fff',
+                        color: it.programa ? '#fff' : '#4A7FD9',
+                        borderColor: '#4A7FD9',
+                    } }, "Programa"),
+                React.createElement("button", { className: "mt-btn-sm primary", style: { flexShrink: 0 }, onClick: () => marcarAntesDeIrFeito(it.id) }, "Feito"),
+                React.createElement("button", { className: "mt-del", onClick: () => removerAntesDeIrPendente(it.id) }, "\u00D7"))))),
+        React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '16px 0 4px' } }, "CONCLU\u00CDDOS"),
+        React.createElement("div", { className: "mt-fixas-scroll" },
+            antesDeIrConcluidos.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum item conclu\u00EDdo ainda."),
+            antesDeIrConcluidos.map((it) => (React.createElement("div", { key: it.id, className: "mt-fixa-item", style: { alignItems: 'center' } },
+                React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#999', textDecoration: 'line-through', wordBreak: 'break-word' } }, it.texto),
+                React.createElement("button", { onClick: () => abrirProgramaAntesDeIr(it.id), title: it.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
+                        flexShrink: 0, fontSize: 10.5, fontWeight: 700, padding: '4px 9px',
+                        borderRadius: 20, border: '1.5px solid', cursor: 'pointer',
+                        background: it.programa ? '#4A7FD9' : '#fff',
+                        color: it.programa ? '#fff' : '#4A7FD9',
+                        borderColor: '#4A7FD9',
+                    } }, "Programa"),
+                React.createElement("button", { className: "mt-del", onClick: () => removerAntesDeIrConcluido(it.id) }, "\u00D7")))))));
     // Painel "Era de Ouro": idêntico ao Ganhos (registro agrupado por ano), mas sem o grupo
     // especial "Lary" — aqui só existe "Indefinido" no fim da lista, já que é uma memória própria.
     // eraDeOuroRegistro é totalmente separado de ganhosRegistro.
@@ -4072,17 +4427,48 @@ function App() {
             msgFace && React.createElement("p", { className: "mt-premio-msg" }, msgFace)),
         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
             React.createElement("button", { className: "mt-discreto-btn", onClick: () => setFaceExpandido((v) => !v), title: faceExpandido ? 'Ocultar registro' : 'Ver registro de Face' }, faceExpandido ? '▲' : '▼'),
-            React.createElement("span", { style: { fontSize: 12, color: '#999' } }, "Registro de Face")),
+            React.createElement("span", { style: { fontSize: 12, color: '#999' } }, "Registro de Face"),
+            faceExpandido && (React.createElement("button", { className: "mt-discreto-btn", style: { marginLeft: 'auto' }, onClick: () => setFaceRegistroConfigAberto((v) => !v), title: faceRegistroConfigAberto ? 'Fechar configurações' : 'Configurações do registro' }, faceRegistroConfigAberto ? '×' : '⚙️'))),
         faceExpandido && (React.createElement(React.Fragment, null,
             React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                 faceRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum registro ainda."),
                 faceRegistro.map((r, i) => (React.createElement("div", { key: r.id, className: "mt-fixa-item", style: mesmoDiaRegistro(r, faceRegistro[i + 1]) ? { borderBottom: 'none' } : undefined },
-                    r.foto && React.createElement("img", { src: r.foto, className: "mt-alerta-img-preview", alt: "" }),
-                    r.video && React.createElement("video", { src: r.video, className: "mt-alerta-img-preview", muted: true }),
+                    r.foto && React.createElement("img", { src: r.foto, className: "mt-alerta-img-preview", alt: "", onClick: () => setMidiaAmpliada({ tipo: 'foto', url: r.foto }) }),
+                    r.video && React.createElement("video", { src: r.video, className: "mt-alerta-img-preview", muted: true, onClick: () => setMidiaAmpliada({ tipo: 'video', url: r.video }) }),
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, r.comentario),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
-                    React.createElement("button", { className: "mt-del", onClick: () => removerRegistroFace(r.id) }, "\u00D7")))))))));
+                    faceRegistroConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerRegistroFace(r.id) }, "\u00D7"))))))))));
+    // Linha do tempo gráfica da aba História: reta horizontal com um ponto por evento,
+    // posicionado conforme o ano (negativo = a.C., positivo = d.C., 0 = ano zero).
+    // Escala 'anos' aproxima (10 em 10 anos nas marcações); 'seculo' afasta (100 em 100).
+    const renderLinhaDoTempoHistoria = () => {
+        const eventos = histEventos.filter((e) => e.tipo === histTipoSelecionado).slice().sort((a, b) => a.ano - b.ano);
+        if (eventos.length === 0) {
+            return React.createElement("p", { className: "mt-empty", style: { marginTop: 10 } }, "Nenhum evento neste tipo ainda \u2014 a linha do tempo aparece aqui assim que voc\u00EA registrar o primeiro.");
+        }
+        const pxPorAno = histEscala === 'seculo' ? 0.5 : 4;
+        const anos = eventos.map((e) => e.ano);
+        const margem = histEscala === 'seculo' ? 200 : 20;
+        const anoMin = Math.min(...anos, 0) - margem;
+        const anoMax = Math.max(...anos, 0) + margem;
+        const largura = Math.max(320, (anoMax - anoMin) * pxPorAno);
+        const y = 42;
+        const anoParaX = (ano) => (ano - anoMin) * pxPorAno;
+        const passo = histEscala === 'seculo' ? 100 : 10;
+        const marcas = [];
+        for (let a = Math.ceil(anoMin / passo) * passo; a <= anoMax; a += passo)
+            marcas.push(a);
+        return (React.createElement("div", { style: { overflowX: 'auto', marginTop: 12, background: '#FBFAF6', borderRadius: 10, border: '1px solid #ddd8c9', WebkitOverflowScrolling: 'touch' } },
+            React.createElement("svg", { width: largura, height: 92, style: { display: 'block' } },
+                React.createElement("line", { x1: 0, y1: y, x2: largura, y2: y, stroke: "#ddd8c9", strokeWidth: 2 }),
+                marcas.map((a) => (React.createElement("g", { key: a },
+                    React.createElement("line", { x1: anoParaX(a), y1: y - 4, x2: anoParaX(a), y2: y + 4, stroke: a === 0 ? '#C0492E' : '#c9c4b4', strokeWidth: a === 0 ? 2 : 1 }),
+                    React.createElement("text", { x: anoParaX(a), y: y + 18, fontSize: "9", textAnchor: "middle", fill: a === 0 ? '#C0492E' : '#999' }, formatAnoHistoria(a))))),
+                eventos.map((e) => (React.createElement("g", { key: e.id },
+                    React.createElement("circle", { cx: anoParaX(e.ano), cy: y, r: 5, fill: "#8A6D3B", stroke: "#fff", strokeWidth: 1.5 }),
+                    React.createElement("text", { x: anoParaX(e.ano), y: y - 12, fontSize: "9", textAnchor: "middle", fill: "#232323" }, formatAnoHistoria(e.ano))))))));
+    };
     // Painel "💰 Bank": mora dentro da aba Finanças, no botão "Bank" ao lado das sessões.
     const renderBank = () => {
         const ultimo = bankRegistro[0] || null;
@@ -4952,15 +5338,16 @@ function App() {
             return;
         setNotasPastasUsos((u) => [limpo, ...u].slice(0, MAX_USOS_PASTAS));
     };
-    // decide qual contagem vale para um texto: palavra-chave exata = 3s; qualquer outro texto = 4s
+    // decide qual contagem vale para um texto: palavra-chave exata = 3s (fixo, não é o contador
+    // de salvar nota); qualquer outro texto = notaAutoSalvarSegundos, se notaAutoSalvarAtivo
     const avaliarContagemNota = (valor) => {
         const achado = acharPorPalavraChave(valor);
         if (achado) {
             setContagemPasta({ tipo: 'pasta', caminho: achado.caminho, nome: achado.nome, restante: 3 });
             return;
         }
-        if (valor.trim()) {
-            setContagemPasta({ tipo: 'nota', restante: 4 });
+        if (valor.trim() && notaAutoSalvarAtivo) {
+            setContagemPasta({ tipo: 'nota', restante: notaAutoSalvarSegundos });
             return;
         }
         setContagemPasta(null);
@@ -5284,7 +5671,7 @@ function App() {
         }
         setSwipeAnim(direcao === 'right' ? 'sair-esq' : 'sair-dir');
         setTimeout(() => {
-            const candidatos = pool.filter((f) => f.id !== fraseExibida?.id);
+            const candidatos = pool.filter((f) => f.id !== (fraseExibida === null || fraseExibida === void 0 ? void 0 : fraseExibida.id));
             const escolhida = (candidatos.length ? candidatos : pool)[Math.floor(Math.random() * (candidatos.length || pool.length))];
             setFraseExibida(escolhida);
             setSwipeAnim('entrar');
@@ -5338,7 +5725,7 @@ function App() {
             registrarDesfazer('notaDoDia', 'frase', { valor: frases[idxDesfazer], idx: idxDesfazer });
         setFrases((fs) => {
             const novo = fs.filter((f) => f.id !== id);
-            if (fraseExibida?.id === id) {
+            if ((fraseExibida === null || fraseExibida === void 0 ? void 0 : fraseExibida.id) === id) {
                 const pool = novo.filter((f) => notaCat === 'aleatorio' || f.cat === notaCat);
                 setFraseExibida(pool.length ? pool[Math.floor(Math.random() * pool.length)] : null);
             }
@@ -5703,7 +6090,7 @@ function App() {
         catch (e) { /* localStorage indisponível: backup segue só com os dados do Minha Tela */ }
         return dados;
     };
-    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos(), configR2: lerConfigR2() }, null, 2);
+    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
     const copiarBackup = () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -5807,6 +6194,10 @@ function App() {
             setNotasPastaCmeeSeed(true);
             setBancoDeHoras(typeof dados.bancoDeHoras === 'number' ? dados.bancoDeHoras : 0);
             setValorHora(typeof dados.valorHora === 'number' ? dados.valorHora : VALOR_HORA_PADRAO);
+            setAutoSalvarAtivo(typeof dados.autoSalvarAtivo === 'boolean' ? dados.autoSalvarAtivo : true);
+            setAutoSalvarSegundos(typeof dados.autoSalvarSegundos === 'number' ? dados.autoSalvarSegundos : 1);
+            setNotaAutoSalvarAtivo(typeof dados.notaAutoSalvarAtivo === 'boolean' ? dados.notaAutoSalvarAtivo : true);
+            setNotaAutoSalvarSegundos(typeof dados.notaAutoSalvarSegundos === 'number' ? dados.notaAutoSalvarSegundos : 4);
             setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? { ...REGRAS_ESTRELAS_PADRAO, ...dados.regrasEstrelas } : REGRAS_ESTRELAS_PADRAO);
             setGruposCustom(Array.isArray(dados.gruposCustom) ? dados.gruposCustom : []);
             {
@@ -5822,6 +6213,8 @@ function App() {
             setCorteDeCabeloRegistro(Array.isArray(dados.corteDeCabeloRegistro) ? dados.corteDeCabeloRegistro : []);
             setMedidasRegistro(Array.isArray(dados.medidasRegistro) ? dados.medidasRegistro : []);
             setFaceRegistro(Array.isArray(dados.faceRegistro) ? dados.faceRegistro : []);
+            setHistEventos(Array.isArray(dados.histEventos) ? dados.histEventos : []);
+            setHistTipos(Array.isArray(dados.histTipos) && dados.histTipos.length ? dados.histTipos : HIST_TIPOS_PADRAO);
             setBankSaldo(typeof dados.bankSaldo === 'number' ? dados.bankSaldo : 0);
             setBankRegistro(Array.isArray(dados.bankRegistro) ? dados.bankRegistro : []);
             setSnatBankSaldo(typeof dados.snatBankSaldo === 'number' ? dados.snatBankSaldo : 0);
@@ -5843,6 +6236,9 @@ function App() {
                 setChecklistSessoes(chk.sessoes);
             }
             setGanhosRegistro(Array.isArray(dados.ganhosRegistro) ? dados.ganhosRegistro : []);
+            setDesbloqueiosRegistro(Array.isArray(dados.desbloqueiosRegistro) ? dados.desbloqueiosRegistro : []);
+            setAntesDeIrPendentes(Array.isArray(dados.antesDeIrPendentes) ? dados.antesDeIrPendentes : []);
+            setAntesDeIrConcluidos(Array.isArray(dados.antesDeIrConcluidos) ? dados.antesDeIrConcluidos : []);
             setEraDeOuroRegistro(Array.isArray(dados.eraDeOuroRegistro) ? dados.eraDeOuroRegistro : []);
             setMomentumRegistro(Array.isArray(dados.momentumRegistro) ? dados.momentumRegistro : []);
             setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
@@ -5879,20 +6275,6 @@ function App() {
                     window.localStorage.setItem(CHAVE_STORAGE_CONTATOS, dados.baralhoDeContatos);
                 }
                 catch (e) { /* idem: não impede a restauração do resto */ }
-            }
-            // restaura a configuração do Cloudflare R2 (URL do Worker + token), se o backup tiver.
-            // Isso é o que evita ter de recolher URL e token do bloco de notas depois de uma
-            // limpeza do Safari ou troca de aparelho. Só sobrescreve quando o backup traz valor
-            // preenchido — um backup antigo (sem esse campo) ou com campo vazio não apaga uma
-            // configuração boa que já esteja no aparelho.
-            if (dados.configR2 && typeof dados.configR2 === 'object') {
-                const urlR2 = String(dados.configR2.url || '').trim();
-                const tokenR2 = String(dados.configR2.token || '').trim();
-                if (urlR2 && tokenR2) {
-                    salvarConfigR2(urlR2, tokenR2);
-                    setR2UrlDraft(urlR2);
-                    setR2TokenDraft(tokenR2);
-                }
             }
             setMsgBackup('Restaurado! Agora toque em "Salvar" no topo para guardar.');
             setSujo(true);
@@ -5991,7 +6373,28 @@ function App() {
         .mt-alerta-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px solid #e7e5df; font-size: 15px; color: #232323; }
         .mt-alerta-item:last-child { border-bottom: none; }
         .mt-alerta-item-dia { font-size: 12px; color: #C9A227; margin-right: 4px; font-weight: 700; flex-shrink: 0; }
-        .mt-alerta-img-preview { max-width: 80px; max-height: 60px; border-radius: 7px; object-fit: cover; flex-shrink: 0; }
+        .mt-alerta-img-preview { max-width: 80px; max-height: 60px; border-radius: 7px; object-fit: cover; flex-shrink: 0; cursor: pointer; }
+
+        .mt-lightbox-backdrop {
+          position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 500;
+          display: flex; align-items: center; justify-content: center; flex-direction: column;
+          animation: mtFade 0.15s ease;
+        }
+        .mt-lightbox-close {
+          position: fixed; top: max(14px, env(safe-area-inset-top)); right: 14px; z-index: 501;
+          width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,0.15);
+          color: #fff; font-size: 22px; line-height: 1; cursor: pointer;
+        }
+        .mt-lightbox-media-wrap {
+          width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+          overflow: hidden; touch-action: none;
+        }
+        .mt-lightbox-media {
+          max-width: 92vw; max-height: 88vh; object-fit: contain; user-select: none;
+          transition: transform 0.05s linear;
+        }
+        .mt-lightbox-media[controls] { touch-action: manipulation; }
+        .mt-lightbox-dica { color: rgba(255,255,255,0.55); font-size: 12px; margin: 10px 0 0; }
         .mt-fixa-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #f0efe9; }
         .mt-fixa-item:last-child { border-bottom: none; }
         .mt-fixa-item.dragging { opacity: 0.35; }
@@ -6406,7 +6809,15 @@ function App() {
                 React.createElement("button", { className: "mt-btn-sm", onClick: () => setDiasSemBackup(null), title: "Esconde o aviso at\u00E9 a pr\u00F3xima abertura do app" }, "Depois"))),
             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, position: 'relative' } },
                 React.createElement("h1", { className: "mt-header-nome", style: { flex: 1, minWidth: 0 } }, "Cherubion"),
-                React.createElement("button", { className: "mt-atalho-btn", style: { position: 'static', width: 36, height: 36, fontSize: 15 }, onClick: () => { window.location.href = 'contatos.html'; }, title: "Baralho de Contatos", "aria-label": "Abrir o Baralho de Contatos" }, "\uD83D\uDCC7"),
+                React.createElement("button", { className: "mt-atalho-btn", style: { position: 'relative', width: 36, height: 36, fontSize: 15 }, onClick: () => { window.location.href = 'contatos.html'; }, title: "Baralho de Contatos", "aria-label": "Abrir o Baralho de Contatos" },
+                    "\uD83D\uDCC7",
+                    lembretesHoje > 0 && (React.createElement("span", { style: {
+                            position: 'absolute', top: -4, right: -4,
+                            minWidth: 16, height: 16, padding: '0 3px',
+                            borderRadius: 999, background: '#e02424', color: '#fff',
+                            fontSize: 10, fontWeight: 700, lineHeight: '16px',
+                            textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,.4)',
+                        } }, lembretesHoje > 9 ? '9+' : lembretesHoje))),
                 React.createElement("button", { className: "mt-atalho-btn", style: { position: 'static', width: 36, height: 36, fontSize: 15 }, onClick: () => { window.location.href = 'notas.html'; }, title: "Cofre de Notas", "aria-label": "Abrir o Cofre de Notas" }, "\uD83D\uDCD3"),
                 React.createElement("button", { className: "mt-atalhos-toggle", onClick: () => setAtalhosAbertos((v) => !v), title: atalhosAbertos ? 'Fechar atalhos' : 'Atalhos rápidos', "aria-label": atalhosAbertos ? 'Fechar atalhos' : 'Atalhos rápidos' }, atalhosAbertos ? '×' : '+'),
                 atalhosAbertos && (React.createElement("div", { className: "mt-atalhos-col" },
@@ -6544,8 +6955,8 @@ function App() {
                                 React.createElement("div", { style: { maxHeight: 140, overflowY: 'auto' } },
                                     alertasNotas.length === 0 && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12 } }, "Nenhuma nota ainda."),
                                     alertasNotas.map((n) => (React.createElement("div", { className: "mt-alerta-item", key: n.id },
-                                        n.imagem && React.createElement("img", { src: n.imagem, className: "mt-alerta-img-preview", alt: "" }),
-                                        n.video && React.createElement("video", { src: n.video, className: "mt-alerta-img-preview", muted: true }),
+                                        n.imagem && React.createElement("img", { src: n.imagem, className: "mt-alerta-img-preview", alt: "", onClick: () => setMidiaAmpliada({ tipo: 'foto', url: n.imagem }) }),
+                                        n.video && React.createElement("video", { src: n.video, className: "mt-alerta-img-preview", muted: true, onClick: () => setMidiaAmpliada({ tipo: 'video', url: n.video }) }),
                                         React.createElement("span", { style: { flex: 1 } }, n.texto),
                                         React.createElement("button", { className: "mt-del", onClick: () => removerNota(n.id) }, "\u00D7"))))))))))),
                 React.createElement("div", { className: "mt-notas-rapidas-wrap", style: { order: ordemJanelas.indexOf('alertas') } },
@@ -6706,7 +7117,7 @@ function App() {
                                 return null;
                             const doGrupo = fixas.filter((t) => t.freq === freq);
                             const comContador = doGrupo.filter((t) => t.prazoISO);
-                            const ordenadas = [...comContador].sort((a, b) => (diasRestantes(a) ?? 0) - (diasRestantes(b) ?? 0));
+                            const ordenadas = [...comContador].sort((a, b) => { var _a, _b; return ((_a = diasRestantes(a)) !== null && _a !== void 0 ? _a : 0) - ((_b = diasRestantes(b)) !== null && _b !== void 0 ? _b : 0); });
                             return (React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: '1px solid #f0efe9' } },
                                 React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginTop: 0, marginBottom: 4 } },
                                     "\u23F3 CONTADOR DE DIAS",
@@ -7257,8 +7668,8 @@ function App() {
                                 React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                                     psoRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum registro ainda."),
                                     psoRegistro.map((r, i) => (React.createElement("div", { key: r.id, className: "mt-fixa-item", style: mesmoDiaRegistro(r, psoRegistro[i + 1]) ? { borderBottom: 'none' } : undefined },
-                                        r.foto && React.createElement("img", { src: r.foto, className: "mt-alerta-img-preview", alt: "" }),
-                                        r.video && React.createElement("video", { src: r.video, className: "mt-alerta-img-preview", muted: true }),
+                                        r.foto && React.createElement("img", { src: r.foto, className: "mt-alerta-img-preview", alt: "", onClick: () => setMidiaAmpliada({ tipo: 'foto', url: r.foto }) }),
+                                        r.video && React.createElement("video", { src: r.video, className: "mt-alerta-img-preview", muted: true, onClick: () => setMidiaAmpliada({ tipo: 'video', url: r.video }) }),
                                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                             React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 700, color: r.valor > 0 ? '#3E8E5A' : r.valor < 0 ? '#C0492E' : '#232323' } },
                                                 "Pso ",
@@ -7305,6 +7716,48 @@ function App() {
                                         React.createElement("p", { className: "mt-config-item-label" }, n === 0 ? 'Sem estrelas' : `${n} estrela${n > 1 ? 's' : ''}`),
                                         React.createElement("p", { className: "mt-config-item-desc" }, "Multiplicador aplicado ao tempo gasto ao premiar.")),
                                     React.createElement("input", { type: "number", step: "0.1", className: "mt-premio-config-input", value: regrasEstrelas[n], onChange: (e) => { const v = parseFloat(e.target.value) || 0; setRegrasEstrelas((r) => ({ ...r, [n]: v })); marcarSujo(); } })))))))),
+                        razaoTabSelecionada === 'historia' && (() => {
+                            const eventosFiltrados = histEventos
+                                .filter((e) => e.tipo === histTipoSelecionado)
+                                .slice()
+                                .sort((a, b) => a.ano - b.ano);
+                            const tipoAtual = histTipos.find((t) => t.id === histTipoSelecionado);
+                            return (React.createElement("div", { className: "mt-premio-secao" },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                                    React.createElement("p", { className: "mt-premio-secao-titulo", style: { flex: 1, margin: 0 } }, "\uD83D\uDCDC Hist\u00F3ria"),
+                                    React.createElement("button", { className: "mt-discreto-btn", onClick: () => setHistConfigAberto((v) => !v), title: histConfigAberto ? 'Fechar configurações' : 'Configurações — editar textos, apagar e criar tipos' }, histConfigAberto ? '×' : '⚙️')),
+                                React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 } }, histTipos.map((t) => (React.createElement("button", { key: t.id, className: "mt-btn-sm", style: histTipoSelecionado === t.id ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B' } : undefined, onClick: () => setHistTipoSelecionado(t.id) }, t.nome)))),
+                                histConfigAberto && (React.createElement(React.Fragment, null,
+                                    React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                                        React.createElement("input", { className: "mt-nota-input", style: { flex: 1 }, placeholder: "Nome do novo tipo de evento\u2026", value: histNovoTipoNome, onChange: (e) => setHistNovoTipoNome(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarTipoHistoria() }),
+                                        React.createElement("button", { className: "mt-btn-sm", onClick: adicionarTipoHistoria }, "+ Tipo")),
+                                    !(tipoAtual === null || tipoAtual === void 0 ? void 0 : tipoAtual.fixo) && (React.createElement("button", { className: "mt-btn-sm", style: { marginTop: 8 }, onClick: () => removerTipoHistoria(histTipoSelecionado) },
+                                        "\uD83D\uDDD1\uFE0F Apagar tipo \"", tipoAtual === null || tipoAtual === void 0 ? void 0 :
+                                        tipoAtual.nome,
+                                        "\" (e os eventos dele)")))),
+                                React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
+                                    React.createElement("button", { className: "mt-btn-sm", style: histEscala === 'anos' ? { background: '#232323', color: '#fff', borderColor: '#232323' } : undefined, onClick: () => setHistEscala('anos') }, "Anos"),
+                                    React.createElement("button", { className: "mt-btn-sm", style: histEscala === 'seculo' ? { background: '#232323', color: '#fff', borderColor: '#232323' } : undefined, onClick: () => setHistEscala('seculo') }, "S\u00E9culo")),
+                                renderLinhaDoTempoHistoria(),
+                                React.createElement("div", { style: { marginTop: 14 } },
+                                    React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Texto do evento\u2026", value: histNovoTexto, onChange: (e) => setHistNovoTexto(e.target.value), style: { minHeight: 50 } }),
+                                    React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                                        React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "numeric", placeholder: "Ano (ex: 476)", value: histNovoAno, onChange: (e) => setHistNovoAno(e.target.value.replace(/\D/g, '')), onKeyDown: (e) => e.key === 'Enter' && adicionarEventoHistoria(), style: { flex: 1 } }),
+                                        React.createElement("select", { className: "mt-nota-input", value: histNovoEra, onChange: (e) => setHistNovoEra(e.target.value), style: { flex: 1 } },
+                                            React.createElement("option", { value: "dC" }, "d.C."),
+                                            React.createElement("option", { value: "aC" }, "a.C."))),
+                                    React.createElement("button", { className: "mt-btn-sm primary", style: { marginTop: 8 }, onClick: adicionarEventoHistoria },
+                                        "Registrar evento \u2014 ", tipoAtual === null || tipoAtual === void 0 ? void 0 :
+                                        tipoAtual.nome),
+                                    msgHistoria && React.createElement("p", { className: "mt-premio-msg" }, msgHistoria)),
+                                React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 14 } },
+                                    eventosFiltrados.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum evento neste tipo ainda."),
+                                    eventosFiltrados.map((e) => (React.createElement("div", { key: e.id, className: "mt-fixa-item" },
+                                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                            React.createElement("span", { style: { fontSize: 11.5, color: '#8A6D3B', fontWeight: 700 } }, formatAnoHistoria(e.ano)),
+                                            histConfigAberto ? (React.createElement("textarea", { className: "mt-bloco-textarea", style: { minHeight: 36, marginTop: 4 }, value: e.texto, onChange: (ev) => editarTextoEventoHistoria(e.id, ev.target.value) })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, e.texto))),
+                                        histConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerEventoHistoria(e.id) }, "\u00D7"))))))));
+                        })(),
                         CHECKLISTS.map((c) => {
                             const abas = chkAbasDe(c.id);
                             const sid = chkSessaoAtual(c.id);
@@ -7320,16 +7773,18 @@ function App() {
                             const ehBank = c.id === 'financas' && sid === BANK_SESSAO;
                             const ehSnatBank = c.id === 'snat' && sid === SNAT_BANK_SESSAO;
                             const ehGanhos = c.id === 'atividades' && sid === GANHOS_SESSAO;
+                            const ehDesbloqueios = c.id === 'atividades' && sid === DESBLOQUEIOS_SESSAO;
+                            const ehAntesDeIr = c.id === 'atividades' && sid === ANTES_DE_IR_SESSAO;
                             const ehEraDeOuro = c.id === 'atividades' && sid === ERA_DE_OURO_SESSAO;
                             const ehBatalha = c.id === 'atividades' && sid === BATALHA_SESSAO;
                             const ehContador = c.id === 'atividades' && sid === CONTADOR_SESSAO;
                             const ehMomentum = c.id === 'atividades' && sid === MOMENTUM_SESSAO;
                             const ehCar = c.id === 'prefeituras' && sid === CAR_SESSAO;
-                            // painéis embutidos (Saldo, Cabelo, Medidas, Face, Bank, Bank Snat, Ganhos, Era de Ouro, Batalha, Contador, Momentum, Car)
-                            const ehPainel = ehSaldo || ehCorte || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehEraDeOuro || ehBatalha || ehContador || ehMomentum || ehCar;
+                            // painéis embutidos (Saldo, Cabelo, Medidas, Face, Bank, Bank Snat, Ganhos, Desbloqueios, Antes de ir, Era de Ouro, Batalha, Contador, Momentum, Car)
+                            const ehPainel = ehSaldo || ehCorte || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehDesbloqueios || ehAntesDeIr || ehEraDeOuro || ehBatalha || ehContador || ehMomentum || ehCar;
                             // o Cabelo é o único painel que mantém a lista de tarefas embaixo dele;
                             // os outros substituem a lista por completo
-                            const escondeTarefas = ehSaldo || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehEraDeOuro || ehBatalha || ehContador || ehMomentum || ehCar;
+                            const escondeTarefas = ehSaldo || ehMedidas || ehFace || ehBank || ehSnatBank || ehGanhos || ehDesbloqueios || ehAntesDeIr || ehEraDeOuro || ehBatalha || ehContador || ehMomentum || ehCar;
                             if (razaoTabSelecionada !== c.id)
                                 return null;
                             return (React.createElement(React.Fragment, { key: c.id },
@@ -7341,7 +7796,7 @@ function App() {
                                     React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 10 } },
                                         abas.map((s) => {
                                             const ativo = sid === s.id;
-                                            const fixa = s.id === 'geral' || s.id === SALDO_SESSAO || s.id === CORTE_SESSAO || s.id === MEDIDAS_SESSAO || s.id === FACE_SESSAO || s.id === BANK_SESSAO || s.id === SNAT_BANK_SESSAO || s.id === GANHOS_SESSAO || s.id === ERA_DE_OURO_SESSAO || s.id === BATALHA_SESSAO || s.id === CONTADOR_SESSAO || s.id === MOMENTUM_SESSAO || s.id === CAR_SESSAO || s.id === PROGRAMA_SESSAO || s.id === JA_TENHO_SESSAO;
+                                            const fixa = s.id === 'geral' || s.id === SALDO_SESSAO || s.id === CORTE_SESSAO || s.id === MEDIDAS_SESSAO || s.id === FACE_SESSAO || s.id === BANK_SESSAO || s.id === SNAT_BANK_SESSAO || s.id === GANHOS_SESSAO || s.id === DESBLOQUEIOS_SESSAO || s.id === ANTES_DE_IR_SESSAO || s.id === ERA_DE_OURO_SESSAO || s.id === BATALHA_SESSAO || s.id === CONTADOR_SESSAO || s.id === MOMENTUM_SESSAO || s.id === CAR_SESSAO || s.id === PROGRAMA_SESSAO || s.id === JA_TENHO_SESSAO;
                                             return (React.createElement(React.Fragment, { key: s.id },
                                                 React.createElement("button", { onClick: () => { setChkMapa(setChkSessaoSel, c.id, s.id); setChkMapa(setChkConfirmRemoverSessao, c.id, false); msgChk(c.id, ''); }, style: {
                                                         fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20,
@@ -7372,6 +7827,8 @@ function App() {
                                     ehBank && renderBank(),
                                     ehSnatBank && renderSnatBank(),
                                     ehGanhos && renderGanhos(),
+                                    ehDesbloqueios && renderDesbloqueios(),
+                                    ehAntesDeIr && renderAntesDeIr(),
                                     ehEraDeOuro && renderEraDeOuro(),
                                     ehBatalha && renderBatalha(),
                                     ehContador && renderContadores(),
@@ -7410,10 +7867,11 @@ function App() {
                                     chkMsg[c.id] && React.createElement("p", { className: "mt-premio-msg" }, chkMsg[c.id]))));
                         }),
                         razaoTabSelecionada === 'categorias' && (() => {
+                            var _a;
                             const cats = categorias;
                             const tabId = catTabSelecionada && cats.find((c) => c.id === catTabSelecionada)
                                 ? catTabSelecionada
-                                : cats[0]?.id || null;
+                                : ((_a = cats[0]) === null || _a === void 0 ? void 0 : _a.id) || null;
                             const catAtiva = cats.find((c) => c.id === tabId) || null;
                             const renderCatConteudo = (cat) => (React.createElement(React.Fragment, null,
                                 React.createElement("div", { className: "mt-cat-head", style: { marginBottom: 8 } }, renamingCat === cat.id ? (React.createElement("div", { className: "mt-rename-row" },
@@ -7638,6 +8096,7 @@ function App() {
                         })(),
                         !historicoModoAtivo && (React.createElement("p", { className: "mt-premio-sub", style: { marginTop: 4 } }, "\uD83E\uDD49 Bronze (at\u00E9 33%) \u00B7 \uD83E\uDD48 Prata (34\u201360%) \u00B7 \uD83E\uDD47 Ouro (61\u201399%) \u00B7 \uD83D\uDC8E Diamante (100%)")),
                         historicoModoAtivo && (() => {
+                            var _a;
                             // ---- Histórico: mesmas opções de frequência que existiam na janela própria,
                             // agora vivendo dentro de Gráficos, atrás do botão 📊 Histórico no cabeçalho. ----
                             const opcoesHist = [
@@ -7670,14 +8129,14 @@ function App() {
                             };
                             // cálculo de porcentagem até a data corrente (sem contar datas futuras)
                             const hoje2Hist = new Date();
-                            const maxIdxHojeHist = {
+                            const maxIdxHojeHist = (_a = {
                                 diaria: hoje2Hist.getDay(),
                                 semanal: Math.min(Math.floor((hoje2Hist.getDate() - 1) / 7), 4),
                                 mensal: hoje2Hist.getMonth(),
                                 trimestral: Math.floor(hoje2Hist.getMonth() / 3),
                                 semestral: hoje2Hist.getMonth() < 6 ? 0 : 1,
                                 anual: 0,
-                            }[freqHist] ?? (colsHist.length - 1);
+                            }[freqHist]) !== null && _a !== void 0 ? _a : (colsHist.length - 1);
                             const colsElegiveisHist = colsVisiveisHist.filter((c) => !c.oculta && c.idx <= maxIdxHojeHist);
                             let totalFeitasHist = 0, totalPossivelHist = 0;
                             itemsHist.forEach((t) => {
@@ -7821,10 +8280,7 @@ function App() {
                         React.createElement("div", { className: "mt-backup-actions" },
                             React.createElement("button", { className: "mt-btn-sm primary", onClick: colarRestaurar }, "Colar"),
                             React.createElement("button", { className: "mt-btn-sm", onClick: restaurarBackup, disabled: !textoRestaurar.trim() }, "Restaurar deste texto")),
-                        React.createElement("p", { className: "mt-backup-msg" }, msgBackup),
-                        React.createElement("p", { style: { margin: '10px 0 0', fontSize: 11.5, color: '#a8a293', textAlign: 'center' } },
-                            "vers\u00E3o instalada: ",
-                            APP_VERSAO)))),
+                        React.createElement("p", { className: "mt-backup-msg" }, msgBackup)))),
                 React.createElement("div", { style: { order: 999, marginTop: 10 } },
                     React.createElement("button", { className: "mt-config-gear-btn", onClick: () => setMostrarConfiguracoes((v) => !v), title: "Configura\u00E7\u00F5es gerais" }, "\u2699\uFE0F"),
                     mostrarConfiguracoes && (React.createElement("div", { className: "mt-config-panel" },
@@ -7844,19 +8300,48 @@ function App() {
                                         width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
                                         boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                                     } }))),
-                        React.createElement("div", { style: { padding: '4px 0 14px', borderBottom: '1px solid #f0efe9', marginBottom: 12 } },
-                            React.createElement("p", { className: "mt-config-item-label", style: { marginBottom: 2 } }, "\uD83D\uDD04 Buscar atualiza\u00E7\u00E3o"),
-                            React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 8 } },
-                                "Recarrega o app agora, buscando o app.js mais novo do GitHub. Serve porque o iPhone suspende o app em vez de fechar: tocar no \u00EDcone \u00E0s vezes retoma a sess\u00E3o antiga sem procurar vers\u00E3o nova. Seus dados n\u00E3o s\u00E3o afetados \u2014 ficam guardados no aparelho, n\u00E3o no arquivo. Vers\u00E3o em uso agora: ",
-                                APP_VERSAO,
-                                "."),
-                            React.createElement("button", { className: "mt-btn-sm primary", onClick: () => {
-                                    // salva o que estiver pendente antes de recarregar, pra não perder
-                                    // nada que ainda não tenha passado pelo salvamento automático
-                                    if (salvarRef.current)
-                                        salvarRef.current();
-                                    setTimeout(() => { window.location.reload(); }, 400);
-                                } }, "\uD83D\uDD04 Buscar atualiza\u00E7\u00E3o agora")),
+                        React.createElement("div", { className: "mt-config-item" },
+                            React.createElement("div", null,
+                                React.createElement("p", { className: "mt-config-item-label" }, "Salvamento autom\u00E1tico"),
+                                React.createElement("p", { className: "mt-config-item-desc" }, autoSalvarAtivo
+                                    ? `Salva sozinho ${autoSalvarSegundos}s depois de qualquer alteração.`
+                                    : 'Desligado — use o botão "💾 Salvar agora" abaixo pra não perder nada.')),
+                            React.createElement("button", { onClick: () => setAutoSalvarAtivo((v) => !v), style: {
+                                    flexShrink: 0, width: 46, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer',
+                                    background: autoSalvarAtivo ? '#6E8C82' : '#ddd8c9', position: 'relative', transition: 'background 0.2s',
+                                }, "aria-label": "Salvamento autom\u00E1tico" },
+                                React.createElement("span", { style: {
+                                        position: 'absolute', top: 3, left: autoSalvarAtivo ? 23 : 3,
+                                        width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                    } }))),
+                        React.createElement("div", { style: { padding: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+                            React.createElement("label", { style: { fontSize: 12.5, color: '#666', display: 'flex', alignItems: 'center', gap: 6 } },
+                                "Intervalo:",
+                                React.createElement("input", { className: "mt-input", type: "number", min: "1", step: "1", value: autoSalvarSegundos, onChange: (e) => setAutoSalvarSegundos(Math.max(1, parseInt(e.target.value, 10) || 1)), style: { width: 60, padding: '5px 8px' } }),
+                                "segundos"),
+                            React.createElement("button", { className: "mt-btn-sm primary", onClick: () => { salvar(); setMsgSalvarManual('Salvo!'); setTimeout(() => setMsgSalvarManual(''), 2000); } }, "\uD83D\uDCBE Salvar agora"),
+                            msgSalvarManual && React.createElement("span", { style: { fontSize: 12, color: '#3E8E5A', fontWeight: 700 } }, msgSalvarManual)),
+                        React.createElement("div", { className: "mt-config-item" },
+                            React.createElement("div", null,
+                                React.createElement("p", { className: "mt-config-item-label" }, "Notas R\u00E1pidas \u2014 salvar ao parar de digitar/ditar"),
+                                React.createElement("p", { className: "mt-config-item-desc" }, notaAutoSalvarAtivo
+                                    ? `Se você parar ${notaAutoSalvarSegundos}s sem digitar (ou ditar), a nota é salva sozinha.`
+                                    : 'Desligado — a nota só salva se você apertar Enter ou o "+".')),
+                            React.createElement("button", { onClick: () => setNotaAutoSalvarAtivo((v) => !v), style: {
+                                    flexShrink: 0, width: 46, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer',
+                                    background: notaAutoSalvarAtivo ? '#6E8C82' : '#ddd8c9', position: 'relative', transition: 'background 0.2s',
+                                }, "aria-label": "Notas R\u00E1pidas \u2014 salvar ao parar de digitar/ditar" },
+                                React.createElement("span", { style: {
+                                        position: 'absolute', top: 3, left: notaAutoSalvarAtivo ? 23 : 3,
+                                        width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                    } }))),
+                        notaAutoSalvarAtivo && (React.createElement("div", { style: { padding: '0 0 4px' } },
+                            React.createElement("label", { style: { fontSize: 12.5, color: '#666', display: 'flex', alignItems: 'center', gap: 6 } },
+                                "Espera:",
+                                React.createElement("input", { className: "mt-input", type: "number", min: "1", step: "1", value: notaAutoSalvarSegundos, onChange: (e) => setNotaAutoSalvarSegundos(Math.max(1, parseInt(e.target.value, 10) || 1)), style: { width: 60, padding: '5px 8px' } }),
+                                "segundos"))),
                         React.createElement("div", { style: { padding: '4px 0 0' } },
                             React.createElement("p", { className: "mt-config-item-label", style: { marginBottom: 2 } }, "\u2601\uFE0F Armazenamento de m\u00EDdia (Cloudflare R2)"),
                             React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 8 } }, "Endere\u00E7o e senha do Worker que guarda fotos e v\u00EDdeos. \u00C9 o mesmo Worker usado pelo Cofre de Notas e pelo Baralho de Contatos \u2014 configure uma vez aqui e os tr\u00EAs apps j\u00E1 enxergam (mesmo localStorage, mesma origem do GitHub Pages)."),
@@ -7874,30 +8359,30 @@ function App() {
                     React.createElement("button", { className: "mt-btn-sm", onClick: fecharPrograma }, "Cancelar"),
                     React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#4A7FD9', color: '#fff' }, onClick: salvarPrograma }, "Salvar"))))),
         revealStage && (React.createElement("div", { className: "mt-backdrop", onClick: revealStage === 'contando' ? undefined : fecharReveal },
-            React.createElement("div", { className: `mt-reveal-card ${revealStage === 'contando' ? '' : revealStage}`, style: { '--cor': revealCat?.cor }, onClick: (e) => e.stopPropagation() },
+            React.createElement("div", { className: `mt-reveal-card ${revealStage === 'contando' ? '' : revealStage}`, style: { '--cor': revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor }, onClick: (e) => e.stopPropagation() },
                 revealStage !== 'contando' && (React.createElement("button", { className: "mt-reveal-close", onClick: fecharReveal, "aria-label": "fechar" }, "\u00D7")),
                 (revealStage === 'shuffling' || revealStage === 'result') && (React.createElement(React.Fragment, null,
-                    React.createElement("p", { className: "mt-reveal-eyebrow" }, revealCat?.nome),
+                    React.createElement("p", { className: "mt-reveal-eyebrow" }, revealCat === null || revealCat === void 0 ? void 0 : revealCat.nome),
                     React.createElement("p", { className: "mt-reveal-texto" }, revealStage === 'shuffling' ? 'embaralhando…' : revealTexto),
                     revealStage === 'result' && revealMinutos && (React.createElement("p", { className: "mt-meta-label", style: { marginBottom: 14 } },
                         "\u23F1 ",
                         revealMinutos < 60 ? `${revealMinutos} min` : '1 hora')),
                     revealStage === 'result' && (React.createElement("div", { className: "mt-reveal-actions" },
-                        React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: revealCat?.cor, color: '#fff' }, onClick: sortearOutra }, "Sortear outra"),
-                        (revealCat?.tipo === 'tempo' || revealMinutos) ? (React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#F2C94C', color: '#5a4a10' }, onClick: iniciarContador }, "\u23F1 Iniciar")) : (React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#F2C94C', color: '#5a4a10' }, onClick: vouFazer }, "Vou fazer")),
+                        React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor, color: '#fff' }, onClick: sortearOutra }, "Sortear outra"),
+                        ((revealCat === null || revealCat === void 0 ? void 0 : revealCat.tipo) === 'tempo' || revealMinutos) ? (React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#F2C94C', color: '#5a4a10' }, onClick: iniciarContador }, "\u23F1 Iniciar")) : (React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#F2C94C', color: '#5a4a10' }, onClick: vouFazer }, "Vou fazer")),
                         React.createElement("button", { className: "mt-btn-sm", onClick: fecharReveal }, "Fechar"))))),
                 revealStage === 'contando' && (React.createElement(React.Fragment, null,
                     React.createElement("p", { className: "mt-reveal-eyebrow" },
                         revealTexto,
                         pausado ? ' · pausado' : ''),
-                    React.createElement("p", { className: "mt-contador-digitos", style: { color: revealCat?.cor } }, formatTempo(segundosDecorridos)),
+                    React.createElement("p", { className: "mt-contador-digitos", style: { color: revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor } }, formatTempo(segundosDecorridos)),
                     revealMinutos && React.createElement("p", { className: "mt-meta-label" },
                         "meta: ",
                         revealMinutos,
                         " min"),
                     React.createElement("div", { className: "mt-reveal-actions" },
                         React.createElement("button", { className: "mt-btn-sm", onClick: pausarOuContinuar }, pausado ? '▶ Continuar' : '⏸ Pausa'),
-                        React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: revealCat?.cor, color: '#fff' }, onClick: pararContador }, "\u23F9 Parar")),
+                        React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: revealCat === null || revealCat === void 0 ? void 0 : revealCat.cor, color: '#fff' }, onClick: pararContador }, "\u23F9 Parar")),
                     React.createElement("div", { className: "mt-reveal-actions", style: { marginTop: 8 } },
                         React.createElement("button", { className: "mt-create-btn", style: { flex: 1, background: '#6E8C82', color: '#fff' }, onClick: marcarDone }, "\u2713 Done"))))))),
         confettiAtivo && (React.createElement("div", { className: "mt-confetti-overlay" }, confettiPecas.map((p) => (React.createElement("span", { key: p.id, className: "mt-confetti-piece", style: {
@@ -7908,7 +8393,10 @@ function App() {
                 animationDuration: `${p.duration}s`,
                 animationDelay: `${p.delay}s`,
                 transform: `rotate(${p.rotacao}deg)`,
-            } })))))));
+            } }))))),
+        React.createElement(VisualizadorMidia, { midia: midiaAmpliada, onFechar: () => setMidiaAmpliada(null) })));
 }
 
+
+// ── monta o app na div#root ──
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
