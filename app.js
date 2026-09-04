@@ -1,12 +1,11 @@
-"use strict";
-// ══════════════════════════════════════════════════════════════════
-// MIOLO DO CHERUBION (app.js) — gerado a partir do App.jsx.
-// Carimbo de versão gravado em horário da Califórnia (America/Los_Angeles,
-// já considera horário de verão automaticamente).
-// ══════════════════════════════════════════════════════════════════
-window.__CHERUBION_VERSAO__ = "2026-09-01 10:36";
+// ══════════════════════════════════════════════════════════════════════
+// MIOLO DO CHERUBION — gerado a partir de App.jsx (JSX compilado para JS puro).
+// Sobe este arquivo no GitHub Pages substituindo o app.js existente.
+// ══════════════════════════════════════════════════════════════════════
+window.__CHERUBION_VERSAO__ = '2026.09.04-5';
 const { useState, useEffect, useRef, useMemo } = React;
 
+"use strict";
 // ===== constantes =====
 // ======================================================================
 // Constantes de configuração do app: cores, listas de checklists, abas do Livro Razão,
@@ -59,6 +58,7 @@ const CONTADOR_SESSAO = '__contador';
 // mensal) dentro da aba Atividades
 const MOMENTUM_SESSAO = '__momentum';
 // id reservado da sessão fixa "Programa" — disponível nas abas Snat, PE, Skill e B.E.S.T.
+// (e, com o nome "Receitas", também na aba Nutrição).
 // É uma sessão de tarefas normal (checklist de verdade), só que os itens dela mostram o
 // mesmo botão "Programa" (janela de texto livre por tarefa) que já existe na aba Realidade,
 // em vez do botão "Priority" padrão
@@ -138,11 +138,8 @@ const normalizarChecklists = (dados) => {
     CHECKLISTS.forEach((c) => {
         if (!Array.isArray(itens[c.id]))
             itens[c.id] = [];
-        if (!Array.isArray(sessoes[c.id])) {
-            // a aba Atividades já nasce com a sessão "Odis" criada — só na primeiríssima vez
-            // (se depois eu apagar essa sessão, sessoes[c.id] vira [] e não é mais recriada aqui)
-            sessoes[c.id] = c.id === 'atividades' ? [{ id: 'odis', nome: 'Odis' }] : [];
-        }
+        if (!Array.isArray(sessoes[c.id]))
+            sessoes[c.id] = [];
     });
     // migração pontual (uma vez só): acrescenta a sessão "Plans" — cópia da Odis — na aba
     // Atividades. Usa __seedVersion guardado dentro do próprio objeto de sessões pra isso
@@ -151,7 +148,16 @@ const normalizarChecklists = (dados) => {
     if (seedVersion < 2) {
         sessoes.atividades = [...(sessoes.atividades || []), { id: 'plans', nome: 'Plans' }];
     }
-    sessoes.__seedVersion = 2;
+    // migração pontual (uma vez só): remove a sessão "Odis" da aba Atividades (pedido pra limpar
+    // a aba). Itens que estavam nela não são apagados — ficam sem sessaoId (caem no bucket
+    // "Geral" dos dados, mesmo que o botão "Geral" esteja escondido ali).
+    if (seedVersion < 3) {
+        sessoes.atividades = (sessoes.atividades || []).filter((s) => s.id !== 'odis');
+        if (Array.isArray(itens.atividades)) {
+            itens.atividades = itens.atividades.map((it) => (it.sessaoId === 'odis' ? { ...it, sessaoId: undefined } : it));
+        }
+    }
+    sessoes.__seedVersion = 3;
     return { itens, sessoes };
 };
 const CATS_PADRAO = [
@@ -206,6 +212,14 @@ const hoje = () => new Date().toLocaleDateString('en-CA');
 // compara o dia (dataISO) de dois registros do Livro Razão — usado para agrupar visualmente itens do mesmo dia
 // compara o dia (dataISO) de dois registros do Livro Razão — usado para agrupar visualmente itens do mesmo dia
 const mesmoDiaRegistro = (a, b) => !!a && !!b && a.dataISO === b.dataISO;
+// converte uma data ISO (yyyy-mm-dd, formato do <input type="date">) para o formato dd/mm/aaaa
+// usado na exibição — sem passar por new Date() para não sofrer deslocamento de fuso horário
+const formatDataBRDeISO = (iso) => {
+    if (!iso)
+        return '';
+    const [ano, mes, dia] = iso.split('-');
+    return `${dia}/${mes}/${ano}`;
+};
 // domingo da semana atual — a semana começa no domingo (mesma convenção do array DIAS_SEMANA,
 // onde índice 0 = Domingo, e de getDay(), onde 0 = Domingo). É essa chave que decide quando as
 // tarefas semanais renovam: a partir do primeiro minuto de domingo.
@@ -1169,6 +1183,11 @@ function App() {
     const [valorCorrigirSaldo, setValorCorrigirSaldo] = useState('');
     const [livroRazaoExpandido, setLivroRazaoExpandido] = useState(false);
     const [msgLivroRazao, setMsgLivroRazao] = useState('');
+    // edição de lançamentos — só aparece com o ⚙️ (mostrarConfigLivroRazao) aberto
+    const [gastoEditandoId, setGastoEditandoId] = useState(null);
+    const [gastoEditValor, setGastoEditValor] = useState('');
+    const [gastoEditDesc, setGastoEditDesc] = useState('');
+    const [gastoEditData, setGastoEditData] = useState('');
     // ---- 💰 Bank (aba Snat): mesmo molde do Saldo B.E.S.T. (saldo + extrato de gastos +
     // adicionar fundos + corrigir saldo), mas com estado próprio — separado do Saldo B.E.S.T.
     // e do Bank de Finanças.
@@ -1182,16 +1201,29 @@ function App() {
     const [valorCorrigirSaldoSnat, setValorCorrigirSaldoSnat] = useState('');
     const [snatBankExpandido, setSnatBankExpandido] = useState(false);
     const [msgSnatBank, setMsgSnatBank] = useState('');
+    // edição de lançamentos do Bank do Snat — só aparece com o ⚙️ aberto
+    const [gastoSnatEditandoId, setGastoSnatEditandoId] = useState(null);
+    const [gastoSnatEditValor, setGastoSnatEditValor] = useState('');
+    const [gastoSnatEditDesc, setGastoSnatEditDesc] = useState('');
+    const [gastoSnatEditData, setGastoSnatEditData] = useState('');
     const [corteDeCabeloRegistro, setCorteDeCabeloRegistro] = useState([]); // [{id, data, dataISO}] — registro individual, separado do extrato de gastos
     const [corteExpandido, setCorteExpandido] = useState(false);
     const [confirmApagarGastos, setConfirmApagarGastos] = useState(false);
     const [confirmApagarCortes, setConfirmApagarCortes] = useState(false);
+    // edição do registro de corte de cabelo — só a data (único campo do registro) — ⚙️ aberto
+    const [corteEditandoId, setCorteEditandoId] = useState(null);
+    const [corteEditData, setCorteEditData] = useState('');
     const [pesoInput, setPesoInput] = useState('');
     const [cinturaInput, setCinturaInput] = useState('');
     const [medidasRegistro, setMedidasRegistro] = useState([]); // [{id, peso, cintura, data, dataISO}]
     const [medidasExpandido, setMedidasExpandido] = useState(false);
     const [confirmApagarMedidas, setConfirmApagarMedidas] = useState(false);
     const [msgMedidas, setMsgMedidas] = useState('');
+    // edição de registro de medidas — ⚙️ aberto
+    const [medidaEditandoId, setMedidaEditandoId] = useState(null);
+    const [medidaEditPeso, setMedidaEditPeso] = useState('');
+    const [medidaEditCintura, setMedidaEditCintura] = useState('');
+    const [medidaEditData, setMedidaEditData] = useState('');
     // ---- 🧴 Face (aba Development): foto/vídeo (câmera) + comentário — mesmo pipeline do R2
     // usado no Pso (foto comprimida e sobe pro servidor quando o R2 está configurado; sem R2,
     // a foto cai no fallback local em base64; vídeo sempre exige R2). Cada registro guarda a
@@ -1218,6 +1250,11 @@ function App() {
     const [bankExpandido, setBankExpandido] = useState(false);
     const [confirmApagarBank, setConfirmApagarBank] = useState(false);
     const [msgBank, setMsgBank] = useState('');
+    // edição de lançamentos do Bank (Finanças) — ⚙️ aberto — reprocessa a cadeia de saldos/%
+    const [bankEditandoId, setBankEditandoId] = useState(null);
+    const [bankEditValor, setBankEditValor] = useState('');
+    const [bankEditNota, setBankEditNota] = useState('');
+    const [bankEditData, setBankEditData] = useState('');
     const [pumpTarefas, setPumpTarefas] = useState([]); // [{id, nome}] botões nomeáveis criados pelo usuário
     const [pumpNovoNome, setPumpNovoNome] = useState('');
     const [pumpConfigAberto, setPumpConfigAberto] = useState(false);
@@ -1282,6 +1319,7 @@ function App() {
     const [ganhosNovoTexto, setGanhosNovoTexto] = useState('');
     const [ganhosAnoSelecionado, setGanhosAnoSelecionado] = useState(new Date().getFullYear());
     const [ganhosAnoAberto, setGanhosAnoAberto] = useState({}); // { [ano]: bool } — controla a seta de expandir cada ano
+    const [ganhosFiltroEstrelas, setGanhosFiltroEstrelas] = useState(0); // 0 = todas; 1/2/3 = só com aquela classificação
     // ---- sessão "Desbloqueios" (Atividades): valor em US$ + nota curta, sempre ordenado do menor pro maior ----
     const [desbloqueiosRegistro, setDesbloqueiosRegistro] = useState([]); // [{id, valor, nota}]
     const [desbloqueiosNovoValor, setDesbloqueiosNovoValor] = useState('');
@@ -1304,6 +1342,9 @@ function App() {
     const [momentumRegistro, setMomentumRegistro] = useState([]); // [{id, texto, mesChave, data, dataISO}]
     const [momentumNovoTexto, setMomentumNovoTexto] = useState('');
     const [momentumMesAberto, setMomentumMesAberto] = useState({}); // { [mesChave]: bool } — controla a seta de expandir cada mês
+    // modo "coroar" — só o botão 👑 aparece com o ⚙️ geral aberto; ativado, toca na mensagem
+    // da entrada pra dar (ou tirar) a coroa dela. Sem limite de quantas podem estar coroadas.
+    const [momentumModoCoroa, setMomentumModoCoroa] = useState(false);
     // ---- Batalha: Brasil x Estados Unidos, cada um com Prós e Contras (listas de notas livres) — painel embutido na aba Atividades ----
     const [batalhaNotas, setBatalhaNotas] = useState({ brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] }); // { [coluna]: [{id, texto}] }
     const [batalhaNovoTexto, setBatalhaNovoTexto] = useState(''); // texto do único input de adicionar
@@ -1482,6 +1523,9 @@ function App() {
     // por padrão nenhuma aba do histórico fica marcada: todos os botões ficam brancos
     const [historicoAba, setHistoricoAba] = useState(null);
     const [historicoExpandido, setHistoricoExpandido] = useState(false);
+    // ---- aba "Pesquisa" dentro de Histórico — busca livre em tudo que existe no app ----
+    const BUSCA_ABA = '__busca';
+    const [buscaTexto, setBuscaTexto] = useState('');
     // Histórico vive dentro da janela "Gráficos" (ex-Quadro de Medalhas): este botão troca o
     // quadro de medalhas pelos botões de frequência (mensal/trimestral/semestral etc.) que abrem
     // a tabela de histórico. Começa desligado para o quadro de medalhas ficar em primeiro plano.
@@ -3001,6 +3045,35 @@ function App() {
         });
         marcarSujo();
     };
+    // ---- edição de um lançamento de gasto já existente (só com o ⚙️ do Livro Razão aberto) ----
+    const iniciarEdicaoGasto = (l) => {
+        setGastoEditandoId(l.id);
+        setGastoEditValor(String(l.valor).replace('.', ','));
+        setGastoEditDesc(l.descricao);
+        setGastoEditData(l.dataISO || hoje());
+    };
+    const cancelarEdicaoGasto = () => setGastoEditandoId(null);
+    const salvarEdicaoGasto = () => {
+        const valor = parseFloat(String(gastoEditValor).replace(',', '.'));
+        const descricao = gastoEditDesc.trim();
+        if (!valor || valor <= 0) {
+            setMsgLivroRazao('Digite um valor gasto válido (ex: 23,50).');
+            return;
+        }
+        if (!descricao) {
+            setMsgLivroRazao('Diga no que esse valor foi gasto.');
+            return;
+        }
+        const dataISO = gastoEditData || hoje();
+        const dataBR = formatDataBRDeISO(dataISO);
+        const anterior = livroRazao.find((x) => x.id === gastoEditandoId);
+        if (anterior)
+            setSaldoLivroRazao((s) => s + anterior.valor - valor); // desfaz o valor antigo e aplica o novo
+        setLivroRazao((l) => l.map((x) => (x.id === gastoEditandoId ? { ...x, valor, descricao, data: dataBR, dataISO } : x)));
+        setGastoEditandoId(null);
+        setMsgLivroRazao('');
+        marcarSujo();
+    };
     // ---- 💰 Bank (Snat) — mesmas regras do Saldo B.E.S.T. acima, com estado próprio ----
     const adicionarGastoSnatBank = () => {
         const valor = parseFloat(String(novoGastoValorSnat).replace(',', '.'));
@@ -3058,6 +3131,35 @@ function App() {
         });
         marcarSujo();
     };
+    // ---- edição de um lançamento do Bank do Snat já existente (só com o ⚙️ aberto) ----
+    const iniciarEdicaoGastoSnat = (l) => {
+        setGastoSnatEditandoId(l.id);
+        setGastoSnatEditValor(String(l.valor).replace('.', ','));
+        setGastoSnatEditDesc(l.descricao);
+        setGastoSnatEditData(l.dataISO || hoje());
+    };
+    const cancelarEdicaoGastoSnat = () => setGastoSnatEditandoId(null);
+    const salvarEdicaoGastoSnat = () => {
+        const valor = parseFloat(String(gastoSnatEditValor).replace(',', '.'));
+        const descricao = gastoSnatEditDesc.trim();
+        if (!valor || valor <= 0) {
+            setMsgSnatBank('Digite um valor gasto válido (ex: 23,50).');
+            return;
+        }
+        if (!descricao) {
+            setMsgSnatBank('Diga no que esse valor foi gasto.');
+            return;
+        }
+        const dataISO = gastoSnatEditData || hoje();
+        const dataBR = formatDataBRDeISO(dataISO);
+        const anterior = snatBankRegistro.find((x) => x.id === gastoSnatEditandoId);
+        if (anterior)
+            setSnatBankSaldo((s) => s + anterior.valor - valor);
+        setSnatBankRegistro((l) => l.map((x) => (x.id === gastoSnatEditandoId ? { ...x, valor, descricao, data: dataBR, dataISO } : x)));
+        setGastoSnatEditandoId(null);
+        setMsgSnatBank('');
+        marcarSujo();
+    };
     // copia um texto simples para a área de transferência — usado nos botões "copiar tudo"
     // do livro razão (gastos e corte de cabelo)
     const copiarLancamento = (texto) => {
@@ -3099,6 +3201,19 @@ function App() {
         if (idx !== -1)
             registrarDesfazer('livroRazao', 'corteDeCabelo', { valor: corteDeCabeloRegistro[idx], idx });
         setCorteDeCabeloRegistro((l) => l.filter((x) => x.id !== id));
+        marcarSujo();
+    };
+    // ---- edição da data de um registro de corte de cabelo já existente (só com o ⚙️ aberto) ----
+    const iniciarEdicaoCorte = (r) => {
+        setCorteEditandoId(r.id);
+        setCorteEditData(r.dataISO || hoje());
+    };
+    const cancelarEdicaoCorte = () => setCorteEditandoId(null);
+    const salvarEdicaoCorte = () => {
+        const dataISO = corteEditData || hoje();
+        const dataBR = formatDataBRDeISO(dataISO);
+        setCorteDeCabeloRegistro((l) => l.map((x) => (x.id === corteEditandoId ? { ...x, data: dataBR, dataISO } : x)));
+        setCorteEditandoId(null);
         marcarSujo();
     };
     // botão geral "copiar tudo" do registro de corte de cabelo
@@ -3143,6 +3258,33 @@ function App() {
         if (idx !== -1)
             registrarDesfazer('livroRazao', 'medida', { valor: medidasRegistro[idx], idx });
         setMedidasRegistro((l) => l.filter((x) => x.id !== id));
+        marcarSujo();
+    };
+    // ---- edição de um registro de medidas já existente (só com o ⚙️ aberto) ----
+    const iniciarEdicaoMedida = (m) => {
+        setMedidaEditandoId(m.id);
+        setMedidaEditPeso(m.peso !== null && m.peso !== undefined ? String(m.peso).replace('.', ',') : '');
+        setMedidaEditCintura(m.cintura !== null && m.cintura !== undefined ? String(m.cintura).replace('.', ',') : '');
+        setMedidaEditData(m.dataISO || hoje());
+    };
+    const cancelarEdicaoMedida = () => setMedidaEditandoId(null);
+    const salvarEdicaoMedida = () => {
+        const peso = medidaEditPeso.trim() ? parseFloat(medidaEditPeso.replace(',', '.')) : null;
+        const cintura = medidaEditCintura.trim() ? parseFloat(medidaEditCintura.replace(',', '.')) : null;
+        if ((peso === null || isNaN(peso)) && (cintura === null || isNaN(cintura))) {
+            setMsgMedidas('Digite ao menos o peso ou a cintura.');
+            return;
+        }
+        const dataISO = medidaEditData || hoje();
+        const dataBR = formatDataBRDeISO(dataISO);
+        setMedidasRegistro((l) => l.map((x) => (x.id === medidaEditandoId ? {
+            ...x,
+            peso: (peso !== null && !isNaN(peso)) ? peso : null,
+            cintura: (cintura !== null && !isNaN(cintura)) ? cintura : null,
+            data: dataBR, dataISO,
+        } : x)));
+        setMedidaEditandoId(null);
+        setMsgMedidas('');
         marcarSujo();
     };
     const copiarTudoMedidas = () => {
@@ -3237,6 +3379,50 @@ function App() {
         registrarDesfazer('livroRazao', 'lancamentoBank', { valor: item, idx });
         setBankRegistro((l) => l.filter((x) => x.id !== id));
         setBankSaldo((s) => s - item.valor);
+        marcarSujo();
+    };
+    // ---- edição de um lançamento do Bank já existente (só com o ⚙️ aberto) ----
+    // como cada lançamento guarda saldoAnterior/saldoNovo/percentual encadeados com o anterior,
+    // editar um valor no meio da lista exige recalcular a cadeia inteira a partir dali —
+    // igual a refazer o livro-razão do ponto editado em diante.
+    const recomputarBank = (lista, saldoInicial) => {
+        const cronologico = [...lista].reverse(); // do mais antigo pro mais novo (a lista fica do mais novo pro mais antigo)
+        let saldoCorrente = saldoInicial;
+        let valorAnteriorCorrente = null;
+        const atualizada = cronologico.map((item) => {
+            const saldoAnterior = saldoCorrente;
+            const percentual = percentualBank(valorAnteriorCorrente, item.valor);
+            const novoItem = { ...item, valorAnterior: valorAnteriorCorrente, saldoAnterior, saldoNovo: saldoAnterior + item.valor, percentual, frase: fraseBank(percentual) };
+            saldoCorrente = novoItem.saldoNovo;
+            valorAnteriorCorrente = item.valor;
+            return novoItem;
+        });
+        return { lista: atualizada.reverse(), saldoFinal: saldoCorrente };
+    };
+    const iniciarEdicaoBank = (l) => {
+        setBankEditandoId(l.id);
+        setBankEditValor(String(l.valor).replace('.', ','));
+        setBankEditNota(l.nota || '');
+        setBankEditData(l.dataISO || hoje());
+    };
+    const cancelarEdicaoBank = () => setBankEditandoId(null);
+    const salvarEdicaoBank = () => {
+        const valor = parseValorBank(bankEditValor);
+        if (isNaN(valor) || valor === 0) {
+            setMsgBank('Digite um valor válido (use - na frente para descontar).');
+            return;
+        }
+        const nota = bankEditNota.trim();
+        const dataISO = bankEditData || hoje();
+        const dataBR = formatDataBRDeISO(dataISO);
+        const listaEditada = bankRegistro.map((x) => (x.id === bankEditandoId ? { ...x, valor, nota, data: dataBR, dataISO } : x));
+        // saldo antes do lançamento mais antigo nunca muda com uma edição — serve de base para reprocessar tudo
+        const saldoBase = bankRegistro.length ? bankRegistro[bankRegistro.length - 1].saldoAnterior : 0;
+        const { lista, saldoFinal } = recomputarBank(listaEditada, saldoBase);
+        setBankRegistro(lista);
+        setBankSaldo(saldoFinal);
+        setBankEditandoId(null);
+        setMsgBank('');
         marcarSujo();
     };
     const copiarTudoBank = () => {
@@ -3597,19 +3783,24 @@ function App() {
         ...(chkId === 'development' ? [{ id: CORTE_SESSAO, nome: '💇 Cabelo' }, { id: MEDIDAS_SESSAO, nome: '📏 Medidas' }, { id: FACE_SESSAO, nome: '🧴 Face' }] : []),
         ...(chkId === 'financas' ? [{ id: BANK_SESSAO, nome: '💰 Bank' }] : []),
         ...(chkId === 'snat' ? [{ id: SNAT_BANK_SESSAO, nome: '💰 Bank' }] : []),
-        ...(chkId === 'atividades' ? [{ id: GANHOS_SESSAO, nome: 'Ganhos' }, { id: DESBLOQUEIOS_SESSAO, nome: 'Desbloqueios' }, { id: ANTES_DE_IR_SESSAO, nome: 'Antes de ir' }, { id: ERA_DE_OURO_SESSAO, nome: 'Era de Ouro' }, { id: BATALHA_SESSAO, nome: '⚔️ Batalha' }, { id: CONTADOR_SESSAO, nome: '⏳ Contador' }, { id: MOMENTUM_SESSAO, nome: 'Momentum' }] : []),
+        ...(chkId === 'atividades' ? [{ id: GANHOS_SESSAO, nome: 'Ganhos' }, { id: DESBLOQUEIOS_SESSAO, nome: 'Faixa de desbloqueio' }, { id: ANTES_DE_IR_SESSAO, nome: 'Antes de ir' }, { id: ERA_DE_OURO_SESSAO, nome: 'Era de Ouro' }, { id: BATALHA_SESSAO, nome: '⚔️ Batalha' }, { id: CONTADOR_SESSAO, nome: '⏳ Contador' }, { id: MOMENTUM_SESSAO, nome: 'Momentum' }] : []),
         ...(chkId === 'prefeituras' ? [{ id: CAR_SESSAO, nome: '🚗 Car' }] : []),
         // sessão fixa "Já Tenho" (checklist normal, botão "Priority" padrão) — só na aba Skill
         ...(chkId === 'skill' ? [{ id: JA_TENHO_SESSAO, nome: 'Já Tenho' }] : []),
         // sessão fixa "Programa" (checklist normal, mas com o botão "Programa" em vez do "Priority")
         ...(['snat', 'pe', 'skill', 'best'].includes(chkId) ? [{ id: PROGRAMA_SESSAO, nome: 'Programa' }] : []),
-        { id: 'geral', nome: 'Geral' },
+        // mesma sessão fixa, só que chamada "Receitas" na aba Nutrição — cada item ganha o botão "Programa"
+        ...(chkId === 'nutricao' ? [{ id: PROGRAMA_SESSAO, nome: 'Receitas' }] : []),
+        // "Geral" fica escondida na aba Atividades — lá tudo já vive nas sessões fixas de cima,
+        // então esse botão só ficava sobrando à toa
+        ...(chkId === 'atividades' ? [] : [{ id: 'geral', nome: 'Geral' }]),
         ...chkSessoesDe(chkId),
     ];
     const sessaoDoItem = (item) => item.sessaoId || 'geral';
     const chkSessaoAtual = (chkId) => {
-        const sel = chkSessaoSel[chkId] || (chkId === 'best' ? SALDO_SESSAO : 'geral');
-        return chkAbasDe(chkId).some((s) => s.id === sel) ? sel : 'geral';
+        const padrao = chkId === 'best' ? SALDO_SESSAO : chkId === 'atividades' ? GANHOS_SESSAO : 'geral';
+        const sel = chkSessaoSel[chkId] || padrao;
+        return chkAbasDe(chkId).some((s) => s.id === sel) ? sel : padrao;
     };
     const chkItensDaSessao = (chkId, sid) => chkItensDe(chkId).filter((i) => sessaoDoItem(i) === sid);
     const setChkMapa = (setter, chkId, valor) => setter((m) => ({ ...m, [chkId]: valor }));
@@ -3910,14 +4101,21 @@ function App() {
         livroRazaoExpandido && (React.createElement(React.Fragment, null,
             React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                 livroRazao.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum lan\u00E7amento ainda."),
-                livroRazao.map((l) => (React.createElement("div", { key: l.id, className: "mt-fixa-item" },
+                livroRazao.map((l) => (React.createElement("div", { key: l.id, className: "mt-fixa-item" }, gastoEditandoId === l.id ? (React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 } },
+                        React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "decimal", value: gastoEditValor, onChange: (e) => setGastoEditValor(e.target.value), style: { flex: '0 0 90px' } }),
+                        React.createElement("input", { className: "mt-nota-input", value: gastoEditDesc, onChange: (e) => setGastoEditDesc(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoGasto(), style: { flex: '1 1 140px' } }),
+                        React.createElement("input", { className: "mt-nota-input", type: "date", value: gastoEditData, onChange: (e) => setGastoEditData(e.target.value), style: { flex: '0 0 140px' } })),
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarEdicaoGasto }, "Salvar"),
+                    React.createElement("button", { className: "mt-btn-sm", onClick: cancelarEdicaoGasto }, "Cancelar"))) : (React.createElement(React.Fragment, null,
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, l.descricao),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, l.data)),
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: '#A85C4D', flexShrink: 0 } },
                         "- ",
                         formatMoeda(l.valor)),
-                    React.createElement("button", { className: "mt-del", onClick: () => removerLancamentoRazao(l.id) }, "\u00D7"))))))),
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoGasto(l), title: "Editar" }, "\u270E"),
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerLancamentoRazao(l.id) }, "\u00D7"))))))))),
         React.createElement("div", { className: "mt-premio-divisor" }),
         React.createElement("div", { className: "mt-premio-secao" },
             React.createElement("p", { className: "mt-premio-secao-titulo" }, "Novo gasto"),
@@ -3951,14 +4149,21 @@ function App() {
         snatBankExpandido && (React.createElement(React.Fragment, null,
             React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                 snatBankRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum lan\u00E7amento ainda."),
-                snatBankRegistro.map((l) => (React.createElement("div", { key: l.id, className: "mt-fixa-item" },
+                snatBankRegistro.map((l) => (React.createElement("div", { key: l.id, className: "mt-fixa-item" }, gastoSnatEditandoId === l.id ? (React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 } },
+                        React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "decimal", value: gastoSnatEditValor, onChange: (e) => setGastoSnatEditValor(e.target.value), style: { flex: '0 0 90px' } }),
+                        React.createElement("input", { className: "mt-nota-input", value: gastoSnatEditDesc, onChange: (e) => setGastoSnatEditDesc(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoGastoSnat(), style: { flex: '1 1 140px' } }),
+                        React.createElement("input", { className: "mt-nota-input", type: "date", value: gastoSnatEditData, onChange: (e) => setGastoSnatEditData(e.target.value), style: { flex: '0 0 140px' } })),
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarEdicaoGastoSnat }, "Salvar"),
+                    React.createElement("button", { className: "mt-btn-sm", onClick: cancelarEdicaoGastoSnat }, "Cancelar"))) : (React.createElement(React.Fragment, null,
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, l.descricao),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, l.data)),
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: '#A85C4D', flexShrink: 0 } },
                         "- ",
                         formatMoeda(l.valor)),
-                    React.createElement("button", { className: "mt-del", onClick: () => removerLancamentoSnatBank(l.id) }, "\u00D7"))))))),
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoGastoSnat(l), title: "Editar" }, "\u270E"),
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerLancamentoSnatBank(l.id) }, "\u00D7"))))))))),
         React.createElement("div", { className: "mt-premio-divisor" }),
         React.createElement("div", { className: "mt-premio-secao" },
             React.createElement("p", { className: "mt-premio-secao-titulo" }, "Novo gasto"),
@@ -3981,11 +4186,16 @@ function App() {
         corteExpandido && (React.createElement(React.Fragment, null,
             React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                 corteDeCabeloRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum registro ainda."),
-                corteDeCabeloRegistro.map((r, i) => (React.createElement("div", { key: r.id, className: "mt-fixa-item", style: mesmoDiaRegistro(r, corteDeCabeloRegistro[i + 1]) ? { borderBottom: 'none' } : undefined },
+                corteDeCabeloRegistro.map((r, i) => (React.createElement("div", { key: r.id, className: "mt-fixa-item", style: mesmoDiaRegistro(r, corteDeCabeloRegistro[i + 1]) ? { borderBottom: 'none' } : undefined }, corteEditandoId === r.id ? (React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("input", { className: "mt-nota-input", type: "date", value: corteEditData, onChange: (e) => setCorteEditData(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoCorte() })),
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarEdicaoCorte }, "Salvar"),
+                    React.createElement("button", { className: "mt-btn-sm", onClick: cancelarEdicaoCorte }, "Cancelar"))) : (React.createElement(React.Fragment, null,
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, "Corte de cabelo"),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
-                    React.createElement("button", { className: "mt-del", onClick: () => removerCorteDeCabelo(r.id) }, "\u00D7")))))))));
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoCorte(r), title: "Editar" }, "\u270E"),
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerCorteDeCabelo(r.id) }, "\u00D7")))))))))));
     // O painel "📏 Medidas corporais" também mora dentro da aba Development, no botão "Medidas".
     // Painel "Ganhos": mora dentro da aba Atividades, no botão "Ganhos" ao lado das sessões.
     // Notas de texto livre, uma por ano, para os últimos 8 anos (sem checkbox, sem valor).
@@ -3995,12 +4205,16 @@ function App() {
         if (!texto)
             return;
         const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        setGanhosRegistro((l) => [{ id: genId(), ano: ganhosAnoSelecionado, texto, data: dataHoje, dataISO: hoje() }, ...l]);
+        setGanhosRegistro((l) => [{ id: genId(), ano: ganhosAnoSelecionado, texto, data: dataHoje, dataISO: hoje(), estrelas: 0 }, ...l]);
         setGanhosNovoTexto('');
         marcarSujo();
     };
     const removerRegistroGanhos = (id) => {
         setGanhosRegistro((l) => l.filter((r) => r.id !== id));
+        marcarSujo();
+    };
+    const definirEstrelasGanhos = (id, valor) => {
+        setGanhosRegistro((l) => l.map((r) => (r.id === id ? { ...r, estrelas: r.estrelas === valor ? 0 : valor } : r)));
         marcarSujo();
     };
     // Desbloqueios: valor em US$ (número) + nota curta, sem agrupamento — a lista inteira
@@ -4094,6 +4308,10 @@ function App() {
         setMomentumRegistro((l) => l.filter((r) => r.id !== id));
         marcarSujo();
     };
+    const alternarCoroaMomentum = (id) => {
+        setMomentumRegistro((l) => l.map((r) => (r.id === id ? { ...r, coroa: !r.coroa } : r)));
+        marcarSujo();
+    };
     const renderGanhos = () => {
         const anoAtual = new Date().getFullYear();
         const ANO_INICIO_GANHOS = 1982;
@@ -4121,9 +4339,13 @@ function App() {
                         React.createElement("option", { value: "indefinido" }, "Indefinido"),
                         React.createElement("option", { value: "lary" }, "Lary")),
                     React.createElement("input", { className: "mt-nota-input", placeholder: "Nova entrada\u2026", value: ganhosNovoTexto, onChange: (e) => setGanhosNovoTexto(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarRegistroGanhos() }),
-                    React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarRegistroGanhos }, "Adicionar"))),
-            grupos.map((ano) => {
-                const doAno = ganhosRegistro.filter((r) => r.ano === ano);
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarRegistroGanhos }, "Adicionar")),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' } },
+                    React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, "Filtrar:"),
+                    React.createElement("button", { className: "mt-btn-sm", onClick: () => setGanhosFiltroEstrelas(0), style: ganhosFiltroEstrelas === 0 ? { background: '#232323', color: '#fff', borderColor: '#232323' } : undefined }, "Todas"),
+                    [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-btn-sm", onClick: () => setGanhosFiltroEstrelas((v) => (v === n ? 0 : n)), style: ganhosFiltroEstrelas === n ? { background: '#C9A227', color: '#fff', borderColor: '#C9A227' } : undefined, title: `Só entradas com ${n} estrela${n > 1 ? 's' : ''}` }, '★'.repeat(n)))))),
+            (ganhosFiltroEstrelas === 0 ? grupos : grupos.filter((ano) => ganhosRegistro.some((r) => r.ano === ano && (r.estrelas || 0) === ganhosFiltroEstrelas))).map((ano) => {
+                const doAno = ganhosRegistro.filter((r) => r.ano === ano && (ganhosFiltroEstrelas === 0 || (r.estrelas || 0) === ganhosFiltroEstrelas));
                 const aberto = !!ganhosAnoAberto[ano];
                 const rotulo = rotuloDe(ano);
                 return (React.createElement("div", { key: ano, style: { marginBottom: 8 } },
@@ -4145,8 +4367,12 @@ function App() {
                             "."),
                         doAno.map((r) => (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto)),
-                            React.createElement("button", { className: "mt-del", onClick: () => removerRegistroGanhos(r.id) }, "\u00D7"))))))));
+                                React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto),
+                                React.createElement("div", { style: { display: 'flex', gap: 3, marginTop: 3 } }, [1, 2, 3].map((n) => (React.createElement("span", { key: n, onClick: () => definirEstrelasGanhos(r.id, n), title: `Classificar com ${n} estrela${n > 1 ? 's' : ''} (toque de novo pra tirar)`, style: {
+                                        cursor: 'pointer', fontSize: 16, lineHeight: 1,
+                                        color: (r.estrelas || 0) >= n ? '#C9A227' : '#ddd8c9',
+                                    } }, "\u2605"))))),
+                            mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroGanhos(r.id) }, "\u00D7"))))))));
             })));
     };
     // Painel "Desbloqueios": valor em US$ + nota curta, lista plana (sem agrupar por ano),
@@ -4155,7 +4381,7 @@ function App() {
         const ordenado = desbloqueiosRegistro.slice().sort((a, b) => a.valor - b.valor);
         return (React.createElement(React.Fragment, null,
             React.createElement("div", { className: "mt-premio-secao" },
-                React.createElement("p", { className: "mt-premio-secao-titulo" }, "Desbloqueios"),
+                React.createElement("p", { className: "mt-premio-secao-titulo" }, "Faixa de desbloqueio"),
                 React.createElement("p", { style: { fontSize: 12, color: '#999', marginTop: -4, marginBottom: 10 } }, "Registre um valor em d\u00F3lares e uma nota curta. A lista fica sempre ordenada do menor valor (topo) pro maior (embaixo)."),
                 React.createElement("div", { className: "mt-premio-saque-row" },
                     React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "decimal", placeholder: "Valor (US$)", value: desbloqueiosNovoValor, onChange: (e) => setDesbloqueiosNovoValor(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarRegistroDesbloqueio(), style: { flex: '0 0 110px' } }),
@@ -4172,8 +4398,8 @@ function App() {
                     React.createElement("div", { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 } },
                         React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: '#57A773', flexShrink: 0 } }, formatMoeda(r.valor)),
                         React.createElement("span", { style: { fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.nota)),
-                    React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoDesbloqueio(r), title: "Editar" }, "\u270E"),
-                    React.createElement("button", { className: "mt-del", onClick: () => removerRegistroDesbloqueio(r.id) }, "\u00D7")))))))));
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoDesbloqueio(r), title: "Editar" }, "\u270E"),
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroDesbloqueio(r.id) }, "\u00D7")))))))));
     };
     // Painel "Antes de ir": checklist de última hora — caixa de texto + Adicionar; cada item
     // pendente ganha um botão "Programa" (igual ao do Contador/Realidade, texto livre por item)
@@ -4196,7 +4422,7 @@ function App() {
                         borderColor: '#4A7FD9',
                     } }, "Programa"),
                 React.createElement("button", { className: "mt-btn-sm primary", style: { flexShrink: 0 }, onClick: () => marcarAntesDeIrFeito(it.id) }, "Feito"),
-                React.createElement("button", { className: "mt-del", onClick: () => removerAntesDeIrPendente(it.id) }, "\u00D7"))))),
+                mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerAntesDeIrPendente(it.id) }, "\u00D7"))))),
         React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '16px 0 4px' } }, "CONCLU\u00CDDOS"),
         React.createElement("div", { className: "mt-fixas-scroll" },
             antesDeIrConcluidos.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum item conclu\u00EDdo ainda."),
@@ -4209,7 +4435,7 @@ function App() {
                         color: it.programa ? '#fff' : '#4A7FD9',
                         borderColor: '#4A7FD9',
                     } }, "Programa"),
-                React.createElement("button", { className: "mt-del", onClick: () => removerAntesDeIrConcluido(it.id) }, "\u00D7")))))));
+                mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerAntesDeIrConcluido(it.id) }, "\u00D7")))))));
     // Painel "Era de Ouro": idêntico ao Ganhos (registro agrupado por ano), mas sem o grupo
     // especial "Lary" — aqui só existe "Indefinido" no fim da lista, já que é uma memória própria.
     // eraDeOuroRegistro é totalmente separado de ganhosRegistro.
@@ -4259,7 +4485,7 @@ function App() {
                         doAno.map((r) => (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto)),
-                            React.createElement("button", { className: "mt-del", onClick: () => removerRegistroEraDeOuro(r.id) }, "\u00D7"))))))));
+                            mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroEraDeOuro(r.id) }, "\u00D7"))))))));
             })));
     };
     // Painel "Momentum": mesmo padrão de agrupamento do Ganhos, mas por mês em vez de ano —
@@ -4279,6 +4505,14 @@ function App() {
             React.createElement("div", { className: "mt-premio-secao" },
                 React.createElement("p", { className: "mt-premio-secao-titulo" }, "Momentum"),
                 React.createElement("p", { style: { fontSize: 12, color: '#999', marginTop: -4, marginBottom: 10 } }, "Registre uma entrada \u2014 a data do dia \u00E9 carimbada sozinha, e o livro fica separado por m\u00EAs."),
+                mostrarConfigLivroRazao && (React.createElement("button", { className: "mt-btn-sm", onClick: () => setMomentumModoCoroa((v) => !v), style: {
+                        marginBottom: 10,
+                        background: momentumModoCoroa ? '#C9A227' : '#fff',
+                        color: momentumModoCoroa ? '#fff' : '#777',
+                        borderColor: '#C9A227',
+                    }, title: momentumModoCoroa ? 'Toque na entrada que quer coroar (ou tirar a coroa) — toque aqui de novo pra sair' : 'Escolher entradas coroadas' },
+                    "\uD83D\uDC51 ",
+                    momentumModoCoroa ? 'Toque na entrada pra coroar' : 'Coroar entrada')),
                 React.createElement("div", { className: "mt-premio-saque-row" },
                     React.createElement("input", { className: "mt-nota-input", placeholder: "Nova entrada\u2026", value: momentumNovoTexto, onChange: (e) => setMomentumNovoTexto(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarRegistroMomentum() }),
                     React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarRegistroMomentum }, "Adicionar"))),
@@ -4303,11 +4537,20 @@ function App() {
                             "Nenhuma entrada em ",
                             rotulo,
                             "."),
-                        doMes.map((r) => (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto),
-                                React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
-                            React.createElement("button", { className: "mt-del", onClick: () => removerRegistroMomentum(r.id) }, "\u00D7"))))))));
+                        doMes.map((r) => {
+                            const podeCoroar = mostrarConfigLivroRazao && momentumModoCoroa;
+                            return (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("span", { onClick: () => podeCoroar && alternarCoroaMomentum(r.id), style: {
+                                            display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word',
+                                            cursor: podeCoroar ? 'pointer' : 'default',
+                                            outline: podeCoroar ? '1px dashed #C9A22766' : 'none', outlineOffset: 3,
+                                        }, title: podeCoroar ? (r.coroa ? 'Tocar pra tirar a coroa' : 'Tocar pra coroar') : undefined },
+                                        r.coroa ? '👑 ' : '',
+                                        r.texto),
+                                    React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
+                                mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroMomentum(r.id) }, "\u00D7")));
+                        })))));
             })));
     };
     // Batalha: um bloco Prós ou Contras — só exibe a lista de notas já criadas (o input é único, lá em cima)
@@ -4318,7 +4561,7 @@ function App() {
             (batalhaNotas[chave] || []).map((n) => (React.createElement("div", { key: n.id, className: "mt-fixa-item", style: { padding: '6px 8px', flexDirection: 'column', alignItems: 'stretch' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start' } },
                     React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 12.5, wordBreak: 'break-word' } }, n.texto),
-                    React.createElement("button", { className: "mt-del", onClick: () => removerNotaBatalha(chave, n.id) }, "\u00D7")),
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerNotaBatalha(chave, n.id) }, "\u00D7")),
                 React.createElement("div", { style: { display: 'flex', gap: 2, marginTop: 4 } }, [1, 2, 3].map((estrela) => (React.createElement("button", { key: estrela, onClick: () => definirEstrelaBatalha(chave, n.id, estrela), title: `${estrela} estrela${estrela > 1 ? 's' : ''}`, style: { padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, color: (n.estrelas || 0) >= estrela ? (chave.toLowerCase().includes('contras') ? '#D64545' : '#D9B23C') : '#ddd8c9' } }, "\u2605"))))))))));
     // Batalha: uma coluna de país — bandeira + nome, com Prós e Contras dentro
     const renderColunaPaisBatalha = (bandeira, nomePais, chavePros, chaveContras) => (React.createElement("div", { style: { flex: 1, minWidth: 0 } },
@@ -4377,7 +4620,7 @@ function App() {
                             color: c.programa ? '#fff' : '#4A7FD9',
                             borderColor: '#4A7FD9',
                         } }, "Programa"),
-                    React.createElement("button", { className: "mt-del", onClick: () => removerContador(c.id) }, "\u00D7")));
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerContador(c.id) }, "\u00D7")));
             }))));
     const renderMedidas = () => (React.createElement(React.Fragment, null,
         React.createElement("div", { className: "mt-premio-secao" },
@@ -4396,11 +4639,18 @@ function App() {
         medidasExpandido && (React.createElement(React.Fragment, null,
             React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                 medidasRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum registro ainda."),
-                medidasRegistro.map((m, i) => (React.createElement("div", { key: m.id, className: "mt-fixa-item", style: mesmoDiaRegistro(m, medidasRegistro[i + 1]) ? { borderBottom: 'none' } : undefined },
+                medidasRegistro.map((m, i) => (React.createElement("div", { key: m.id, className: "mt-fixa-item", style: mesmoDiaRegistro(m, medidasRegistro[i + 1]) ? { borderBottom: 'none' } : undefined }, medidaEditandoId === m.id ? (React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 } },
+                        React.createElement("input", { className: "mt-nota-input", type: "number", step: "0.1", placeholder: "Peso (kg)", value: medidaEditPeso, onChange: (e) => setMedidaEditPeso(e.target.value), style: { flex: '0 0 90px' } }),
+                        React.createElement("input", { className: "mt-nota-input", type: "number", step: "0.1", placeholder: "Cintura (cm)", value: medidaEditCintura, onChange: (e) => setMedidaEditCintura(e.target.value), style: { flex: '0 0 90px' } }),
+                        React.createElement("input", { className: "mt-nota-input", type: "date", value: medidaEditData, onChange: (e) => setMedidaEditData(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoMedida(), style: { flex: '0 0 140px' } })),
+                    React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarEdicaoMedida }, "Salvar"),
+                    React.createElement("button", { className: "mt-btn-sm", onClick: cancelarEdicaoMedida }, "Cancelar"))) : (React.createElement(React.Fragment, null,
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, [m.peso !== null ? `Peso: ${m.peso} kg` : null, m.cintura !== null ? `Cintura: ${m.cintura} cm` : null].filter(Boolean).join(' · ')),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, m.data)),
-                    React.createElement("button", { className: "mt-del", onClick: () => removerMedida(m.id) }, "\u00D7")))))))));
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoMedida(m), title: "Editar" }, "\u270E"),
+                    mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerMedida(m.id) }, "\u00D7")))))))))));
     // 🧴 Face: mora dentro da aba Development, no botão "Face" ao lado de Cabelo e Medidas.
     // Foto/vídeo tirados na hora (câmera direto) + comentário — mesmo pipeline do Pso: com o
     // R2 configurado, a foto sobe comprimida pro servidor e o vídeo sobe puro (só a URL fica
@@ -4494,7 +4744,13 @@ function App() {
             bankExpandido && (React.createElement(React.Fragment, null,
                 React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                     bankRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum lan\u00E7amento ainda."),
-                    bankRegistro.map((l) => (React.createElement("div", { key: l.id, className: "mt-fixa-item" },
+                    bankRegistro.map((l) => (React.createElement("div", { key: l.id, className: "mt-fixa-item" }, bankEditandoId === l.id ? (React.createElement(React.Fragment, null,
+                        React.createElement("div", { style: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 } },
+                            React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "decimal", value: bankEditValor, onChange: (e) => setBankEditValor(e.target.value), style: { flex: '0 0 100px' } }),
+                            React.createElement("input", { className: "mt-nota-input", value: bankEditNota, onChange: (e) => setBankEditNota(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoBank(), style: { flex: '1 1 140px' } }),
+                            React.createElement("input", { className: "mt-nota-input", type: "date", value: bankEditData, onChange: (e) => setBankEditData(e.target.value), style: { flex: '0 0 140px' } })),
+                        React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarEdicaoBank }, "Salvar"),
+                        React.createElement("button", { className: "mt-btn-sm", onClick: cancelarEdicaoBank }, "Cancelar"))) : (React.createElement(React.Fragment, null,
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, l.nota || 'Sem nota'),
                             (l.frase || fraseBank(l.percentual)) && (React.createElement("span", { style: { display: 'block', fontSize: 11.5, fontWeight: 700, color: l.percentual > 0 ? '#3E8E5A' : l.percentual < 0 ? '#A85C4D' : '#999' } }, l.frase || fraseBank(l.percentual))),
@@ -4502,7 +4758,8 @@ function App() {
                         React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: l.valor >= 0 ? '#3E8E5A' : '#A85C4D', flexShrink: 0 } },
                             l.valor >= 0 ? '+ ' : '- ',
                             formatMoeda(Math.abs(l.valor))),
-                        React.createElement("button", { className: "mt-del", onClick: () => removerLancamentoBank(l.id) }, "\u00D7")))))))));
+                        mostrarConfigLivroRazao && React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoBank(l), title: "Editar" }, "\u270E"),
+                        mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerLancamentoBank(l.id) }, "\u00D7")))))))))));
     };
     // ---- atalhos rápidos (coluna à direita) ----
     // Rola a página até deixar o elemento indicado no TOPO da tela.
@@ -5473,8 +5730,10 @@ function App() {
         }
     };
     // Anexo de imagem na Nota do alerta: se o Cloudflare R2 já estiver configurado (Configurações
-    // gerais), comprime e sobe a foto, guardando só a URL. Sem configuração ainda, cai no
-    // comportamento antigo (base64 direto no localStorage) pra nunca travar o fluxo.
+    // gerais), comprime e sobe a foto, guardando só a URL. Sem configuração ainda, comprime do
+    // mesmo jeito (1280px / JPEG 75%) e guarda o resultado já pequeno em base64 no localStorage —
+    // fotos cruas (várias MB cada, direto da câmera do iPhone) estouravam o limite de espaço do
+    // navegador e faziam o salvamento falhar sem avisar, derrubando fotos (às vezes até antigas).
     const handleImagemInput = async (e) => {
         const file = e.target.files && e.target.files[0];
         e.target.value = '';
@@ -5482,9 +5741,21 @@ function App() {
             return;
         const { url, token } = lerConfigR2();
         if (!url || !token) {
-            const reader = new FileReader();
-            reader.onload = (ev) => setNovaNotaImagem(ev.target.result);
-            reader.readAsDataURL(file);
+            setMsgUploadMidia('');
+            setUploadMidiaEmAndamento(true);
+            try {
+                const comprimida = await comprimirImagemParaUpload(file);
+                const reader = new FileReader();
+                reader.onload = (ev) => setNovaNotaImagem(ev.target.result);
+                reader.onerror = () => setMsgUploadMidia('Não consegui processar a foto. Tente de novo.');
+                reader.readAsDataURL(comprimida);
+            }
+            catch (err) {
+                setMsgUploadMidia('Não consegui processar a foto. Tente de novo.');
+            }
+            finally {
+                setUploadMidiaEmAndamento(false);
+            }
             return;
         }
         setMsgUploadMidia('');
@@ -5527,7 +5798,8 @@ function App() {
         }
     };
     // ---- Pso: foto (câmera) + vídeo (câmera) — mesmo pipeline de cima (comprime e sobe pro
-    // R2 quando configurado; sem R2, foto cai no fallback em base64 e vídeo fica bloqueado). ----
+    // R2 quando configurado; sem R2, comprime do mesmo jeito e cai no fallback em base64,
+    // já pequena, pra não estourar o limite de espaço do navegador e derrubar fotos). ----
     const handleFotoInputPso = async (e) => {
         const file = e.target.files && e.target.files[0];
         e.target.value = '';
@@ -5535,10 +5807,22 @@ function App() {
             return;
         const { url, token } = lerConfigR2();
         if (!url || !token) {
-            const reader = new FileReader();
-            reader.onload = (ev) => setPsoNovaFoto(ev.target.result);
-            reader.readAsDataURL(file);
-            setMsgUploadMidiaPso('⚠️ Cloudflare R2 não configurado — a foto foi guardada localmente (base64). Configure em ⚙️ Configurações gerais para subir pro servidor.');
+            setMsgUploadMidiaPso('');
+            setUploadMidiaPsoEmAndamento(true);
+            try {
+                const comprimida = await comprimirImagemParaUpload(file);
+                const reader = new FileReader();
+                reader.onload = (ev) => setPsoNovaFoto(ev.target.result);
+                reader.onerror = () => setMsgUploadMidiaPso('Não consegui processar a foto. Tente de novo.');
+                reader.readAsDataURL(comprimida);
+                setMsgUploadMidiaPso('⚠️ Cloudflare R2 não configurado — a foto foi comprimida e guardada localmente (base64). Configure em ⚙️ Configurações gerais para subir pro servidor.');
+            }
+            catch (err) {
+                setMsgUploadMidiaPso('Não consegui processar a foto. Tente de novo.');
+            }
+            finally {
+                setUploadMidiaPsoEmAndamento(false);
+            }
             return;
         }
         setMsgUploadMidiaPso('');
@@ -5586,10 +5870,22 @@ function App() {
             return;
         const { url, token } = lerConfigR2();
         if (!url || !token) {
-            const reader = new FileReader();
-            reader.onload = (ev) => setFaceNovaFoto(ev.target.result);
-            reader.readAsDataURL(file);
-            setMsgUploadMidiaFace('⚠️ Cloudflare R2 não configurado — a foto foi guardada localmente (base64). Configure em ⚙️ Configurações gerais para subir pro servidor.');
+            setMsgUploadMidiaFace('');
+            setUploadMidiaFaceEmAndamento(true);
+            try {
+                const comprimida = await comprimirImagemParaUpload(file);
+                const reader = new FileReader();
+                reader.onload = (ev) => setFaceNovaFoto(ev.target.result);
+                reader.onerror = () => setMsgUploadMidiaFace('Não consegui processar a foto. Tente de novo.');
+                reader.readAsDataURL(comprimida);
+                setMsgUploadMidiaFace('⚠️ Cloudflare R2 não configurado — a foto foi comprimida e guardada localmente (base64). Configure em ⚙️ Configurações gerais para subir pro servidor.');
+            }
+            catch (err) {
+                setMsgUploadMidiaFace('Não consegui processar a foto. Tente de novo.');
+            }
+            finally {
+                setUploadMidiaFaceEmAndamento(false);
+            }
             return;
         }
         setMsgUploadMidiaFace('');
@@ -7458,7 +7754,7 @@ function App() {
                                         React.createElement("button", { className: "mt-btn-sm primary", onClick: adicionarPumpTarefa }, "Adicionar")),
                                     pumpTarefas.length > 0 && (React.createElement("div", { style: { marginTop: 10 } }, pumpTarefas.map((t) => (React.createElement("div", { key: t.id, className: "mt-fixa-item" },
                                         React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#232323' } }, t.nome),
-                                        React.createElement("button", { className: "mt-del", onClick: () => removerPumpTarefa(t.id) }, "\u00D7")))))))),
+                                        mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerPumpTarefa(t.id) }, "\u00D7")))))))),
                                 React.createElement("div", { style: { marginTop: 10 } },
                                     pumpTarefas.length === 0 && React.createElement("p", { className: "mt-empty", style: { marginBottom: 8 } }, "Nenhuma tarefa criada. Toque no + para criar \u2014 ou registre s\u00F3 um coment\u00E1rio abaixo."),
                                     React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 } },
@@ -7510,7 +7806,7 @@ function App() {
                                                 "Sensibilidade da pele ",
                                                 r.pele > 0 ? `+${r.pele}` : r.pele)),
                                             React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
-                                        React.createElement("button", { className: "mt-del", onClick: () => removerRegistroPump(r.id) }, "\u00D7"))))))))),
+                                        mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroPump(r.id) }, "\u00D7"))))))))),
                         razaoTabSelecionada === 'pso' && (React.createElement(React.Fragment, null,
                             React.createElement("div", { className: "mt-premio-secao" },
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
@@ -7683,7 +7979,7 @@ function App() {
                                                 r.causa),
                                             r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#232323' } }, r.comentario),
                                             React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
-                                        React.createElement("button", { className: "mt-del", onClick: () => removerRegistroPso(r.id) }, "\u00D7"))))))))),
+                                        mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroPso(r.id) }, "\u00D7"))))))))),
                         razaoTabSelecionada === 'premiacao' && (React.createElement(React.Fragment, null,
                             React.createElement("div", { className: "mt-premio-secao" },
                                 React.createElement("p", { className: "mt-premio-secao-titulo" }, "\uD83C\uDFE6 Banco de Horas"),
@@ -7862,7 +8158,7 @@ function App() {
                                                     color: it.prioridade ? '#fff' : '#C9A227',
                                                     borderColor: it.prioridade ? '#C0492E' : '#C9A227',
                                                 } }, "Priority")),
-                                            React.createElement("button", { className: "mt-del", onClick: () => removerItemChk(c.id, it.id) }, "\u00D7")))))),
+                                            mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerItemChk(c.id, it.id) }, "\u00D7")))))),
                                     mostrarConfigLivroRazao && sid !== 'geral' && !ehPainel && sid !== PROGRAMA_SESSAO && sid !== JA_TENHO_SESSAO && (React.createElement("div", { style: { marginTop: 8 } }, chkConfirmRemoverSessao[c.id] ? (React.createElement("button", { className: "mt-btn-sm", style: { borderColor: '#E8633D', color: '#E8633D' }, onClick: () => removerSessaoChk(c.id, sid) }, "Confirmar apagar sess\u00E3o? (as tarefas voltam para a Geral)")) : (React.createElement("button", { className: "mt-btn-sm", onClick: () => setChkMapa(setChkConfirmRemoverSessao, c.id, true) }, "Apagar esta sess\u00E3o")))),
                                     chkMsg[c.id] && React.createElement("p", { className: "mt-premio-msg" }, chkMsg[c.id]))));
                         }),
@@ -7941,7 +8237,7 @@ function App() {
                                                     ? `Feito · ${new Date(item.feitoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
                                                     : 'Aguardando'),
                                                 React.createElement("button", { className: "mt-premio-btn", onClick: () => confirmarPremiacao(item), title: "Converter em tempo (Premia\u00E7\u00E3o)", "aria-label": "Premiar" }, "\uD83C\uDFC6"),
-                                                React.createElement("button", { className: "mt-del", onClick: () => removerDaLista(item.id) }, "\u00D7"))))))) : listaMistaAberta ? (React.createElement("div", { style: { marginTop: 12 } },
+                                                mostrarConfigLista && React.createElement("button", { className: "mt-del", onClick: () => removerDaLista(item.id) }, "\u00D7"))))))) : listaMistaAberta ? (React.createElement("div", { style: { marginTop: 12 } },
                                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 } },
                                                 React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0, color: '#8E6BAE' } },
                                                     "Misturado \u00B7 ",
@@ -8109,6 +8405,9 @@ function App() {
                                 ...gruposCustom.map((g) => ({
                                     freq: g.id, label: g.nome, cols: ['Registro'], items: fixas.filter((t) => t.freq === g.id),
                                 })),
+                                // "Pesquisa" é totalmente diferente das demais: não é uma tabela por período,
+                                // é uma busca livre em tudo que existe no app (ver renderBusca mais abaixo).
+                                { freq: BUSCA_ABA, label: '🔍 Pesquisa', cols: [], items: [] },
                             ];
                             // sem fallback para opcoesHist[0]: se nada foi tocado, nenhum botão fica preto
                             const atualHist = opcoesHist.find((o) => o.freq === historicoAba) || null;
@@ -8160,7 +8459,63 @@ function App() {
                                         color: historicoAba === o.freq ? '#fff' : '#777',
                                         borderColor: historicoAba === o.freq ? '#232323' : '#ddd8c9',
                                     } }, o.label)))),
-                                historicoExpandido && atualHist && (React.createElement(React.Fragment, null,
+                                historicoAba === BUSCA_ABA && (() => {
+                                    const termo = buscaTexto.trim().toLowerCase();
+                                    const resultados = [];
+                                    if (termo) {
+                                        const add = (tipo, texto, origem, ehAbaOuSessao) => {
+                                            if (texto && String(texto).toLowerCase().includes(termo)) {
+                                                resultados.push({ tipo, texto: String(texto), origem, ehAbaOuSessao: !!ehAbaOuSessao });
+                                            }
+                                        };
+                                        // abas e sessões do Livro Razão — resultado em azul (é uma aba/sessão, não um item dentro dela)
+                                        ABAS_RAZAO_FIXAS.forEach((a) => add('Aba', a.nome, 'Livro Razão', true));
+                                        CHECKLISTS.forEach((c) => {
+                                            add('Aba', c.nome, 'Livro Razão', true);
+                                            chkSessoesDe(c.id).forEach((s) => add('Sessão', s.nome, `Livro Razão · ${c.nome}`, true));
+                                            (checklistItens[c.id] || []).forEach((it) => add('Tarefa', it.texto, `Livro Razão · ${c.nome}`));
+                                        });
+                                        categorias.forEach((cat) => {
+                                            add('Categoria', cat.nome, 'Categorias', true);
+                                            cat.tarefas.forEach((t) => add('Tarefa', t.texto, `Categorias · ${cat.nome}`));
+                                        });
+                                        lista.forEach((it) => add('Item da lista', it.texto, 'Minha lista'));
+                                        fixas.forEach((t) => add('Tarefa fixa', t.texto, `Tarefas fixas · ${nomeGrupoFixa(t.freq)}`));
+                                        notasRapidas.forEach((n) => add('Nota rápida', n.texto, 'Notas rápidas'));
+                                        livroRazao.forEach((l) => add('Gasto', l.descricao, 'Livro Razão · Gastos'));
+                                        snatBankRegistro.forEach((l) => add('Gasto', l.descricao, 'Livro Razão · Bank do Snat'));
+                                        bankRegistro.forEach((l) => add('Lançamento', l.nota, 'Livro Razão · Finanças'));
+                                        ganhosRegistro.forEach((r) => add('Ganho', r.texto, 'Livro Razão · Atividades · Ganhos'));
+                                        desbloqueiosRegistro.forEach((r) => add('Desbloqueio', r.nota, 'Livro Razão · Atividades · Faixa de desbloqueio'));
+                                        antesDeIrPendentes.forEach((it) => add('Antes de ir', it.texto, 'Livro Razão · Atividades · Antes de ir'));
+                                        antesDeIrConcluidos.forEach((it) => add('Antes de ir', it.texto, 'Livro Razão · Atividades · Antes de ir'));
+                                        eraDeOuroRegistro.forEach((r) => add('Era de Ouro', r.texto, 'Livro Razão · Atividades · Era de Ouro'));
+                                        momentumRegistro.forEach((r) => add('Momentum', r.texto, 'Livro Razão · Atividades · Momentum'));
+                                        contadoresRegressivos.forEach((c) => add('Contador', c.nome, 'Livro Razão · Atividades · Contador'));
+                                        Object.keys(batalhaNotas).forEach((chave) => (batalhaNotas[chave] || []).forEach((n) => add('Nota de batalha', n.texto, 'Livro Razão · Atividades · Batalha')));
+                                        pumpTarefas.forEach((t) => add('Pump', t.nome, 'Livro Razão · Pump'));
+                                        psoTarefas.forEach((t) => add('Pso', t.nome, 'Livro Razão · Pso'));
+                                        psoProtocolos.forEach((p) => add('Protocolo', p.texto, 'Livro Razão · Pso · Protocolos'));
+                                        psoTestes.forEach((t) => add('Teste', t.texto, 'Livro Razão · Pso · Testes'));
+                                        psoRegistro.forEach((r) => add('Registro Pso', r.comentario, 'Livro Razão · Pso'));
+                                        faceRegistro.forEach((r) => add('Registro Face', r.comentario, 'Livro Razão · Development · Face'));
+                                        histEventos.forEach((e) => add('Evento histórico', e.texto, 'Livro Razão · História'));
+                                    }
+                                    return (React.createElement("div", { style: { marginTop: 4 } },
+                                        React.createElement("input", { type: "text", value: buscaTexto, onChange: (e) => setBuscaTexto(e.target.value), placeholder: "Digite pra buscar em tudo do app\u2026", className: "mt-nota-input", style: { width: '100%', marginBottom: 10, boxSizing: 'border-box' }, autoFocus: true }),
+                                        !termo && React.createElement("p", { className: "mt-empty" }, "Digite algo pra buscar entre tarefas, abas, sess\u00F5es, notas e registros."),
+                                        termo && resultados.length === 0 && React.createElement("p", { className: "mt-empty" },
+                                            "Nada encontrado pra \"",
+                                            buscaTexto,
+                                            "\"."),
+                                        resultados.length > 0 && (React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, resultados.map((r, i) => (React.createElement("div", { key: i, className: "mt-fixa-item", style: { flexDirection: 'column', alignItems: 'flex-start', gap: 2 } },
+                                            React.createElement("span", { style: { fontSize: 13.5, fontWeight: r.ehAbaOuSessao ? 700 : 600, color: r.ehAbaOuSessao ? '#4A7FD9' : '#232323' } }, r.texto),
+                                            React.createElement("span", { style: { fontSize: 11, color: '#999' } },
+                                                r.tipo,
+                                                " \u00B7 ",
+                                                r.origem))))))));
+                                })(),
+                                historicoAba !== BUSCA_ABA && historicoExpandido && atualHist && (React.createElement(React.Fragment, null,
                                     (() => {
                                         const dias = [];
                                         for (let i = 6; i >= 0; i--) {
@@ -8397,6 +8752,4 @@ function App() {
         React.createElement(VisualizadorMidia, { midia: midiaAmpliada, onFechar: () => setMidiaAmpliada(null) })));
 }
 
-
-// ── monta o app na div#root ──
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
