@@ -17509,6 +17509,8 @@ const blankFC = () => ({
     novidades: "",
     pros: "",
     contras: "",
+    gosta: "",
+    naogosta: "",
     proxima: "",
     reactions: "",
     sskill: 0,
@@ -17520,6 +17522,8 @@ const CAMPOS_FC = [
     ["novidades", "Novidades", "O que há de novo"],
     ["pros", "Pros", "O que funcionou"],
     ["contras", "Contras", "O que não funcionou"],
+    ["gosta", "Ela gosta", "O que ela gosta"],
+    ["naogosta", "Não gosta", "O que ela não gosta"],
     ["proxima", "Fazer na próxima", "Ajustes para a próxima vez"],
     ["reactions", "Reactions", "Reações dela e suas"],
 ];
@@ -18941,6 +18945,31 @@ function BaralhoDeContatos() {
         setConhecimento((cs) => [{ id: uid(), texto: t, data: Date.now() }, ...cs]);
     };
     const removerConhecimento = (id) => setConhecimento((cs) => cs.filter((c) => c.id !== id));
+    const addMsgFalar = (cardId, texto) => {
+        const t = String(texto || "").trim();
+        if (!t)
+            return;
+        setCards((cs) => cs.map((c) => c.id === cardId
+            ? { ...c, msgFalar: [{ id: uid(), texto: t, criadoEm: Date.now() }, ...(c.msgFalar || [])] }
+            : c));
+    };
+    const editarMsgFalar = (cardId, itemId, texto) => setCards((cs) => cs.map((c) => c.id === cardId
+        ? { ...c, msgFalar: (c.msgFalar || []).map((m) => (m.id === itemId ? { ...m, texto } : m)) }
+        : c));
+    const removerMsgFalar = (cardId, itemId) => setCards((cs) => cs.map((c) => c.id === cardId ? { ...c, msgFalar: (c.msgFalar || []).filter((m) => m.id !== itemId) } : c));
+    const concluirMsgFalar = (cardId, itemId) => setCards((cs) => cs.map((c) => {
+        if (c.id !== cardId)
+            return c;
+        const item = (c.msgFalar || []).find((m) => m.id === itemId);
+        if (!item)
+            return c;
+        return {
+            ...c,
+            msgFalar: (c.msgFalar || []).filter((m) => m.id !== itemId),
+            msgFalado: [{ ...item, concluidoEm: Date.now() }, ...(c.msgFalado || [])],
+        };
+    }));
+    const removerMsgFalado = (cardId, itemId) => setCards((cs) => cs.map((c) => c.id === cardId ? { ...c, msgFalado: (c.msgFalado || []).filter((m) => m.id !== itemId) } : c));
     const patchDating = (id, campo, valor) => setCards((cs) => cs.map((c) => c.id === id ? { ...c, dating: { ...(c.dating || {}), [campo]: valor } } : c));
     const registrarDating = (cardId) => setCards((cs) => cs.map((c) => c.id === cardId
         ? {
@@ -19009,7 +19038,7 @@ function BaralhoDeContatos() {
         nuvemAberta && (react_1.default.createElement(ModalNuvem, { status: nuvemStatus, onVerificar: () => sincronizarNuvem(true), onFechar: () => setNuvemAberta(false) })),
         configAberta && (react_1.default.createElement(ModalConfig, { minhaCidade: minhaCidade, onMudarCidade: setMinhaCidade, temCidade: temCidade, chaveMinha: chaveMinha, statusOrigem: statusOrigem, onR2Salvo: () => setR2Check((n) => n + 1), onFechar: () => setConfigAberta(false) })),
         loaded && tela === "baralho" && (react_1.default.createElement(PainelLembretesHoje, { lembretes: lembretes, onIrCalendario: () => setTela("calendario") })),
-        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "calendario" ? (react_1.default.createElement(TelaCalendario, { lembretes: lembretes, onAdd: addLembrete, onRemover: removerLembrete })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
+        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onAddMsgFalar: addMsgFalar, onEditarMsgFalar: editarMsgFalar, onRemoverMsgFalar: removerMsgFalar, onConcluirMsgFalar: concluirMsgFalar, onRemoverMsgFalado: removerMsgFalado, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "calendario" ? (react_1.default.createElement(TelaCalendario, { lembretes: lembretes, onAdd: addLembrete, onRemover: removerLembrete })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
         react_1.default.createElement("footer", { className: "bc-footer" },
             react_1.default.createElement("span", { className: erro ? "bc-status bc-status-erro" : "bc-status" }, erro
                 ? "não foi possível salvar"
@@ -19038,7 +19067,7 @@ function BaralhoDeContatos() {
 }
 /* ── tela 1: baralho ───────────────────────────────────── */
 const valorOrdem = (m) => (m.estado === "mesma" ? 0 : m.estado === "ok" ? m.mi : Infinity);
-function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, novaId, medir, onNova, onImportarPerfil, onPatch, onPatchDating, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, onEditarFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
+function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, novaId, medir, onNova, onImportarPerfil, onPatch, onPatchDating, onAddMsgFalar, onEditarMsgFalar, onRemoverMsgFalar, onConcluirMsgFalar, onRemoverMsgFalado, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, onEditarFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
     const [busca, setBusca] = (0, react_1.useState)("");
     const [aberta, setAberta] = (0, react_1.useState)(novaId || null);
     const [lendo, setLendo] = (0, react_1.useState)(false);
@@ -19131,7 +19160,7 @@ function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGl
                         "mi"))))),
         visiveis.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty" }, cards.length === 0
             ? "O baralho está vazio. Crie a primeira carta para começar a preencher."
-            : "Nenhuma carta corresponde aos filtros.")) : (react_1.default.createElement("div", { className: "bc-lista" }, visiveis.map((c) => aberta === c.id ? (react_1.default.createElement(Carta, { key: c.id, carta: c, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: onCiclarGlyph, onEscolherGlyph: onEscolherGlyph, nova: c.id === novaId, medida: medir(c.local), onFechar: () => setAberta(null), onPatch: (campo, v) => onPatch(c.id, campo, v), onPatchDating: (campo, v) => onPatchDating(c.id, campo, v), onRemove: () => onRemove(c.id), onLancar: (tipo, qtd, com) => onLancar(c.id, tipo, qtd, com), onRemoverLancamento: (lid) => onRemoverLancamento(c.id, lid), onRegistrarDating: () => onRegistrarDating(c.id), onRegistrarFC: (entrada) => onRegistrarFC(c.id, entrada), onRemoverFC: (fid) => onRemoverFC(c.id, fid), onEditarFC: (fid, patch) => onEditarFC(c.id, fid, patch), acoes: acoes, onCriarAcao: onCriarAcao, onRemoverAcao: onRemoverAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: onValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: onCriarBotaoInvest, onRemoverBotaoInvest: onRemoverBotaoInvest, onCriarCategoria: onCriarCategoria, onRemoverCategoria: onRemoverCategoria })) : (react_1.default.createElement(Linha, { key: c.id, carta: c, sources: sources, sourceGlyphs: sourceGlyphs, onAbrir: () => setAberta(c.id) }))))),
+            : "Nenhuma carta corresponde aos filtros.")) : (react_1.default.createElement("div", { className: "bc-lista" }, visiveis.map((c) => aberta === c.id ? (react_1.default.createElement(Carta, { key: c.id, carta: c, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: onCiclarGlyph, onEscolherGlyph: onEscolherGlyph, nova: c.id === novaId, medida: medir(c.local), onFechar: () => setAberta(null), onPatch: (campo, v) => onPatch(c.id, campo, v), onPatchDating: (campo, v) => onPatchDating(c.id, campo, v), onAddMsgFalar: (texto) => onAddMsgFalar(c.id, texto), onEditarMsgFalar: (itemId, texto) => onEditarMsgFalar(c.id, itemId, texto), onRemoverMsgFalar: (itemId) => onRemoverMsgFalar(c.id, itemId), onConcluirMsgFalar: (itemId) => onConcluirMsgFalar(c.id, itemId), onRemoverMsgFalado: (itemId) => onRemoverMsgFalado(c.id, itemId), onRemove: () => onRemove(c.id), onLancar: (tipo, qtd, com) => onLancar(c.id, tipo, qtd, com), onRemoverLancamento: (lid) => onRemoverLancamento(c.id, lid), onRegistrarDating: () => onRegistrarDating(c.id), onRegistrarFC: (entrada) => onRegistrarFC(c.id, entrada), onRemoverFC: (fid) => onRemoverFC(c.id, fid), onEditarFC: (fid, patch) => onEditarFC(c.id, fid, patch), acoes: acoes, onCriarAcao: onCriarAcao, onRemoverAcao: onRemoverAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: onValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: onCriarBotaoInvest, onRemoverBotaoInvest: onRemoverBotaoInvest, onCriarCategoria: onCriarCategoria, onRemoverCategoria: onRemoverCategoria })) : (react_1.default.createElement(Linha, { key: c.id, carta: c, sources: sources, sourceGlyphs: sourceGlyphs, onAbrir: () => setAberta(c.id) }))))),
         lendo && (react_1.default.createElement(LeitorPerfil, { onFechar: () => setLendo(false), onCriar: (dados) => {
                 onImportarPerfil(dados);
                 setLendo(false);
@@ -19558,10 +19587,12 @@ function Banco({ tipo, titulo, unidade, exemplo, saldo, lancamentos, valorHora, 
                 l.comentario && react_1.default.createElement("span", { className: "bc-linhacom" }, l.comentario)),
             react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemoverLancamento(l.id), "aria-label": "Estornar lan\u00E7amento" }, "\u00D7")))))))));
 }
-function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, nova, medida, onFechar, onPatch, onPatchDating, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, onEditarFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
+function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, nova, medida, onFechar, onPatch, onPatchDating, onAddMsgFalar, onEditarMsgFalar, onRemoverMsgFalar, onConcluirMsgFalar, onRemoverMsgFalado, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, onEditarFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
     const [confirma, setConfirma] = (0, react_1.useState)(false);
+    const [detalhesAberto, setDetalhesAberto] = (0, react_1.useState)(false);
     const [fcAberto, setFcAberto] = (0, react_1.useState)(false);
     const [nextAberto, setNextAberto] = (0, react_1.useState)(false);
+    const [msgAberto, setMsgAberto] = (0, react_1.useState)(false);
     const [datingSalvo, setDatingSalvo] = (0, react_1.useState)(false);
     const [investAberto, setInvestAberto] = (0, react_1.useState)(false);
     const [datingAberto, setDatingAberto] = (0, react_1.useState)(false);
@@ -19707,7 +19738,8 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
             onPatch("tags", [...atuais, t]);
         setNovaTag("");
     };
-    return (react_1.default.createElement("article", { className: (nova ? "bc-card bc-deal" : "bc-card") + (visIndex !== null ? " bc-card-planar" : "") },
+    const algumPainelAberto = visIndex !== null || fcAberto || nextAberto || msgAberto;
+    return (react_1.default.createElement("article", { className: (nova ? "bc-card bc-deal" : "bc-card") + (algumPainelAberto ? " bc-card-planar" : "") },
         react_1.default.createElement("div", { className: "bc-card-inner" },
             react_1.default.createElement(Index, null),
             react_1.default.createElement(Index, { virado: true }),
@@ -19716,9 +19748,7 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                 react_1.default.createElement(Semaforo, { valor: carta.farol, onEscolher: (v) => onPatch("farol", v) })),
             react_1.default.createElement("div", { className: "bc-body" },
                 react_1.default.createElement("div", { className: "bc-midiacfg-row" },
-                    react_1.default.createElement("button", { type: "button", className: midiaConfig ? "bc-midiacfg-btn bc-midiacfg-btn-on" : "bc-midiacfg-btn", onClick: () => setMidiaConfig((v) => !v), "aria-pressed": midiaConfig },
-                        "\u2699 ",
-                        midiaConfig ? "concluir" : "configurar fotos e vídeos")),
+                    react_1.default.createElement("button", { type: "button", className: midiaConfig ? "bc-midiacfg-btn bc-midiacfg-btn-on" : "bc-midiacfg-btn", onClick: () => setMidiaConfig((v) => !v), "aria-pressed": midiaConfig, "aria-label": midiaConfig ? "concluir configuração de fotos e vídeos" : "configurar fotos e vídeos" }, "\u2699")),
                 react_1.default.createElement("div", { className: "bc-foto-wrap" },
                     react_1.default.createElement("button", { type: "button", className: "bc-foto", onClick: () => (carta.foto ? abrirVisualizador("__principal__") : fotoRef.current && fotoRef.current.click()), "aria-label": carta.foto ? "Ver foto" : "Adicionar foto" }, carta.foto ? (react_1.default.createElement("img", { className: "bc-foto-img", src: carta.foto, alt: "" })) : (react_1.default.createElement("span", { className: "bc-foto-placeholder" }, "\u25C9 foto"))),
                     react_1.default.createElement("div", { className: "bc-foto-acoes" }, carta.foto ? (react_1.default.createElement(react_1.default.Fragment, null,
@@ -19739,81 +19769,83 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                 react_1.default.createElement("label", { className: "bc-nome-wrap" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Nome"),
                     react_1.default.createElement("input", { className: "bc-nome", value: carta.nome, onChange: (e) => onPatch("nome", e.target.value) })),
-                react_1.default.createElement("div", { className: "bc-row" },
-                    react_1.default.createElement(Campo, { label: "Ra\u00E7a", value: carta.raca, onChange: (v) => onPatch("raca", v), grow: 2 }),
-                    react_1.default.createElement(Campo, { label: "Idade", value: carta.idade, onChange: (v) => onPatch("idade", v.replace(/[^\d]/g, "").slice(0, 3)), grow: 1, inputMode: "numeric" })),
-                react_1.default.createElement("div", { className: "bc-opts bc-racaopts" },
-                    RACAS.map((r) => (react_1.default.createElement(Pill, { key: r, ativo: (carta.raca || "").trim().toLowerCase() === r.toLowerCase(), onClick: () => {
-                            setOutraRaca(false);
-                            onPatch("raca", (carta.raca || "").trim().toLowerCase() === r.toLowerCase() ? "" : r);
-                        } }, r))),
-                    react_1.default.createElement(Pill, { ativo: outraRaca || (!!(carta.raca || "").trim() && !ehRacaBase(carta.raca)), onClick: () => setOutraRaca((v) => !v) }, "Outros")),
-                outraRaca && (react_1.default.createElement("div", { className: "bc-catrow" },
-                    react_1.default.createElement("input", { className: "bc-catinput", value: carta.raca || "", onChange: (e) => onPatch("raca", e.target.value), onKeyDown: (e) => e.key === "Enter" && setOutraRaca(false), placeholder: "Escreva a ra\u00E7a", "aria-label": "Outra ra\u00E7a", autoFocus: true }),
-                    react_1.default.createElement("button", { className: "bc-catbtn", onClick: () => setOutraRaca(false) }, "Pronto"))),
-                react_1.default.createElement("div", null,
-                    react_1.default.createElement(Campo, { label: "Localiza\u00E7\u00E3o", value: carta.local, onChange: (v) => onPatch("local", v), lista: "bc-cidades" }),
-                    react_1.default.createElement(Distancia, { m: medida })),
-                react_1.default.createElement("div", { className: "bc-row" },
-                    react_1.default.createElement(Campo, { label: "Altura", value: carta.altura || "", onChange: (v) => onPatch("altura", v), grow: 1 }),
-                    react_1.default.createElement(Campo, { label: "Fuma", value: carta.fumo || "", onChange: (v) => onPatch("fumo", v), grow: 1 }),
-                    react_1.default.createElement(Campo, { label: "Bebe", value: carta.bebida || "", onChange: (v) => onPatch("bebida", v), grow: 1 })),
-                react_1.default.createElement(Campo, { label: "Trabalho", value: carta.trabalho || "", onChange: (v) => onPatch("trabalho", v) }),
-                react_1.default.createElement("div", { className: "bc-row" },
-                    react_1.default.createElement(Campo, { label: "Escolaridade", value: carta.escolaridade || "", onChange: (v) => onPatch("escolaridade", v), grow: 2 }),
-                    react_1.default.createElement(Campo, { label: "Religi\u00E3o", value: carta.religiao || "", onChange: (v) => onPatch("religiao", v), grow: 1 })),
-                react_1.default.createElement(Campo, { label: "Faculdade", value: carta.faculdade || "", onChange: (v) => onPatch("faculdade", v) }),
-                react_1.default.createElement("div", { className: "bc-row" },
-                    react_1.default.createElement(Campo, { label: "Filhos", value: carta.filhos || "", onChange: (v) => onPatch("filhos", v), grow: 2 }),
-                    react_1.default.createElement(Campo, { label: "\u00C9 de", value: carta.origem || "", onChange: (v) => onPatch("origem", v), grow: 1, lista: "bc-cidades" })),
-                react_1.default.createElement(Campo, { label: "Procura", value: carta.busca || "", onChange: (v) => onPatch("busca", v) }),
-                react_1.default.createElement("div", { className: "bc-group" },
-                    react_1.default.createElement("span", { className: "bc-lbl" }, "Interesses"),
-                    react_1.default.createElement("div", { className: "bc-tagsbox" },
-                        (carta.tags || []).map((t) => (react_1.default.createElement("span", { className: "bc-tag", key: t },
-                            t,
-                            react_1.default.createElement("span", { className: "bc-tagx", role: "button", tabIndex: 0, "aria-label": "Remover " + t, onClick: () => onPatch("tags", (carta.tags || []).filter((x) => x !== t)) }, "\u00D7")))),
-                        !(carta.tags || []).length && react_1.default.createElement("span", { className: "bc-mini" }, "nenhum")),
-                    react_1.default.createElement("div", { className: "bc-catrow" },
-                        react_1.default.createElement("input", { className: "bc-catinput", value: novaTag, onChange: (e) => setNovaTag(e.target.value), onKeyDown: (e) => e.key === "Enter" && addTag(), placeholder: "Adicionar interesse", "aria-label": "Adicionar interesse" }),
-                        react_1.default.createElement("button", { className: "bc-catbtn", onClick: addTag }, "Adicionar"))),
-                react_1.default.createElement("hr", { className: "bc-hr" }),
-                react_1.default.createElement("div", { className: "bc-group" },
-                    react_1.default.createElement("span", { className: "bc-lbl" }, "Idioma"),
-                    react_1.default.createElement("div", { className: "bc-opts" }, IDIOMAS.map((l) => (react_1.default.createElement(Pill, { key: l, ativo: carta.idioma === l, onClick: () => onPatch("idioma", carta.idioma === l ? "" : l) }, l))))),
-                react_1.default.createElement("div", { className: "bc-group" },
-                    react_1.default.createElement("span", { className: "bc-lbl" }, "Fonte"),
-                    react_1.default.createElement("div", { className: "bc-opts" }, BASE_SOURCES.map((s) => (react_1.default.createElement(Pill, { key: s, ativo: carta.fonte === s, onClick: () => onPatch("fonte", carta.fonte === s ? "" : s) }, s))))),
-                react_1.default.createElement("div", { className: "bc-group" },
-                    react_1.default.createElement("span", { className: "bc-lbl" }, "Naipe"),
-                    react_1.default.createElement("div", { className: "bc-opts bc-naipeopts" }, NAIPE_LEGENDA.map(([g, rotulo]) => (react_1.default.createElement("button", { key: g, type: "button", className: carta.naipe === g ? "bc-pill bc-pill-on" : "bc-pill", onClick: () => onPatch("naipe", carta.naipe === g ? "" : g), "aria-pressed": carta.naipe === g },
-                        react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-g bc-g-red" : "bc-g" }, g),
-                        rotulo))))),
-                react_1.default.createElement("hr", { className: "bc-hr" }),
-                react_1.default.createElement("div", { className: "bc-group" },
-                    react_1.default.createElement("button", { className: "bc-acaoadd bc-verfc", onClick: () => setInvestAberto((v) => !v), "aria-expanded": investAberto }, investAberto ? "ocultar Investimento" : "Investimento"),
-                    investAberto && (react_1.default.createElement(react_1.default.Fragment, null,
-                        react_1.default.createElement(Banco, { tipo: "horas", titulo: "Banco de horas", unidade: "h", exemplo: "1,5", saldo: saldoHoras, lancamentos: lancHoras, valorHora: carta.valorHoraFixo ? valorHoraPadrao : carta.valorHora, onValorHora: (v) => onPatch("valorHora", v), fixo: carta.valorHoraFixo, onFixo: (v) => {
-                                if (v && (carta.valorHora || "").trim())
-                                    onValorHoraPadrao(carta.valorHora);
-                                onPatch("valorHoraFixo", v);
-                            }, onLancar: onLancar, onRemoverLancamento: onRemoverLancamento }),
-                        react_1.default.createElement(Banco, { tipo: "valor", titulo: "Investimento", unidade: "$", exemplo: "25,00", saldo: saldoValor, lancamentos: lancValor, botoes: botoesInvest, onCriarBotao: onCriarBotaoInvest, onRemoverBotao: onRemoverBotaoInvest, onLancar: onLancar, onRemoverLancamento: onRemoverLancamento })))),
-                react_1.default.createElement("hr", { className: "bc-hr" }),
-                react_1.default.createElement("div", { className: "bc-group" },
-                    react_1.default.createElement("button", { className: "bc-acaoadd bc-verfc", onClick: () => setDatingAberto((v) => !v), "aria-expanded": datingAberto }, datingAberto ? "ocultar Dating" : "Dating"),
-                    datingAberto && (react_1.default.createElement(react_1.default.Fragment, null,
-                        react_1.default.createElement("div", { className: "bc-dating" }, CAMPOS_DATING.map(([campo, rotulo]) => (react_1.default.createElement("label", { className: "bc-datingbox", key: campo },
-                            react_1.default.createElement("span", { className: "bc-datinglbl" }, rotulo),
-                            react_1.default.createElement("textarea", { className: "bc-datingtexto", rows: 2, value: (carta.dating || {})[campo] || "", onChange: (e) => onPatchDating(campo, e.target.value) }))))),
-                        react_1.default.createElement("div", { className: "bc-bancoacoes" },
-                            react_1.default.createElement("button", { className: "bc-feito", onClick: registrarDating, disabled: !temDating }, datingSalvo ? "Registrado" : "Feito"),
-                            react_1.default.createElement("span", { className: "bc-mini" },
-                                (carta.datingLog || []).length,
-                                " no hist\u00F3rico"))))),
-                react_1.default.createElement("label", { className: "bc-group" },
-                    react_1.default.createElement("span", { className: "bc-lbl" }, "Personalidade"),
-                    react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: carta.personalidade || "", onChange: (e) => onPatch("personalidade", e.target.value) })),
+                react_1.default.createElement("button", { type: "button", className: "bc-acaoadd bc-verfc bc-detalhesbtn", onClick: () => setDetalhesAberto((v) => !v), "aria-expanded": detalhesAberto }, detalhesAberto ? "ocultar Detalhes" : "Detalhes"),
+                detalhesAberto && (react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("div", { className: "bc-row" },
+                        react_1.default.createElement(Campo, { label: "Ra\u00E7a", value: carta.raca, onChange: (v) => onPatch("raca", v), grow: 2 }),
+                        react_1.default.createElement(Campo, { label: "Idade", value: carta.idade, onChange: (v) => onPatch("idade", v.replace(/[^\d]/g, "").slice(0, 3)), grow: 1, inputMode: "numeric" })),
+                    react_1.default.createElement("div", { className: "bc-opts bc-racaopts" },
+                        RACAS.map((r) => (react_1.default.createElement(Pill, { key: r, ativo: (carta.raca || "").trim().toLowerCase() === r.toLowerCase(), onClick: () => {
+                                setOutraRaca(false);
+                                onPatch("raca", (carta.raca || "").trim().toLowerCase() === r.toLowerCase() ? "" : r);
+                            } }, r))),
+                        react_1.default.createElement(Pill, { ativo: outraRaca || (!!(carta.raca || "").trim() && !ehRacaBase(carta.raca)), onClick: () => setOutraRaca((v) => !v) }, "Outros")),
+                    outraRaca && (react_1.default.createElement("div", { className: "bc-catrow" },
+                        react_1.default.createElement("input", { className: "bc-catinput", value: carta.raca || "", onChange: (e) => onPatch("raca", e.target.value), onKeyDown: (e) => e.key === "Enter" && setOutraRaca(false), placeholder: "Escreva a ra\u00E7a", "aria-label": "Outra ra\u00E7a", autoFocus: true }),
+                        react_1.default.createElement("button", { className: "bc-catbtn", onClick: () => setOutraRaca(false) }, "Pronto"))),
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement(Campo, { label: "Localiza\u00E7\u00E3o", value: carta.local, onChange: (v) => onPatch("local", v), lista: "bc-cidades" }),
+                        react_1.default.createElement(Distancia, { m: medida })),
+                    react_1.default.createElement("div", { className: "bc-row" },
+                        react_1.default.createElement(Campo, { label: "Altura", value: carta.altura || "", onChange: (v) => onPatch("altura", v), grow: 1 }),
+                        react_1.default.createElement(Campo, { label: "Fuma", value: carta.fumo || "", onChange: (v) => onPatch("fumo", v), grow: 1 }),
+                        react_1.default.createElement(Campo, { label: "Bebe", value: carta.bebida || "", onChange: (v) => onPatch("bebida", v), grow: 1 })),
+                    react_1.default.createElement(Campo, { label: "Trabalho", value: carta.trabalho || "", onChange: (v) => onPatch("trabalho", v) }),
+                    react_1.default.createElement("div", { className: "bc-row" },
+                        react_1.default.createElement(Campo, { label: "Escolaridade", value: carta.escolaridade || "", onChange: (v) => onPatch("escolaridade", v), grow: 2 }),
+                        react_1.default.createElement(Campo, { label: "Religi\u00E3o", value: carta.religiao || "", onChange: (v) => onPatch("religiao", v), grow: 1 })),
+                    react_1.default.createElement(Campo, { label: "Faculdade", value: carta.faculdade || "", onChange: (v) => onPatch("faculdade", v) }),
+                    react_1.default.createElement("div", { className: "bc-row" },
+                        react_1.default.createElement(Campo, { label: "Filhos", value: carta.filhos || "", onChange: (v) => onPatch("filhos", v), grow: 2 }),
+                        react_1.default.createElement(Campo, { label: "\u00C9 de", value: carta.origem || "", onChange: (v) => onPatch("origem", v), grow: 1, lista: "bc-cidades" })),
+                    react_1.default.createElement(Campo, { label: "Procura", value: carta.busca || "", onChange: (v) => onPatch("busca", v) }),
+                    react_1.default.createElement("div", { className: "bc-group" },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "Interesses"),
+                        react_1.default.createElement("div", { className: "bc-tagsbox" },
+                            (carta.tags || []).map((t) => (react_1.default.createElement("span", { className: "bc-tag", key: t },
+                                t,
+                                react_1.default.createElement("span", { className: "bc-tagx", role: "button", tabIndex: 0, "aria-label": "Remover " + t, onClick: () => onPatch("tags", (carta.tags || []).filter((x) => x !== t)) }, "\u00D7")))),
+                            !(carta.tags || []).length && react_1.default.createElement("span", { className: "bc-mini" }, "nenhum")),
+                        react_1.default.createElement("div", { className: "bc-catrow" },
+                            react_1.default.createElement("input", { className: "bc-catinput", value: novaTag, onChange: (e) => setNovaTag(e.target.value), onKeyDown: (e) => e.key === "Enter" && addTag(), placeholder: "Adicionar interesse", "aria-label": "Adicionar interesse" }),
+                            react_1.default.createElement("button", { className: "bc-catbtn", onClick: addTag }, "Adicionar"))),
+                    react_1.default.createElement("hr", { className: "bc-hr" }),
+                    react_1.default.createElement("div", { className: "bc-group" },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "Idioma"),
+                        react_1.default.createElement("div", { className: "bc-opts" }, IDIOMAS.map((l) => (react_1.default.createElement(Pill, { key: l, ativo: carta.idioma === l, onClick: () => onPatch("idioma", carta.idioma === l ? "" : l) }, l))))),
+                    react_1.default.createElement("div", { className: "bc-group" },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "Fonte"),
+                        react_1.default.createElement("div", { className: "bc-opts" }, BASE_SOURCES.map((s) => (react_1.default.createElement(Pill, { key: s, ativo: carta.fonte === s, onClick: () => onPatch("fonte", carta.fonte === s ? "" : s) }, s))))),
+                    react_1.default.createElement("div", { className: "bc-group" },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "Naipe"),
+                        react_1.default.createElement("div", { className: "bc-opts bc-naipeopts" }, NAIPE_LEGENDA.map(([g, rotulo]) => (react_1.default.createElement("button", { key: g, type: "button", className: carta.naipe === g ? "bc-pill bc-pill-on" : "bc-pill", onClick: () => onPatch("naipe", carta.naipe === g ? "" : g), "aria-pressed": carta.naipe === g },
+                            react_1.default.createElement("span", { className: glyphDaFonteRed(g) ? "bc-g bc-g-red" : "bc-g" }, g),
+                            rotulo))))),
+                    react_1.default.createElement("hr", { className: "bc-hr" }),
+                    react_1.default.createElement("div", { className: "bc-group" },
+                        react_1.default.createElement("button", { className: "bc-acaoadd bc-verfc", onClick: () => setInvestAberto((v) => !v), "aria-expanded": investAberto }, investAberto ? "ocultar Investimento" : "Investimento"),
+                        investAberto && (react_1.default.createElement(react_1.default.Fragment, null,
+                            react_1.default.createElement(Banco, { tipo: "horas", titulo: "Banco de horas", unidade: "h", exemplo: "1,5", saldo: saldoHoras, lancamentos: lancHoras, valorHora: carta.valorHoraFixo ? valorHoraPadrao : carta.valorHora, onValorHora: (v) => onPatch("valorHora", v), fixo: carta.valorHoraFixo, onFixo: (v) => {
+                                    if (v && (carta.valorHora || "").trim())
+                                        onValorHoraPadrao(carta.valorHora);
+                                    onPatch("valorHoraFixo", v);
+                                }, onLancar: onLancar, onRemoverLancamento: onRemoverLancamento }),
+                            react_1.default.createElement(Banco, { tipo: "valor", titulo: "Investimento", unidade: "$", exemplo: "25,00", saldo: saldoValor, lancamentos: lancValor, botoes: botoesInvest, onCriarBotao: onCriarBotaoInvest, onRemoverBotao: onRemoverBotaoInvest, onLancar: onLancar, onRemoverLancamento: onRemoverLancamento })))),
+                    react_1.default.createElement("hr", { className: "bc-hr" }),
+                    react_1.default.createElement("div", { className: "bc-group" },
+                        react_1.default.createElement("button", { className: "bc-acaoadd bc-verfc", onClick: () => setDatingAberto((v) => !v), "aria-expanded": datingAberto }, datingAberto ? "ocultar Dating" : "Dating"),
+                        datingAberto && (react_1.default.createElement(react_1.default.Fragment, null,
+                            react_1.default.createElement("div", { className: "bc-dating" }, CAMPOS_DATING.map(([campo, rotulo]) => (react_1.default.createElement("label", { className: "bc-datingbox", key: campo },
+                                react_1.default.createElement("span", { className: "bc-datinglbl" }, rotulo),
+                                react_1.default.createElement("textarea", { className: "bc-datingtexto", rows: 2, value: (carta.dating || {})[campo] || "", onChange: (e) => onPatchDating(campo, e.target.value) }))))),
+                            react_1.default.createElement("div", { className: "bc-bancoacoes" },
+                                react_1.default.createElement("button", { className: "bc-feito", onClick: registrarDating, disabled: !temDating }, datingSalvo ? "Registrado" : "Feito"),
+                                react_1.default.createElement("span", { className: "bc-mini" },
+                                    (carta.datingLog || []).length,
+                                    " no hist\u00F3rico"))))),
+                    react_1.default.createElement("label", { className: "bc-group" },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "Personalidade"),
+                        react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: carta.personalidade || "", onChange: (e) => onPatch("personalidade", e.target.value) })))),
                 react_1.default.createElement("label", { className: "bc-group" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Notas"),
                     react_1.default.createElement("textarea", { className: "bc-notas", rows: 3, value: carta.notas, onChange: (e) => onPatch("notas", e.target.value), placeholder: "Anota\u00E7\u00F5es sobre o contato" })),
@@ -19821,7 +19853,10 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                     react_1.default.createElement("button", { className: "bc-fcbtn", onClick: () => setFcAberto(true) },
                         "FC Skill",
                         (carta.fcskill || []).length > 0 && react_1.default.createElement("em", null, (carta.fcskill || []).length)),
-                    react_1.default.createElement("button", { className: "bc-fcbtn bc-nextbtn", onClick: () => setNextAberto(true) }, "Next Date")),
+                    react_1.default.createElement("button", { className: "bc-fcbtn bc-nextbtn", onClick: () => setNextAberto(true) }, "Next Date"),
+                    react_1.default.createElement("button", { className: "bc-fcbtn bc-msgbtn", onClick: () => setMsgAberto(true) },
+                        "Msg",
+                        (carta.msgFalar || []).length > 0 && react_1.default.createElement("em", null, (carta.msgFalar || []).length))),
                 ultima && (react_1.default.createElement("p", { className: "bc-hist" },
                     carta.historico.length,
                     " ",
@@ -19834,6 +19869,7 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                         carta.criadoEm ? fmtData(carta.criadoEm) : "—"),
                     react_1.default.createElement("button", { className: confirma ? "bc-remover bc-remover-on" : "bc-remover", onClick: () => (confirma ? onRemove() : setConfirma(true)), onBlur: () => setConfirma(false) }, confirma ? "confirmar remoção" : "remover carta")))),
         fcAberto && (react_1.default.createElement(PainelFC, { carta: carta, acoes: acoes, onCriarAcao: onCriarAcao, onRemoverAcao: onRemoverAcao, onFechar: () => setFcAberto(false), onRegistrar: onRegistrarFC, onRemover: onRemoverFC, onEditar: onEditarFC })),
+        msgAberto && (react_1.default.createElement(PainelMsg, { carta: carta, onFechar: () => setMsgAberto(false), onAddFalar: onAddMsgFalar, onEditarFalar: onEditarMsgFalar, onRemoverFalar: onRemoverMsgFalar, onConcluirFalar: onConcluirMsgFalar, onRemoverFalado: onRemoverMsgFalado })),
         nextAberto && (react_1.default.createElement(PainelNext, { carta: carta, acoes: acoes, onPatch: onPatch, onFechar: () => setNextAberto(false) })),
         visIndex !== null && midiasCarta[visIndex] && (react_1.default.createElement("div", { className: "bc-fotoview", role: "dialog", "aria-label": midiasCarta[visIndex].tipo === "video" ? "Vídeo" : "Foto", onClick: () => setVisIndex(null), onTouchStart: onToqueInicio, onTouchEnd: onToqueFim },
             midiasCarta[visIndex].tipo === "video" ? (react_1.default.createElement("video", { key: midiasCarta[visIndex].id, src: midiasCarta[visIndex].url, controls: true, playsInline: true, autoPlay: true, onClick: (e) => e.stopPropagation() })) : (react_1.default.createElement("img", { key: midiasCarta[visIndex].id, src: midiasCarta[visIndex].url, alt: "", onClick: (e) => e.stopPropagation() })),
@@ -19918,9 +19954,92 @@ function PainelNext({ carta, acoes = [], onPatch, onFechar }) {
                 verTudo &&
                     (registros.length === 0 ? (react_1.default.createElement("p", { className: "bc-mini" }, "Nenhum registro de FC Skill neste contato ainda.")) : (react_1.default.createElement("div", { className: "bc-fclista" }, registros.map((r) => (react_1.default.createElement(RegistroFC, { key: r.id, registro: r }))))))))));
 }
+/* ── painel Msg (a falar / falado) ─────────────────────── */
+function PainelMsg({ carta, onFechar, onAddFalar, onEditarFalar, onRemoverFalar, onConcluirFalar, onRemoverFalado }) {
+    useTravarRolagem(true);
+    const [escrevendo, setEscrevendo] = (0, react_1.useState)(false);
+    const [texto, setTexto] = (0, react_1.useState)("");
+    const falar = carta.msgFalar || [];
+    const falado = carta.msgFalado || [];
+    const adicionar = () => {
+        const t = texto.trim();
+        if (!t)
+            return;
+        onAddFalar(t);
+        setTexto("");
+    };
+    return (react_1.default.createElement("div", { className: "bc-modal", role: "dialog", "aria-label": "Msg" },
+        react_1.default.createElement("div", { className: "bc-modalbox" },
+            react_1.default.createElement("div", { className: "bc-modalhead" },
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("p", { className: "bc-modaleyebrow" }, "Msg"),
+                    react_1.default.createElement("h3", { className: "bc-modaltitulo" }, carta.nome.trim() || "sem nome")),
+                react_1.default.createElement("button", { className: "bc-modalx", onClick: onFechar, "aria-label": "Fechar" }, "\u00D7")),
+            react_1.default.createElement("div", { className: "bc-modalbody" },
+                react_1.default.createElement("section", { className: "bc-nextbloco" },
+                    react_1.default.createElement("button", { className: "bc-acaoadd bc-verfc", onClick: () => setEscrevendo((v) => !v), "aria-expanded": escrevendo }, escrevendo ? "ocultar Falar" : "Falar"),
+                    escrevendo && (react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("label", { className: "bc-group" },
+                            react_1.default.createElement("span", { className: "bc-lbl" }, "Falar"),
+                            react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: texto, onChange: (e) => setTexto(e.target.value), placeholder: "Escreva o que voc\u00EA quer falar", "aria-label": "Falar", autoFocus: true })),
+                        react_1.default.createElement("div", { className: "bc-bancoacoes" },
+                            react_1.default.createElement("button", { className: "bc-feito", onClick: adicionar, disabled: !texto.trim() }, "Adicionar"))))),
+                react_1.default.createElement("section", { className: "bc-nextbloco" },
+                    react_1.default.createElement("span", { className: "bc-lbl" },
+                        "A falar ",
+                        falar.length > 0 ? "(" + falar.length + ")" : ""),
+                    falar.length === 0 ? (react_1.default.createElement("p", { className: "bc-mini" }, "Nada na lista ainda.")) : (react_1.default.createElement("div", { className: "bc-fclista" }, falar.map((m) => (react_1.default.createElement(ItemMsgFalar, { key: m.id, item: m, onEditar: (t) => onEditarFalar(m.id, t), onRemover: () => onRemoverFalar(m.id), onConcluir: () => onConcluirFalar(m.id) })))))),
+                react_1.default.createElement("section", { className: "bc-nextbloco" },
+                    react_1.default.createElement("span", { className: "bc-lbl" },
+                        "Falado ",
+                        falado.length > 0 ? "(" + falado.length + ")" : ""),
+                    falado.length === 0 ? (react_1.default.createElement("p", { className: "bc-mini" }, "Nada conclu\u00EDdo ainda.")) : (react_1.default.createElement("div", { className: "bc-fclista" }, falado.map((m) => (react_1.default.createElement(ItemMsgFalado, { key: m.id, item: m, onRemover: () => onRemoverFalado(m.id) }))))))))));
+}
+function ItemMsgFalar({ item, onEditar, onRemover, onConcluir }) {
+    const [editando, setEditando] = (0, react_1.useState)(false);
+    const [texto, setTexto] = (0, react_1.useState)(item.texto);
+    const [confirma, setConfirma] = (0, react_1.useState)(false);
+    const salvar = () => {
+        const t = texto.trim();
+        if (!t)
+            return;
+        onEditar(t);
+        setEditando(false);
+    };
+    const cancelar = () => {
+        setTexto(item.texto);
+        setEditando(false);
+    };
+    if (editando) {
+        return (react_1.default.createElement("article", { className: "bc-fcreg bc-fcreg-editando" },
+            react_1.default.createElement("div", { className: "bc-fcregtop" },
+                react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(item.criadoEm))),
+            react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: texto, onChange: (e) => setTexto(e.target.value), autoFocus: true }),
+            react_1.default.createElement("div", { className: "bc-bancoacoes" },
+                react_1.default.createElement("button", { className: "bc-feito", onClick: salvar, disabled: !texto.trim() }, "Salvar"),
+                react_1.default.createElement("button", { className: "bc-link", onClick: cancelar }, "cancelar"))));
+    }
+    return (react_1.default.createElement("article", { className: "bc-fcreg" },
+        react_1.default.createElement("div", { className: "bc-fcregtop" },
+            react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(item.criadoEm)),
+            react_1.default.createElement("button", { className: "bc-linhax bc-fcedit-btn", onClick: () => setEditando(true), "aria-label": "Editar" }, "\u270E"),
+            react_1.default.createElement("button", { className: "bc-linhax", onClick: () => (confirma ? onRemover() : setConfirma(true)), onBlur: () => setConfirma(false), "aria-label": "Excluir" }, confirma ? "excluir?" : "×")),
+        react_1.default.createElement("p", { className: "bc-fccampo" }, item.texto),
+        react_1.default.createElement("div", { className: "bc-bancoacoes" },
+            react_1.default.createElement("button", { className: "bc-feito", onClick: onConcluir }, "Done"))));
+}
+function ItemMsgFalado({ item, onRemover }) {
+    const [confirma, setConfirma] = (0, react_1.useState)(false);
+    return (react_1.default.createElement("article", { className: "bc-fcreg" },
+        react_1.default.createElement("div", { className: "bc-fcregtop" },
+            react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(item.concluidoEm || item.criadoEm)),
+            react_1.default.createElement("button", { className: "bc-linhax", onClick: () => (confirma ? onRemover() : setConfirma(true)), onBlur: () => setConfirma(false), "aria-label": "Excluir" }, confirma ? "excluir?" : "×")),
+        react_1.default.createElement("p", { className: "bc-fccampo" }, item.texto)));
+}
 /* ── painel FC Skill ───────────────────────────────────── */
 function PainelFC({ carta, acoes = [], onCriarAcao, onRemoverAcao, onFechar, onRegistrar, onRemover, onEditar }) {
-    const vazio = { experience: "", novidades: "", pros: "", contras: "", proxima: "", reactions: "", sskill: 0, sentimentos: 0 };
+    useTravarRolagem(true);
+    const vazio = { experience: "", novidades: "", pros: "", contras: "", gosta: "", naogosta: "", proxima: "", reactions: "", sskill: 0, sentimentos: 0 };
     const [campos, setCampos] = (0, react_1.useState)(vazio);
     const [salvo, setSalvo] = (0, react_1.useState)(false);
     const [marcados, setMarcados] = (0, react_1.useState)([]);
@@ -20025,6 +20144,8 @@ function RegistroFC({ registro, onRemover, onEditar, nomeContato }) {
             novidades: registro.novidades || "",
             pros: registro.pros || "",
             contras: registro.contras || "",
+            gosta: registro.gosta || "",
+            naogosta: registro.naogosta || "",
             proxima: registro.proxima || "",
             reactions: registro.reactions || "",
             sskill: typeof registro.sskill === "number" ? registro.sskill : 0,
@@ -20748,7 +20869,8 @@ const CSS = `
 
 /* painel FC Skill */
 .bc-modal{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;justify-content:center;
-  padding:28px 16px;background:rgba(16,10,20,.78);overflow-y:auto;}
+  padding:28px 16px;background:rgba(16,10,20,.78);overflow-y:auto;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;}
 .bc-modalbox{width:100%;max-width:620px;background:var(--card);color:var(--ink);border-radius:6px;
   box-shadow:0 30px 60px rgba(0,0,0,.55);}
 .bc-modalhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
@@ -20893,6 +21015,8 @@ const CSS = `
 .bc-cardbtns .bc-fcbtn{flex:1 1 120px;}
 .bc-nextbtn{background:transparent;color:var(--ink);border:1.5px solid var(--ink);}
 .bc-nextbtn:hover{background:var(--ink);color:var(--card);border-color:var(--ink);}
+.bc-msgbtn{background:var(--soft);color:var(--ink);border:1.5px solid var(--rule);}
+.bc-msgbtn:hover{background:var(--ink);color:var(--card);border-color:var(--ink);}
 .bc-nextbloco{border:1px solid var(--edge);border-left:3px solid var(--red);border-radius:2px;
   padding:12px 13px;background:rgba(21,16,15,.02);}
 .bc-nextbloco-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
