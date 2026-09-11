@@ -1,12 +1,30 @@
-window.__CHERUBION_VERSAO__ = "2026-09-09 11:14";
+// ======================================================================
+// Cherubion — app.js (miolo)
+// Versão: 20260910-2030
+// Sessão: Script do Sucesso agora lista, ao final, as medalhas ganhas
+// (semanal/mensal/trimestral/semestral/anual) — exceto Bronze — com
+// descrição da frequência de cada uma.
+// ======================================================================
+window.__CHERUBION_VERSAO__ = "20260910-2030";
+
 const { useState, useEffect, useRef, useMemo } = React;
 
-"use strict";
 // ===== constantes =====
 // ======================================================================
 // Constantes de configuração do app: cores, listas de checklists, abas do Livro Razão,
 // categorias padrão e as funções que normalizam esses dados ao carregar do storage.
 // ======================================================================
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 const STORAGE_KEY = 'minhas-tarefas-data';
 const CORES = ['#5B7C99', '#D96C4F', '#6E8C82', '#A85C4D', '#8E6BAE', '#C9A227'];
 const DURACOES = [5, 10, 15, 30, 60];
@@ -112,6 +130,50 @@ const HIST_TIPOS_PADRAO = [
     { id: 'geral', nome: 'Geral', fixo: true },
     { id: 'civilizacoes', nome: 'Civilizações e Culturas', fixo: true },
 ];
+// regiões/continentes selecionáveis ao registrar um evento do tipo "Civilizações e Culturas".
+// continentes sem `subs` (Oceania, Eurásia) são selecionáveis diretamente; os demais só revelam
+// suas subdivisões ao serem tocados — a seleção em si acontece na subdivisão.
+const REGIOES_CIVILIZACOES = [
+    { id: 'americas', nome: 'Américas', subs: [
+            { id: 'america_norte', nome: 'América do Norte' },
+            { id: 'america_central', nome: 'América Central' },
+            { id: 'caribe', nome: 'Caribe (Antilhas)' },
+            { id: 'america_sul', nome: 'América do Sul' },
+        ] },
+    { id: 'europa', nome: 'Europa', subs: [
+            { id: 'europa_ocidental', nome: 'Europa Ocidental' },
+            { id: 'leste_europeu', nome: 'Leste Europeu' },
+            { id: 'europa_central', nome: 'Europa Central' },
+            { id: 'norte_europa', nome: 'Norte da Europa' },
+            { id: 'sul_europa', nome: 'Sul da Europa' },
+        ] },
+    { id: 'asia', nome: 'Ásia', subs: [
+            { id: 'oriente_medio', nome: 'Oriente Médio' },
+            { id: 'leste_asiatico', nome: 'Leste Asiático' },
+            { id: 'sudeste_asiatico', nome: 'Sudeste Asiático' },
+            { id: 'subcontinente_indiano', nome: 'Subcontinente Indiano' },
+            { id: 'asia_central', nome: 'Ásia Central' },
+            { id: 'norte_asia', nome: 'Norte da Ásia / Sibéria' },
+            { id: 'caucaso', nome: 'Cáucaso' },
+        ] },
+    { id: 'africa', nome: 'África', subs: [
+            { id: 'norte_africa', nome: 'Norte da África' },
+            { id: 'africa_subsaariana', nome: 'África Subsaariana' },
+        ] },
+    { id: 'oceania', nome: 'Oceania', subs: [] },
+    { id: 'eurasia', nome: 'Eurásia', subs: [] },
+];
+// devolve o rótulo legível de uma região/subdivisão a partir do id salvo no evento
+const nomeRegiaoCivilizacao = (id) => {
+    for (const c of REGIOES_CIVILIZACOES) {
+        if (c.id === id)
+            return c.nome;
+        const s = c.subs.find((x) => x.id === id);
+        if (s)
+            return c.nome + ' – ' + s.nome;
+    }
+    return id;
+};
 const ABAS_RAZAO = [...ABAS_RAZAO_FIXAS, ...CHECKLISTS];
 const ORDEM_ABAS_RAZAO_PADRAO = ABAS_RAZAO.map((a) => a.id);
 // mantém só ids que existem e acrescenta no fim os que faltarem (abas novas entram sozinhas)
@@ -128,8 +190,8 @@ const normalizarOrdemAbasRazao = (arr) => {
 // (prefeituras/prefeiturasSessoes), para que nenhum dado já salvo se perca.
 const normalizarChecklists = (dados) => {
     const ehObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
-    const itens = ehObj(dados.checklistItens) ? { ...dados.checklistItens } : {};
-    const sessoes = ehObj(dados.checklistSessoes) ? { ...dados.checklistSessoes } : {};
+    const itens = ehObj(dados.checklistItens) ? Object.assign({}, dados.checklistItens) : {};
+    const sessoes = ehObj(dados.checklistSessoes) ? Object.assign({}, dados.checklistSessoes) : {};
     if (!Array.isArray(itens.prefeituras) && Array.isArray(dados.prefeituras))
         itens.prefeituras = dados.prefeituras;
     if (!Array.isArray(sessoes.prefeituras) && Array.isArray(dados.prefeiturasSessoes))
@@ -153,7 +215,7 @@ const normalizarChecklists = (dados) => {
     if (seedVersion < 3) {
         sessoes.atividades = (sessoes.atividades || []).filter((s) => s.id !== 'odis');
         if (Array.isArray(itens.atividades)) {
-            itens.atividades = itens.atividades.map((it) => (it.sessaoId === 'odis' ? { ...it, sessaoId: undefined } : it));
+            itens.atividades = itens.atividades.map((it) => (it.sessaoId === 'odis' ? Object.assign(Object.assign({}, it), { sessaoId: undefined }) : it));
         }
     }
     sessoes.__seedVersion = 3;
@@ -172,14 +234,14 @@ const baseNome = (s) => s.replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{26FF}\u{2700}
 // after loading from backup, restore canonical names + order for the 5 known categories
 // after loading from backup, restore canonical names + order for the 5 known categories
 const normalizarCategorias = (cats) => {
-    const canonicals = CATS_PADRAO.map((c) => ({ ...c, base: baseNome(c.nome) }));
+    const canonicals = CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { base: baseNome(c.nome) })));
     // separate known from unknown
     const known = [];
     const unknown = [];
     cats.forEach((cat) => {
         const match = canonicals.find((c) => baseNome(cat.nome).includes(c.base) || c.base.includes(baseNome(cat.nome)));
         if (match)
-            known.push({ ...cat, nome: match.nome, cor: match.cor, _order: canonicals.indexOf(match) });
+            known.push(Object.assign(Object.assign({}, cat), { nome: match.nome, cor: match.cor, _order: canonicals.indexOf(match) }));
         else
             unknown.push(cat);
     });
@@ -267,6 +329,26 @@ const formatAnoHistoria = (ano) => {
         return 'Ano 0';
     return n < 0 ? `${Math.abs(n)} a.C.` : `${n} d.C.`;
 };
+// converte um inteiro positivo em numeral romano (usado no rótulo do século)
+const ROMANOS_VALORES = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+const paraNumeralRomano = (num) => {
+    let n = Math.max(1, Math.round(num));
+    let out = '';
+    for (const [v, s] of ROMANOS_VALORES) {
+        while (n >= v) {
+            out += s;
+            n -= v;
+        }
+    }
+    return out;
+};
+// devolve o rótulo do século (numeral romano) de um ano interno da linha do tempo da História
+const formatSeculoHistoria = (ano) => {
+    const n = Number(ano) || 0;
+    const seculo = Math.max(1, Math.ceil(Math.abs(n) / 100));
+    const era = n < 0 ? 'a.C.' : 'd.C.';
+    return `Século ${paraNumeralRomano(seculo)} ${era}`;
+};
 // ---- badge de lembretes de hoje no atalho do Baralho de Contatos (📇) ----
 // lê o localStorage do app Contatos (chave 'baralho:v1') e conta quantos itens de
 // lembretes[] têm data === hoje. Data local (não toISOString, que é UTC e erra perto
@@ -286,7 +368,7 @@ const contarLembretesHoje = () => {
         const hoje = hojeISO();
         return lembretes.filter((l) => l && l.data === hoje).length;
     }
-    catch {
+    catch (_a) {
         return 0;
     }
 };
@@ -575,13 +657,7 @@ const migrarItemAgenda = (a) => {
         hojeDt.setDate(hojeDt.getDate() + diff);
         return { id: a.id, texto: a.texto, data: paraISO(hojeDt), repetir: 'semanal' };
     }
-    return {
-        id: a.id,
-        texto: a.texto,
-        data: a.data || hoje(),
-        repetir: a.repetir || 'nenhuma',
-        ...(a.repetir === 'customizada' ? { intervaloDias: Math.max(1, Number(a.intervaloDias) || 1) } : {}),
-    };
+    return Object.assign({ id: a.id, texto: a.texto, data: a.data || hoje(), repetir: a.repetir || 'nenhuma' }, (a.repetir === 'customizada' ? { intervaloDias: Math.max(1, Number(a.intervaloDias) || 1) } : {}));
 };
 // calcula a próxima ocorrência de um item da agenda em relação a hoje; retorna null se já passou e não repete
 // calcula a próxima ocorrência de um item da agenda em relação a hoje; retorna null se já passou e não repete
@@ -773,7 +849,7 @@ const criarNotaObsidianSeNaoExiste = (notes, id, titulo) => {
     if (notes[id])
         return notes;
     const agora = Date.now();
-    return { ...notes, [id]: { id, title: titulo, content: '', createdAt: agora, updatedAt: agora } };
+    return Object.assign(Object.assign({}, notes), { [id]: { id, title: titulo, content: '', createdAt: agora, updatedAt: agora } });
 };
 // cria (recursivamente) a nota de uma pasta do Cherubion no Obsidian, com uma nota por
 // subpasta e os links entre elas — usado quando a pasta é inteiramente nova pro Obsidian
@@ -785,7 +861,7 @@ const criarSubarvoreNoObsidian = (notesEntrada, pastaCherubion) => {
         conteudo = adicionarLinkAoConteudo(conteudo, sub.nome);
     });
     if (conteudo !== notes[pastaCherubion.id].content) {
-        notes = { ...notes, [pastaCherubion.id]: { ...notes[pastaCherubion.id], content: conteudo, updatedAt: Date.now() } };
+        notes = Object.assign(Object.assign({}, notes), { [pastaCherubion.id]: Object.assign(Object.assign({}, notes[pastaCherubion.id]), { content: conteudo, updatedAt: Date.now() }) });
     }
     return notes;
 };
@@ -807,7 +883,7 @@ const apagarSubarvoreDoObsidian = (notesEntrada, id, visitados) => {
         if (alvo && !vistos.has(alvo.id))
             notes = apagarSubarvoreDoObsidian(notes, alvo.id, vistos);
     });
-    const resto = { ...notes };
+    const resto = Object.assign({}, notes);
     delete resto[id];
     return resto;
 };
@@ -855,7 +931,7 @@ const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsi
             if (nomeFinal !== emL.nome)
                 mudouCherubion = true;
             if (nomeFinal !== notes[id].title) {
-                notes = { ...notes, [id]: { ...notes[id], title: nomeFinal, updatedAt: Date.now() } };
+                notes = Object.assign(Object.assign({}, notes), { [id]: Object.assign(Object.assign({}, notes[id]), { title: nomeFinal, updatedAt: Date.now() }) });
             }
             const filho = sincronizarNivelPastas({
                 anteriorLista: emA ? emA.subpastas : [],
@@ -869,7 +945,7 @@ const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsi
                 mudouCherubion = true;
             if (filho.mudouObsidian)
                 mudouObsidian = true;
-            novaListaCherubion.push({ ...emL, nome: nomeFinal, subpastas: filho.novaListaCherubion });
+            novaListaCherubion.push(Object.assign(Object.assign({}, emL), { nome: nomeFinal, subpastas: filho.novaListaCherubion }));
             novaCanonica.push({ id, nome: nomeFinal, subpastas: filho.novaCanonica });
         }
         else if (emL && !emR) {
@@ -918,7 +994,7 @@ const sincronizarNivelPastas = ({ anteriorLista, pastasCherubionNivel, notesObsi
         // se sumiu dos dois lados, a exclusão já foi propagada numa sincronização anterior: ignora
     });
     if (containerAtual && conteudoContainer !== containerAtual.content) {
-        notes = { ...notes, [idContainerReal]: { ...notes[idContainerReal], content: conteudoContainer, updatedAt: Date.now() } };
+        notes = Object.assign(Object.assign({}, notes), { [idContainerReal]: Object.assign(Object.assign({}, notes[idContainerReal]), { content: conteudoContainer, updatedAt: Date.now() }) });
         mudouObsidian = true;
     }
     return { notes, novaListaCherubion, novaCanonica, mudouCherubion, mudouObsidian };
@@ -1150,16 +1226,19 @@ function App() {
     const [razaoTabSelecionada, setRazaoTabSelecionada] = useState('best'); // aba ativa no card unificado do Livro Razão
     const [ordemAbasRazao, setOrdemAbasRazao] = useState(ORDEM_ABAS_RAZAO_PADRAO); // ordem dos botões das abas
     // ---- livro razão: aba História — linha do tempo com pontos por ano, filtrável por tipo ----
-    const [histEventos, setHistEventos] = useState([]); // [{id, tipo, ano, texto}]
+    const [histEventos, setHistEventos] = useState([]); // [{id, tipo, ano, texto, regioes?}] — regioes só é usado no tipo 'civilizacoes'
     const [histTipos, setHistTipos] = useState(HIST_TIPOS_PADRAO); // [{id, nome, fixo?}]
     const [histTipoSelecionado, setHistTipoSelecionado] = useState('geral'); // tipo ativo: filtra a linha do tempo e é o tipo do próximo evento registrado
-    const [histEscala, setHistEscala] = useState('anos'); // 'anos' | 'seculo' — densidade da linha do tempo
     const [histConfigAberto, setHistConfigAberto] = useState(false); // com o ⚙️ aberto: textos editáveis, × de apagar e criação de novo tipo
     const [histNovoTexto, setHistNovoTexto] = useState('');
     const [histNovoAno, setHistNovoAno] = useState('');
     const [histNovoEra, setHistNovoEra] = useState('dC'); // 'dC' | 'aC'
     const [histNovoTipoNome, setHistNovoTipoNome] = useState('');
     const [msgHistoria, setMsgHistoria] = useState('');
+    // seleção de regiões/continentes para o próximo evento do tipo "Civilizações e Culturas"
+    const [histRegioesPainelAberto, setHistRegioesPainelAberto] = useState(false); // botão principal que revela os continentes
+    const [histContinenteExpandido, setHistContinenteExpandido] = useState(null); // continente com subdivisões visíveis no momento
+    const [histRegioesSelecionadas, setHistRegioesSelecionadas] = useState([]); // ids marcados — só esses são registrados no evento
     // ---- badge do atalho do Baralho de Contatos: quantos lembretes vencem hoje ----
     const [lembretesHoje, setLembretesHoje] = useState(0);
     useEffect(() => {
@@ -1556,7 +1635,7 @@ function App() {
         setStatus('');
         if (!storageExiste()) {
             setStatus('Armazenamento automático não está disponível aqui. Use "copiar backup" / "restaurar" para guardar seus dados manualmente.');
-            setCategorias(CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] })));
+            setCategorias(CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { id: genId(), tarefas: [] }))));
             setCarregando(false);
             return;
         }
@@ -1578,7 +1657,7 @@ function App() {
                 // se não há categorias salvas, semente as padrão
                 const cats = Array.isArray(dados.categorias) && dados.categorias.length > 0
                     ? normalizarCategorias(dados.categorias)
-                    : CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] }));
+                    : CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { id: genId(), tarefas: [] })));
                 setCategorias(cats);
                 setFixas(dados.fixas || []);
                 setLista(dados.lista || []);
@@ -1586,14 +1665,11 @@ function App() {
                 setComentariosFixas(Array.isArray(dados.comentariosFixas) ? dados.comentariosFixas : []);
                 comentariosFixasRef.current = Array.isArray(dados.comentariosFixas) ? dados.comentariosFixas : [];
                 setQuadroMedalhas(dados.quadroMedalhas && typeof dados.quadroMedalhas === 'object'
-                    ? { ...QUADRO_MEDALHAS_PADRAO, ...dados.quadroMedalhas }
-                    : QUADRO_MEDALHAS_PADRAO);
+                    ? Object.assign(Object.assign({}, QUADRO_MEDALHAS_PADRAO), dados.quadroMedalhas) : QUADRO_MEDALHAS_PADRAO);
                 setQuadroPercentuais(dados.quadroPercentuais && typeof dados.quadroPercentuais === 'object'
-                    ? { ...QUADRO_PERCENTUAIS_PADRAO, ...dados.quadroPercentuais }
-                    : QUADRO_PERCENTUAIS_PADRAO);
+                    ? Object.assign(Object.assign({}, QUADRO_PERCENTUAIS_PADRAO), dados.quadroPercentuais) : QUADRO_PERCENTUAIS_PADRAO);
                 setResumoMedalhas(dados.resumoMedalhas && typeof dados.resumoMedalhas === 'object'
-                    ? { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [], ...dados.resumoMedalhas }
-                    : { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] });
+                    ? Object.assign({ diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] }, dados.resumoMedalhas) : { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] });
                 setFrases(dados.frases || []);
                 const prioridadeSalva = typeof dados.notaCatPrioridade === 'string' ? dados.notaCatPrioridade : 'aleatorio';
                 setNotaCatPrioridade(prioridadeSalva);
@@ -1613,7 +1689,7 @@ function App() {
                 setAutoSalvarSegundos(typeof dados.autoSalvarSegundos === 'number' ? dados.autoSalvarSegundos : 1);
                 setNotaAutoSalvarAtivo(typeof dados.notaAutoSalvarAtivo === 'boolean' ? dados.notaAutoSalvarAtivo : true);
                 setNotaAutoSalvarSegundos(typeof dados.notaAutoSalvarSegundos === 'number' ? dados.notaAutoSalvarSegundos : 4);
-                setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? { ...REGRAS_ESTRELAS_PADRAO, ...dados.regrasEstrelas } : REGRAS_ESTRELAS_PADRAO);
+                setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? Object.assign(Object.assign({}, REGRAS_ESTRELAS_PADRAO), dados.regrasEstrelas) : REGRAS_ESTRELAS_PADRAO);
                 setGruposCustom(dados.gruposCustom || []);
                 {
                     const versaoOrd = typeof dados.ordemJanelasVersao === 'number' ? dados.ordemJanelasVersao : 1;
@@ -1658,7 +1734,7 @@ function App() {
                 setGoalsConcluidos(Array.isArray(dados.goalsConcluidos) ? dados.goalsConcluidos : []);
                 setEraDeOuroRegistro(Array.isArray(dados.eraDeOuroRegistro) ? dados.eraDeOuroRegistro : []);
                 setMomentumRegistro(Array.isArray(dados.momentumRegistro) ? dados.momentumRegistro : []);
-                setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
+                setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? Object.assign({ brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] }, dados.batalhaNotas) : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
                 setContadoresRegressivos(Array.isArray(dados.contadoresRegressivos) ? dados.contadoresRegressivos : []);
                 setModoConcluir(!!dados.modoConcluir);
                 setModoDone(dados.modoDone && typeof dados.modoDone === 'object' && !Array.isArray(dados.modoDone) ? dados.modoDone : {});
@@ -1687,7 +1763,7 @@ function App() {
                     setMostrarRecuperacao(true);
                 }
                 // primeira vez: semente categorias padrão
-                setCategorias(CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] })));
+                setCategorias(CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { id: genId(), tarefas: [] }))));
                 const freqsRoll = ['diaria', 'semanal', 'mensal', 'trimestral', 'semestral', 'anual'];
                 freqsRoll.forEach((fq) => { periodosRef.current[fq] = chavePeriodo(fq); });
                 dadosCarregadosRef.current = true;
@@ -1704,7 +1780,7 @@ function App() {
                     window.localStorage.setItem('mt-resgate:' + STORAGE_KEY + ':' + Date.now(), bruto);
             }
             catch (eResgate) { /* localStorage indisponível — nada a resgatar */ }
-            setCategorias(CATS_PADRAO.map((c) => ({ ...c, id: genId(), tarefas: [] })));
+            setCategorias(CATS_PADRAO.map((c) => (Object.assign(Object.assign({}, c), { id: genId(), tarefas: [] }))));
             const freqsRoll = ['diaria', 'semanal', 'mensal', 'trimestral', 'semestral', 'anual'];
             freqsRoll.forEach((fq) => { if (!periodosRef.current[fq])
                 periodosRef.current[fq] = chavePeriodo(fq); });
@@ -1728,7 +1804,7 @@ function App() {
             return;
         aberturaContadaRef.current = true;
         const d = hoje();
-        setAberturasApp((m) => ({ ...m, [d]: (m[d] || 0) + 1 }));
+        setAberturasApp((m) => (Object.assign(Object.assign({}, m), { [d]: (m[d] || 0) + 1 })));
         setDiasSemBackup(lerDiasSemBackup()); // alimenta o lembrete de backup
         setSujo(true);
     }, [carregando]);
@@ -1881,12 +1957,12 @@ function App() {
             if (resultado.mudouCherubion) {
                 setNotasPastas(resultado.novaListaCherubion);
                 if (idsApagados.length) {
-                    setNotasRapidas((ns) => ns.map((n) => (idsApagados.includes(n.pastaId) ? { ...n, pastaId: 'geral' } : n)));
+                    setNotasRapidas((ns) => ns.map((n) => (idsApagados.includes(n.pastaId) ? Object.assign(Object.assign({}, n), { pastaId: 'geral' }) : n)));
                 }
                 marcarSujo();
             }
             if (resultado.mudouObsidian) {
-                salvarDadosObsidian({ ...dadosObsidian, notes: resultado.notes });
+                salvarDadosObsidian(Object.assign(Object.assign({}, dadosObsidian), { notes: resultado.notes }));
             }
             if (resultado.mudouCherubion || resultado.mudouObsidian) {
                 salvarEspelhoPastas(resultado.novaCanonica);
@@ -1919,10 +1995,7 @@ function App() {
         const carimbo = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         const blocoNovo = `${nota.texto}\n— enviado do Cherubion em ${carimbo} —\n`;
         const novoConteudo = notaDestino.content ? `${blocoNovo}\n${notaDestino.content}` : blocoNovo;
-        const ok = salvarDadosObsidian({
-            ...dadosObsidian,
-            notes: { ...dadosObsidian.notes, [pastaId]: { ...notaDestino, content: novoConteudo, updatedAt: Date.now() } },
-        });
+        const ok = salvarDadosObsidian(Object.assign(Object.assign({}, dadosObsidian), { notes: Object.assign(Object.assign({}, dadosObsidian.notes), { [pastaId]: Object.assign(Object.assign({}, notaDestino), { content: novoConteudo, updatedAt: Date.now() }) }) }));
         if (!ok) {
             setNotaCopiadaId({ id, estado: 'erro' });
             setTimeout(() => setNotaCopiadaId((v) => (v && v.id === id ? null : v)), 1800);
@@ -2051,7 +2124,7 @@ function App() {
                         return c;
                     const tarefas = [...c.tarefas];
                     tarefas.splice(Math.max(0, Math.min(item.idx, tarefas.length)), 0, item.tarefa);
-                    return { ...c, tarefas };
+                    return Object.assign(Object.assign({}, c), { tarefas });
                 }));
                 break;
             case 'fixa':
@@ -2127,12 +2200,12 @@ function App() {
                     const arr = [...(m[chkId] || [])];
                     const i = Math.max(0, Math.min(idx, arr.length));
                     arr.splice(i, 0, valor);
-                    return { ...m, [chkId]: arr };
+                    return Object.assign(Object.assign({}, m), { [chkId]: arr });
                 });
                 break;
             }
             case 'checklistTudo':
-                setChecklistItens((m) => ({ ...m, [item.chkId]: item.valor }));
+                setChecklistItens((m) => (Object.assign(Object.assign({}, m), { [item.chkId]: item.valor })));
                 break;
             case 'sessaoChk': {
                 // devolve a sessão apagada à sua posição e recoloca nela as tarefas que tinham voltado para a Geral
@@ -2142,12 +2215,9 @@ function App() {
                     if (!arr.some((s) => s.id === sessao.id)) {
                         arr.splice(Math.max(0, Math.min(idx, arr.length)), 0, sessao);
                     }
-                    return { ...m, [chkId]: arr };
+                    return Object.assign(Object.assign({}, m), { [chkId]: arr });
                 });
-                setChecklistItens((m) => ({
-                    ...m,
-                    [chkId]: (m[chkId] || []).map((i) => (itensIds.includes(i.id) ? { ...i, sessaoId: sessao.id } : i)),
-                }));
+                setChecklistItens((m) => (Object.assign(Object.assign({}, m), { [chkId]: (m[chkId] || []).map((i) => (itensIds.includes(i.id) ? Object.assign(Object.assign({}, i), { sessaoId: sessao.id }) : i)) })));
                 setChkMapa(setChkSessaoSel, chkId, sessao.id);
                 break;
             }
@@ -2176,7 +2246,7 @@ function App() {
                 setNotasPastas((ps) => inserirNoEm(ps, item.paiId, item.idx, item.no));
                 setNotasRapidas((ns) => ns.map((n) => {
                     const original = item.notasAfetadas.find((x) => x.id === n.id);
-                    return original ? { ...n, pastaId: original.pastaId } : n;
+                    return original ? Object.assign(Object.assign({}, n), { pastaId: original.pastaId }) : n;
                 }));
                 setNotasPastasUsos(item.usosAntes);
                 setNotaCaminhoSel(item.caminhoSelAntes);
@@ -2229,12 +2299,12 @@ function App() {
         setQuadroMedalhas((qm) => {
             const arr = [...(qm[freq] || [])];
             arr[i] = valor; // valor pode ser 'bronze' | 'prata' | 'ouro' | 'diamante' | null (retirar)
-            return { ...qm, [freq]: arr };
+            return Object.assign(Object.assign({}, qm), { [freq]: arr });
         });
         setQuadroPercentuais((qp) => {
             const arr = [...(qp[freq] || [])];
             arr[i] = valor ? PCT_REPRESENTATIVO_MEDALHA[valor] : null;
-            return { ...qp, [freq]: arr };
+            return Object.assign(Object.assign({}, qp), { [freq]: arr });
         });
         setMedalhaEditando(null);
         marcarSujo();
@@ -2247,10 +2317,10 @@ function App() {
         const abrindo = !comentarioAberto[freq];
         if (abrindo) {
             const atual = comentarioAtual(freq);
-            setComentarioRascunho((r) => ({ ...r, [freq]: atual ? atual.texto : '' }));
-            setComentarioSolucao((r) => ({ ...r, [freq]: atual && atual.solucao ? atual.solucao : '' }));
+            setComentarioRascunho((r) => (Object.assign(Object.assign({}, r), { [freq]: atual ? atual.texto : '' })));
+            setComentarioSolucao((r) => (Object.assign(Object.assign({}, r), { [freq]: atual && atual.solucao ? atual.solucao : '' })));
         }
-        setComentarioAberto((m) => ({ ...m, [freq]: abrindo }));
+        setComentarioAberto((m) => (Object.assign(Object.assign({}, m), { [freq]: abrindo })));
     };
     const salvarComentario = (freq) => {
         const texto = (comentarioRascunho[freq] || '').trim();
@@ -2264,7 +2334,7 @@ function App() {
                 setComentariosFixas((l) => l.filter((c) => !(c.freq === freq && c.chave === chave)));
                 marcarSujo();
             }
-            setComentarioAberto((m) => ({ ...m, [freq]: false }));
+            setComentarioAberto((m) => (Object.assign(Object.assign({}, m), { [freq]: false })));
             return;
         }
         const dataHoje = new Date().toLocaleString('pt-BR', {
@@ -2273,10 +2343,10 @@ function App() {
         setComentariosFixas((l) => {
             const existe = l.some((c) => c.freq === freq && c.chave === chave);
             if (existe)
-                return l.map((c) => (c.freq === freq && c.chave === chave ? { ...c, texto, solucao, data: dataHoje } : c));
+                return l.map((c) => (c.freq === freq && c.chave === chave ? Object.assign(Object.assign({}, c), { texto, solucao, data: dataHoje }) : c));
             return [{ id: genId(), freq, chave, texto, solucao, data: dataHoje, dataISO: hoje() }, ...l];
         });
-        setComentarioAberto((m) => ({ ...m, [freq]: false }));
+        setComentarioAberto((m) => (Object.assign(Object.assign({}, m), { [freq]: false })));
         marcarSujo();
     };
     const removerComentario = (id) => {
@@ -2324,7 +2394,7 @@ function App() {
         const novasFixas = fixasAtuais.map((t) => {
             if (t.freq !== freq)
                 return t;
-            return { ...t, historico: Array(SLOTS[freq] || 7).fill(false) };
+            return Object.assign(Object.assign({}, t), { historico: Array(SLOTS[freq] || 7).fill(false) });
         });
         return { novaFixas: novasFixas, novoLivro };
     };
@@ -2346,7 +2416,7 @@ function App() {
             // 1 = amarela, 2 ou mais = vermelha. Concluir a tarefa zera o contador.
             // Se o app ficou dias/semanas fechado, todos os períodos que passaram são contados.
             const atrasos = feita ? (pulados - 1) : (t.atrasos || 0) + pulados;
-            return { ...t, feitoEm: null, feitoDia: null, historico, atrasos };
+            return Object.assign(Object.assign({}, t), { feitoEm: null, feitoDia: null, historico, atrasos });
         });
     };
     // Dado o período "pai" (ex: 'semanal') e a chave ISO do período anterior dele (a que acabou de virar),
@@ -2412,13 +2482,13 @@ function App() {
         setResumoMedalhas((r) => {
             const lista = Array.isArray(r[freqFilho]) ? r[freqFilho] : [];
             const entrada = { id: genId(), label: labelPeriodo, medalha, mediaPct: media };
-            return { ...r, [freqFilho]: [entrada, ...lista] };
+            return Object.assign(Object.assign({}, r), { [freqFilho]: [entrada, ...lista] });
         });
         // zera o quadro do período filho para começar o novo ciclo do zero
-        const proximoPercentuais = { ...quadroPercentuaisRef.current, [freqFilho]: Array(tamanhoFilho).fill(null) };
+        const proximoPercentuais = Object.assign(Object.assign({}, quadroPercentuaisRef.current), { [freqFilho]: Array(tamanhoFilho).fill(null) });
         quadroPercentuaisRef.current = proximoPercentuais; // atualiza o ref imediatamente (evita closure desatualizada dentro do mesmo ciclo)
         setQuadroPercentuais(proximoPercentuais);
-        setQuadroMedalhas((q) => ({ ...q, [freqFilho]: Array(tamanhoFilho).fill(null) }));
+        setQuadroMedalhas((q) => (Object.assign(Object.assign({}, q), { [freqFilho]: Array(tamanhoFilho).fill(null) })));
     };
     // Verifica periodicamente se algum período virou
     const verificarRollovers = (fixasAtuais, livroAtual) => {
@@ -2464,15 +2534,15 @@ function App() {
                         const atual = Array.isArray(q[freq]) ? [...q[freq]] : Array(tamanhoFreq).fill(null);
                         if (idxFechado >= 0 && idxFechado < atual.length)
                             atual[idxFechado] = medalhaFechada;
-                        return { ...q, [freq]: atual };
+                        return Object.assign(Object.assign({}, q), { [freq]: atual });
                     });
                     const percentuaisFreqAtual = Array.isArray(quadroPercentuaisRef.current[freq])
                         ? [...quadroPercentuaisRef.current[freq]]
                         : Array(tamanhoFreq).fill(null);
                     if (idxFechado >= 0 && idxFechado < percentuaisFreqAtual.length)
                         percentuaisFreqAtual[idxFechado] = pctFechado;
-                    quadroPercentuaisRef.current = { ...quadroPercentuaisRef.current, [freq]: percentuaisFreqAtual };
-                    setQuadroPercentuais((q) => ({ ...q, [freq]: percentuaisFreqAtual }));
+                    quadroPercentuaisRef.current = Object.assign(Object.assign({}, quadroPercentuaisRef.current), { [freq]: percentuaisFreqAtual });
+                    setQuadroPercentuais((q) => (Object.assign(Object.assign({}, q), { [freq]: percentuaisFreqAtual })));
                 }
                 // o período virou: desmarca + atualiza histórico
                 // conta TODOS os períodos passados desde a última abertura, não só um
@@ -2563,8 +2633,7 @@ function App() {
         if (item && !item.repoFeito)
             tocarSinoConcluido(); // som só ao marcar, não ao desmarcar
         setCategorias((cs) => cs.map((c) => c.id === catId
-            ? { ...c, tarefas: c.tarefas.map((t) => (t.id === tarefaId ? { ...t, repoFeito: !t.repoFeito } : t)) }
-            : c));
+            ? Object.assign(Object.assign({}, c), { tarefas: c.tarefas.map((t) => (t.id === tarefaId ? Object.assign(Object.assign({}, t), { repoFeito: !t.repoFeito }) : t)) }) : c));
         marcarSujo();
     };
     const excluirCategoria = (id) => {
@@ -2578,7 +2647,7 @@ function App() {
         const nome = renameTexto.trim();
         if (!nome)
             return;
-        setCategorias((cs) => cs.map((c) => (c.id === id ? { ...c, nome } : c)));
+        setCategorias((cs) => cs.map((c) => (c.id === id ? Object.assign(Object.assign({}, c), { nome }) : c)));
         setRenamingCat(null);
         setRenameTexto('');
         marcarSujo();
@@ -2631,8 +2700,8 @@ function App() {
             return [{ id: genId(), texto: t.texto, freq: grupoId, feitoEm: null, historico: [false] }, ...fs];
         });
         // feedback visual: o botão daquela tarefa confirma "✓ Adicionado" por 1,2s
-        setPrioritarioFeito((m) => ({ ...m, [t.id]: true }));
-        setTimeout(() => setPrioritarioFeito((m) => { const n = { ...m }; delete n[t.id]; return n; }), 1200);
+        setPrioritarioFeito((m) => (Object.assign(Object.assign({}, m), { [t.id]: true })));
+        setTimeout(() => setPrioritarioFeito((m) => { const n = Object.assign({}, m); delete n[t.id]; return n; }), 1200);
         marcarSujo();
     };
     const adicionarTarefa = (cat) => {
@@ -2646,9 +2715,8 @@ function App() {
             : (filtroSortear[cat.id] != null ? filtroSortear[cat.id] : null);
         const premiacao = premiacaoDraft[cat.id] || 0;
         setCategorias((cs) => cs.map((c) => c.id === cat.id
-            ? { ...c, tarefas: [...c.tarefas, { id: genId(), texto, minutos, premiacao }] }
-            : c));
-        setRascunhoTarefa((r) => ({ ...r, [cat.id]: '' }));
+            ? Object.assign(Object.assign({}, c), { tarefas: [...c.tarefas, { id: genId(), texto, minutos, premiacao }] }) : c));
+        setRascunhoTarefa((r) => (Object.assign(Object.assign({}, r), { [cat.id]: '' })));
         marcarSujo();
     };
     const removerTarefa = (catId, tarefaId) => {
@@ -2656,7 +2724,7 @@ function App() {
         const idx = cat ? cat.tarefas.findIndex((t) => t.id === tarefaId) : -1;
         if (cat && idx !== -1)
             registrarDesfazer('categorias', 'tarefaCategoria', { catId, tarefa: cat.tarefas[idx], idx });
-        setCategorias((cs) => cs.map((c) => (c.id === catId ? { ...c, tarefas: c.tarefas.filter((t) => t.id !== tarefaId) } : c)));
+        setCategorias((cs) => cs.map((c) => (c.id === catId ? Object.assign(Object.assign({}, c), { tarefas: c.tarefas.filter((t) => t.id !== tarefaId) }) : c)));
         marcarSujo();
     };
     // pool de tarefas elegíveis para o sorteio, aplicando os filtros de duração e de estrela.
@@ -3079,7 +3147,7 @@ function App() {
         const anterior = livroRazao.find((x) => x.id === gastoEditandoId);
         if (anterior)
             setSaldoLivroRazao((s) => s + anterior.valor - valor); // desfaz o valor antigo e aplica o novo
-        setLivroRazao((l) => l.map((x) => (x.id === gastoEditandoId ? { ...x, valor, descricao, data: dataBR, dataISO } : x)));
+        setLivroRazao((l) => l.map((x) => (x.id === gastoEditandoId ? Object.assign(Object.assign({}, x), { valor, descricao, data: dataBR, dataISO }) : x)));
         setGastoEditandoId(null);
         setMsgLivroRazao('');
         marcarSujo();
@@ -3165,7 +3233,7 @@ function App() {
         const anterior = snatBankRegistro.find((x) => x.id === gastoSnatEditandoId);
         if (anterior)
             setSnatBankSaldo((s) => s + anterior.valor - valor);
-        setSnatBankRegistro((l) => l.map((x) => (x.id === gastoSnatEditandoId ? { ...x, valor, descricao, data: dataBR, dataISO } : x)));
+        setSnatBankRegistro((l) => l.map((x) => (x.id === gastoSnatEditandoId ? Object.assign(Object.assign({}, x), { valor, descricao, data: dataBR, dataISO }) : x)));
         setGastoSnatEditandoId(null);
         setMsgSnatBank('');
         marcarSujo();
@@ -3222,7 +3290,7 @@ function App() {
     const salvarEdicaoCorte = () => {
         const dataISO = corteEditData || hoje();
         const dataBR = formatDataBRDeISO(dataISO);
-        setCorteDeCabeloRegistro((l) => l.map((x) => (x.id === corteEditandoId ? { ...x, data: dataBR, dataISO } : x)));
+        setCorteDeCabeloRegistro((l) => l.map((x) => (x.id === corteEditandoId ? Object.assign(Object.assign({}, x), { data: dataBR, dataISO }) : x)));
         setCorteEditandoId(null);
         marcarSujo();
     };
@@ -3287,12 +3355,7 @@ function App() {
         }
         const dataISO = medidaEditData || hoje();
         const dataBR = formatDataBRDeISO(dataISO);
-        setMedidasRegistro((l) => l.map((x) => (x.id === medidaEditandoId ? {
-            ...x,
-            peso: (peso !== null && !isNaN(peso)) ? peso : null,
-            cintura: (cintura !== null && !isNaN(cintura)) ? cintura : null,
-            data: dataBR, dataISO,
-        } : x)));
+        setMedidasRegistro((l) => l.map((x) => (x.id === medidaEditandoId ? Object.assign(Object.assign({}, x), { peso: (peso !== null && !isNaN(peso)) ? peso : null, cintura: (cintura !== null && !isNaN(cintura)) ? cintura : null, data: dataBR, dataISO }) : x)));
         setMedidaEditandoId(null);
         setMsgMedidas('');
         marcarSujo();
@@ -3402,7 +3465,7 @@ function App() {
         const atualizada = cronologico.map((item) => {
             const saldoAnterior = saldoCorrente;
             const percentual = percentualBank(valorAnteriorCorrente, item.valor);
-            const novoItem = { ...item, valorAnterior: valorAnteriorCorrente, saldoAnterior, saldoNovo: saldoAnterior + item.valor, percentual, frase: fraseBank(percentual) };
+            const novoItem = Object.assign(Object.assign({}, item), { valorAnterior: valorAnteriorCorrente, saldoAnterior, saldoNovo: saldoAnterior + item.valor, percentual, frase: fraseBank(percentual) });
             saldoCorrente = novoItem.saldoNovo;
             valorAnteriorCorrente = item.valor;
             return novoItem;
@@ -3425,7 +3488,7 @@ function App() {
         const nota = bankEditNota.trim();
         const dataISO = bankEditData || hoje();
         const dataBR = formatDataBRDeISO(dataISO);
-        const listaEditada = bankRegistro.map((x) => (x.id === bankEditandoId ? { ...x, valor, nota, data: dataBR, dataISO } : x));
+        const listaEditada = bankRegistro.map((x) => (x.id === bankEditandoId ? Object.assign(Object.assign({}, x), { valor, nota, data: dataBR, dataISO }) : x));
         // saldo antes do lançamento mais antigo nunca muda com uma edição — serve de base para reprocessar tudo
         const saldoBase = bankRegistro.length ? bankRegistro[bankRegistro.length - 1].saldoAnterior : 0;
         const { lista, saldoFinal } = recomputarBank(listaEditada, saldoBase);
@@ -3632,7 +3695,7 @@ function App() {
             cancelarEdicaoTeste();
             return;
         }
-        setPsoTestes((ts) => ts.map((t) => (t.id === testeEditandoId ? { ...t, texto } : t)));
+        setPsoTestes((ts) => ts.map((t) => (t.id === testeEditandoId ? Object.assign(Object.assign({}, t), { texto }) : t)));
         setTesteEditandoId(null);
         setTesteEditTexto('');
         marcarSujo();
@@ -3750,10 +3813,25 @@ function App() {
             return;
         }
         const ano = magnitude === 0 ? 0 : (histNovoEra === 'aC' ? -magnitude : magnitude);
-        setHistEventos((prev) => [...prev, { id: genIdHistoria(), tipo: histTipoSelecionado, ano, texto }]);
+        const regioes = histTipoSelecionado === 'civilizacoes' ? histRegioesSelecionadas : [];
+        setHistEventos((prev) => [...prev, { id: genIdHistoria(), tipo: histTipoSelecionado, ano, texto, regioes }]);
         setHistNovoTexto('');
         setHistNovoAno('');
+        setHistRegioesSelecionadas([]);
         setMsgHistoria('');
+    };
+    // toca numa subdivisão (ou num continente sem subdivisões, como Oceania/Eurásia): alterna se está marcado
+    const toggleHistRegiao = (id) => {
+        setHistRegioesSelecionadas((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    };
+    // toca num continente com subdivisões: só abre/fecha a lista de subdivisões — a seleção em si
+    // acontece tocando nas subdivisões reveladas
+    const toggleHistContinente = (continente) => {
+        if (continente.subs.length === 0) {
+            toggleHistRegiao(continente.id);
+            return;
+        }
+        setHistContinenteExpandido((prev) => (prev === continente.id ? null : continente.id));
     };
     const removerEventoHistoria = (id) => {
         const idx = histEventos.findIndex((x) => x.id === id);
@@ -3762,7 +3840,7 @@ function App() {
         setHistEventos((prev) => prev.filter((x) => x.id !== id));
     };
     const editarTextoEventoHistoria = (id, novoTexto) => {
-        setHistEventos((prev) => prev.map((x) => (x.id === id ? { ...x, texto: novoTexto } : x)));
+        setHistEventos((prev) => prev.map((x) => (x.id === id ? Object.assign(Object.assign({}, x), { texto: novoTexto }) : x)));
     };
     const adicionarTipoHistoria = () => {
         const nome = histNovoTipoNome.trim();
@@ -3814,9 +3892,9 @@ function App() {
         return chkAbasDe(chkId).some((s) => s.id === sel) ? sel : padrao;
     };
     const chkItensDaSessao = (chkId, sid) => chkItensDe(chkId).filter((i) => sessaoDoItem(i) === sid);
-    const setChkMapa = (setter, chkId, valor) => setter((m) => ({ ...m, [chkId]: valor }));
-    const setItensDe = (chkId, fn) => setChecklistItens((m) => ({ ...m, [chkId]: fn(m[chkId] || []) }));
-    const setSessoesDe = (chkId, fn) => setChecklistSessoes((m) => ({ ...m, [chkId]: fn(m[chkId] || []) }));
+    const setChkMapa = (setter, chkId, valor) => setter((m) => (Object.assign(Object.assign({}, m), { [chkId]: valor })));
+    const setItensDe = (chkId, fn) => setChecklistItens((m) => (Object.assign(Object.assign({}, m), { [chkId]: fn(m[chkId] || []) })));
+    const setSessoesDe = (chkId, fn) => setChecklistSessoes((m) => (Object.assign(Object.assign({}, m), { [chkId]: fn(m[chkId] || []) })));
     const msgChk = (chkId, texto) => setChkMapa(setChkMsg, chkId, texto);
     const adicionarItemChk = (chkId) => {
         const texto = (chkNovoTexto[chkId] || '').trim();
@@ -3871,7 +3949,7 @@ function App() {
         }
         // remove por id e, por segurança, também qualquer outra entrada com o mesmo nome
         setSessoesDe(chkId, (s) => s.filter((x) => x.id !== sid && !(alvo && x.nome === alvo.nome)));
-        setItensDe(chkId, (l) => l.map((i) => (sessaoDoItem(i) === sid ? { ...i, sessaoId: null } : i)));
+        setItensDe(chkId, (l) => l.map((i) => (sessaoDoItem(i) === sid ? Object.assign(Object.assign({}, i), { sessaoId: null }) : i)));
         setChkMapa(setChkSessaoSel, chkId, 'geral');
         setChkMapa(setChkConfirmRemoverSessao, chkId, false);
         setChkMapa(setChkCriandoSessao, chkId, false);
@@ -3889,18 +3967,18 @@ function App() {
             const historico = t.historico ? [...t.historico] : [false];
             historico[idxHistorico(t.freq)] = feito;
             if (!feito)
-                return { ...t, feitoEm: null, feitoDia: null, historico };
+                return Object.assign(Object.assign({}, t), { feitoEm: null, feitoDia: null, historico });
             const mapa = {
                 diaria: hoje(), semanal: domingoDaSemana(), mensal: primeiroDiaDoMes(),
                 trimestral: primeiroDiaDoTrimestre(), semestral: primeiroDiaSemestre(), anual: primeiroDiaDoanual(),
             };
-            return { ...t, feitoEm: mapa[t.freq] || hoje(), feitoDia: hoje(), historico, atrasos: 0 };
+            return Object.assign(Object.assign({}, t), { feitoEm: mapa[t.freq] || hoje(), feitoDia: hoje(), historico, atrasos: 0 });
         }));
     };
     const alternarItemChk = (chkId, id) => {
         const item = chkItensDe(chkId).find((i) => i.id === id);
         const novo = item ? !item.feito : true;
-        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, feito: novo } : i)));
+        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { feito: novo }) : i)));
         // se o item foi marcado como Priority, a cópia nos Prioritários acompanha
         if (item && item.fixaId)
             marcarFixaComo(item.fixaId, novo);
@@ -3915,7 +3993,7 @@ function App() {
         if (item.prioridade) {
             if (item.fixaId)
                 setFixas((fs) => fs.filter((t) => t.id !== item.fixaId));
-            setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, prioridade: false, fixaId: null } : i)));
+            setItensDe(chkId, (l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { prioridade: false, fixaId: null }) : i)));
             marcarSujo();
             return;
         }
@@ -3931,7 +4009,7 @@ function App() {
                 feitoEm: item.feito ? hoje() : null, feitoDia: item.feito ? hoje() : null,
                 historico: [!!item.feito], origemChk: { chkId, itemId: id },
             }, ...fs]);
-        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, prioridade: true, fixaId: novaFixaId } : i)));
+        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { prioridade: true, fixaId: novaFixaId }) : i)));
         marcarSujo();
     };
     // Painel 🚗 Car (dentro de Prefeituras): botões de atalho — cada toque manda a mensagem
@@ -3982,21 +4060,21 @@ function App() {
             return;
         if (programaAberto.fonte === 'contador') {
             const { id } = programaAberto;
-            setContadoresRegressivos((l) => l.map((c) => (c.id === id ? { ...c, programa: programaTextoEdit } : c)));
+            setContadoresRegressivos((l) => l.map((c) => (c.id === id ? Object.assign(Object.assign({}, c), { programa: programaTextoEdit }) : c)));
         }
         else if (programaAberto.fonte === 'antesdeir') {
             const { id } = programaAberto;
-            setAntesDeIrPendentes((l) => l.map((i) => (i.id === id ? { ...i, programa: programaTextoEdit } : i)));
-            setAntesDeIrConcluidos((l) => l.map((i) => (i.id === id ? { ...i, programa: programaTextoEdit } : i)));
+            setAntesDeIrPendentes((l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { programa: programaTextoEdit }) : i)));
+            setAntesDeIrConcluidos((l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { programa: programaTextoEdit }) : i)));
         }
         else if (programaAberto.fonte === 'goals') {
             const { id } = programaAberto;
-            setGoalsPendentes((l) => l.map((i) => (i.id === id ? { ...i, programa: programaTextoEdit } : i)));
-            setGoalsConcluidos((l) => l.map((i) => (i.id === id ? { ...i, programa: programaTextoEdit } : i)));
+            setGoalsPendentes((l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { programa: programaTextoEdit }) : i)));
+            setGoalsConcluidos((l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { programa: programaTextoEdit }) : i)));
         }
         else {
             const { chkId, itemId } = programaAberto;
-            setItensDe(chkId, (l) => l.map((i) => (i.id === itemId ? { ...i, programa: programaTextoEdit } : i)));
+            setItensDe(chkId, (l) => l.map((i) => (i.id === itemId ? Object.assign(Object.assign({}, i), { programa: programaTextoEdit }) : i)));
         }
         marcarSujo();
         setProgramaAberto(null);
@@ -4013,7 +4091,7 @@ function App() {
             return;
         const atual = CICLO_COR_ITEM.indexOf(item.cor || null);
         const proxima = CICLO_COR_ITEM[(atual + 1) % CICLO_COR_ITEM.length];
-        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? { ...i, cor: proxima } : i)));
+        setItensDe(chkId, (l) => l.map((i) => (i.id === id ? Object.assign(Object.assign({}, i), { cor: proxima }) : i)));
         marcarSujo();
     };
     const removerItemChk = (chkId, id) => {
@@ -4034,20 +4112,17 @@ function App() {
         if (!texto)
             return;
         const coluna = batalhaPaisSel + (batalhaTipoSel === 'pros' ? 'Pros' : 'Contras');
-        setBatalhaNotas((m) => ({ ...m, [coluna]: [{ id: Date.now() + Math.random(), texto, estrelas: 0 }, ...(m[coluna] || [])] }));
+        setBatalhaNotas((m) => (Object.assign(Object.assign({}, m), { [coluna]: [{ id: Date.now() + Math.random(), texto, estrelas: 0 }, ...(m[coluna] || [])] })));
         setBatalhaNovoTexto('');
         marcarSujo();
     };
     const removerNotaBatalha = (coluna, id) => {
-        setBatalhaNotas((m) => ({ ...m, [coluna]: (m[coluna] || []).filter((n) => n.id !== id) }));
+        setBatalhaNotas((m) => (Object.assign(Object.assign({}, m), { [coluna]: (m[coluna] || []).filter((n) => n.id !== id) })));
         marcarSujo();
     };
     // toca numa estrela pra dar aquela nota (1, 2 ou 3); tocar na mesma estrela que já está marcada zera
     const definirEstrelaBatalha = (coluna, id, estrelas) => {
-        setBatalhaNotas((m) => ({
-            ...m,
-            [coluna]: (m[coluna] || []).map((n) => (n.id === id ? { ...n, estrelas: n.estrelas === estrelas ? 0 : estrelas } : n)),
-        }));
+        setBatalhaNotas((m) => (Object.assign(Object.assign({}, m), { [coluna]: (m[coluna] || []).map((n) => (n.id === id ? Object.assign(Object.assign({}, n), { estrelas: n.estrelas === estrelas ? 0 : estrelas }) : n)) })));
         marcarSujo();
     };
     // Contador Regressivo: cada contador guarda o valor inicial (ex.: 256) e a data em que foi criado;
@@ -4236,14 +4311,14 @@ function App() {
         marcarSujo();
     };
     const definirEstrelasGanhos = (id, valor) => {
-        setGanhosRegistro((l) => l.map((r) => (r.id === id ? { ...r, estrelas: r.estrelas === valor ? 0 : valor } : r)));
+        setGanhosRegistro((l) => l.map((r) => (r.id === id ? Object.assign(Object.assign({}, r), { estrelas: r.estrelas === valor ? 0 : valor }) : r)));
         marcarSujo();
     };
     // mesmo sistema de classificação por estrelas do Ganhos, aplicado ao Antes de ir — o item
     // pode estar em pendentes ou já em concluídos, então atualiza os dois de uma vez (só um bate)
     const definirEstrelasAntesDeIr = (id, valor) => {
-        setAntesDeIrPendentes((l) => l.map((r) => (r.id === id ? { ...r, estrelas: r.estrelas === valor ? 0 : valor } : r)));
-        setAntesDeIrConcluidos((l) => l.map((r) => (r.id === id ? { ...r, estrelas: r.estrelas === valor ? 0 : valor } : r)));
+        setAntesDeIrPendentes((l) => l.map((r) => (r.id === id ? Object.assign(Object.assign({}, r), { estrelas: r.estrelas === valor ? 0 : valor }) : r)));
+        setAntesDeIrConcluidos((l) => l.map((r) => (r.id === id ? Object.assign(Object.assign({}, r), { estrelas: r.estrelas === valor ? 0 : valor }) : r)));
         marcarSujo();
     };
     // Desbloqueios: valor em US$ (número) + nota curta, sem agrupamento — a lista inteira
@@ -4274,7 +4349,7 @@ function App() {
         const nota = desbloqueiosEditNota.trim();
         if (Number.isNaN(valor) || !nota)
             return;
-        setDesbloqueiosRegistro((l) => l.map((r) => (r.id === desbloqueiosEditandoId ? { ...r, valor, nota } : r)));
+        setDesbloqueiosRegistro((l) => l.map((r) => (r.id === desbloqueiosEditandoId ? Object.assign(Object.assign({}, r), { valor, nota }) : r)));
         setDesbloqueiosEditandoId(null);
         marcarSujo();
     };
@@ -4364,7 +4439,7 @@ function App() {
         marcarSujo();
     };
     const alternarCoroaMomentum = (id) => {
-        setMomentumRegistro((l) => l.map((r) => (r.id === id ? { ...r, coroa: !r.coroa } : r)));
+        setMomentumRegistro((l) => l.map((r) => (r.id === id ? Object.assign(Object.assign({}, r), { coroa: !r.coroa }) : r)));
         marcarSujo();
     };
     // ---- 🔍 Pesquisa: busca livre em tudo que existe no app. Vivia dentro do Histórico (Gráficos);
@@ -4464,7 +4539,7 @@ function App() {
                 const aberto = !!ganhosAnoAberto[ano];
                 const rotulo = rotuloDe(ano);
                 return (React.createElement("div", { key: ano, style: { marginBottom: 8 } },
-                    React.createElement("button", { onClick: () => setGanhosAnoAberto((m) => ({ ...m, [ano]: !m[ano] })), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
+                    React.createElement("button", { onClick: () => setGanhosAnoAberto((m) => (Object.assign(Object.assign({}, m), { [ano]: !m[ano] }))), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
                             display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                             fontSize: 13, fontWeight: 700, color: corRotuloAno(ano), padding: '8px 2px',
                             border: 'none', borderBottom: '1.5px solid #ddd8c9', background: 'none', cursor: 'pointer',
@@ -4482,7 +4557,7 @@ function App() {
                             "."),
                         doAno.map((r) => (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.texto, onChange: (e) => setGanhosRegistro((l) => l.map((x) => (x.id === r.id ? { ...x, texto: e.target.value } : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto)),
+                                mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.texto, onChange: (e) => setGanhosRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { texto: e.target.value }) : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto)),
                                 React.createElement("div", { style: { display: 'flex', gap: 3, marginTop: 3 } }, [1, 2, 3].map((n) => (React.createElement("span", { key: n, onClick: () => definirEstrelasGanhos(r.id, n), title: `Classificar com ${n} estrela${n > 1 ? 's' : ''} (toque de novo pra tirar)`, style: {
                                         cursor: 'pointer', fontSize: 16, lineHeight: 1,
                                         color: (r.estrelas || 0) >= n ? '#C9A227' : '#ddd8c9',
@@ -4533,7 +4608,7 @@ function App() {
             antesDeIrPendentes.filter((it) => antesDeIrFiltroEstrelas === 0 || (it.estrelas || 0) === antesDeIrFiltroEstrelas).length === 0 && React.createElement("p", { className: "mt-empty" }, "Nada pendente \u2014 adicione algo acima."),
             antesDeIrPendentes.filter((it) => antesDeIrFiltroEstrelas === 0 || (it.estrelas || 0) === antesDeIrFiltroEstrelas).map((it) => (React.createElement("div", { key: it.id, className: "mt-fixa-item" },
                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                    mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: it.texto, onChange: (e) => setAntesDeIrPendentes((l) => l.map((x) => (x.id === it.id ? { ...x, texto: e.target.value } : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, it.texto)),
+                    mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: it.texto, onChange: (e) => setAntesDeIrPendentes((l) => l.map((x) => (x.id === it.id ? Object.assign(Object.assign({}, x), { texto: e.target.value }) : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, it.texto)),
                     React.createElement("div", { style: { display: 'flex', gap: 3, marginTop: 3 } }, [1, 2, 3].map((n) => (React.createElement("span", { key: n, onClick: () => definirEstrelasAntesDeIr(it.id, n), title: `Classificar com ${n} estrela${n > 1 ? 's' : ''} (toque de novo pra tirar)`, style: {
                             cursor: 'pointer', fontSize: 16, lineHeight: 1,
                             color: (it.estrelas || 0) >= n ? '#C9A227' : '#ddd8c9',
@@ -4552,7 +4627,7 @@ function App() {
             antesDeIrConcluidos.filter((it) => antesDeIrFiltroEstrelas === 0 || (it.estrelas || 0) === antesDeIrFiltroEstrelas).length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum item conclu\u00EDdo ainda."),
             antesDeIrConcluidos.filter((it) => antesDeIrFiltroEstrelas === 0 || (it.estrelas || 0) === antesDeIrFiltroEstrelas).map((it) => (React.createElement("div", { key: it.id, className: "mt-fixa-item" },
                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                    mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: it.texto, onChange: (e) => setAntesDeIrConcluidos((l) => l.map((x) => (x.id === it.id ? { ...x, texto: e.target.value } : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#999', textDecoration: 'line-through', wordBreak: 'break-word' } }, it.texto)),
+                    mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: it.texto, onChange: (e) => setAntesDeIrConcluidos((l) => l.map((x) => (x.id === it.id ? Object.assign(Object.assign({}, x), { texto: e.target.value }) : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#999', textDecoration: 'line-through', wordBreak: 'break-word' } }, it.texto)),
                     React.createElement("div", { style: { display: 'flex', gap: 3, marginTop: 3 } }, [1, 2, 3].map((n) => (React.createElement("span", { key: n, onClick: () => definirEstrelasAntesDeIr(it.id, n), title: `Classificar com ${n} estrela${n > 1 ? 's' : ''} (toque de novo pra tirar)`, style: {
                             cursor: 'pointer', fontSize: 16, lineHeight: 1,
                             color: (it.estrelas || 0) >= n ? '#C9A227' : '#ddd8c9',
@@ -4576,7 +4651,7 @@ function App() {
         React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 6 } },
             goalsPendentes.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nada pendente \u2014 adicione algo acima."),
             goalsPendentes.map((it) => (React.createElement("div", { key: it.id, className: "mt-fixa-item", style: { alignItems: 'center' } },
-                mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: it.texto, onChange: (e) => setGoalsPendentes((l) => l.map((x) => (x.id === it.id ? { ...x, texto: e.target.value } : x))), style: { flex: 1, minWidth: 0 } })) : (React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, it.texto)),
+                mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: it.texto, onChange: (e) => setGoalsPendentes((l) => l.map((x) => (x.id === it.id ? Object.assign(Object.assign({}, x), { texto: e.target.value }) : x))), style: { flex: 1, minWidth: 0 } })) : (React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, it.texto)),
                 React.createElement("button", { onClick: () => abrirProgramaGoals(it.id), title: it.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
                         flexShrink: 0, fontSize: 10.5, fontWeight: 700, padding: '4px 9px',
                         borderRadius: 20, border: '1.5px solid', cursor: 'pointer',
@@ -4590,7 +4665,7 @@ function App() {
         React.createElement("div", { className: "mt-fixas-scroll" },
             goalsConcluidos.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum item conclu\u00EDdo ainda."),
             goalsConcluidos.map((it) => (React.createElement("div", { key: it.id, className: "mt-fixa-item", style: { alignItems: 'center' } },
-                mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: it.texto, onChange: (e) => setGoalsConcluidos((l) => l.map((x) => (x.id === it.id ? { ...x, texto: e.target.value } : x))), style: { flex: 1, minWidth: 0 } })) : (React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#999', textDecoration: 'line-through', wordBreak: 'break-word' } }, it.texto)),
+                mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: it.texto, onChange: (e) => setGoalsConcluidos((l) => l.map((x) => (x.id === it.id ? Object.assign(Object.assign({}, x), { texto: e.target.value }) : x))), style: { flex: 1, minWidth: 0 } })) : (React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 13.5, color: '#999', textDecoration: 'line-through', wordBreak: 'break-word' } }, it.texto)),
                 React.createElement("button", { onClick: () => abrirProgramaGoals(it.id), title: it.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
                         flexShrink: 0, fontSize: 10.5, fontWeight: 700, padding: '4px 9px',
                         borderRadius: 20, border: '1.5px solid', cursor: 'pointer',
@@ -4629,7 +4704,7 @@ function App() {
                 const aberto = !!eraDeOuroAnoAberto[ano];
                 const rotulo = rotuloDe(ano);
                 return (React.createElement("div", { key: ano, style: { marginBottom: 8 } },
-                    React.createElement("button", { onClick: () => setEraDeOuroAnoAberto((m) => ({ ...m, [ano]: !m[ano] })), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
+                    React.createElement("button", { onClick: () => setEraDeOuroAnoAberto((m) => (Object.assign(Object.assign({}, m), { [ano]: !m[ano] }))), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
                             display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                             fontSize: 13, fontWeight: 700, color: corRotuloAno(ano), padding: '8px 2px',
                             border: 'none', borderBottom: '1.5px solid #ddd8c9', background: 'none', cursor: 'pointer',
@@ -4646,7 +4721,7 @@ function App() {
                             rotulo,
                             "."),
                         doAno.map((r) => (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } }, mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.texto, onChange: (e) => setEraDeOuroRegistro((l) => l.map((x) => (x.id === r.id ? { ...x, texto: e.target.value } : x))), style: { width: '100%', boxSizing: 'border-box' } })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto))),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } }, mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.texto, onChange: (e) => setEraDeOuroRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { texto: e.target.value }) : x))), style: { width: '100%', boxSizing: 'border-box' } })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word' } }, r.texto))),
                             mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroEraDeOuro(r.id) }, "\u00D7"))))))));
             })));
     };
@@ -4705,7 +4780,7 @@ function App() {
                 const aberto = !!momentumMesAberto[mesChave];
                 const rotulo = rotuloMes(mesChave);
                 return (React.createElement("div", { key: mesChave, style: { marginBottom: 8 } },
-                    React.createElement("button", { onClick: () => setMomentumMesAberto((m) => ({ ...m, [mesChave]: !m[mesChave] })), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
+                    React.createElement("button", { onClick: () => setMomentumMesAberto((m) => (Object.assign(Object.assign({}, m), { [mesChave]: !m[mesChave] }))), title: aberto ? `Ocultar ${rotulo}` : `Ver entradas de ${rotulo}`, style: {
                             display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                             fontSize: 13, fontWeight: 700, color: '#232323', padding: '8px 2px',
                             border: 'none', borderBottom: '1.5px solid #ddd8c9', background: 'none', cursor: 'pointer',
@@ -4725,7 +4800,7 @@ function App() {
                             const podeCoroar = mostrarConfigLivroRazao && momentumModoCoroa;
                             return (React.createElement("div", { key: r.id, className: "mt-fixa-item" },
                                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                    mostrarConfigLivroRazao && !podeCoroar ? (React.createElement("input", { className: "mt-nota-input", value: r.texto, onChange: (e) => setMomentumRegistro((l) => l.map((x) => (x.id === r.id ? { ...x, texto: e.target.value } : x))), style: { width: '100%', boxSizing: 'border-box' } })) : (React.createElement("span", { onClick: () => podeCoroar && alternarCoroaMomentum(r.id), style: {
+                                    mostrarConfigLivroRazao && !podeCoroar ? (React.createElement("input", { className: "mt-nota-input", value: r.texto, onChange: (e) => setMomentumRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { texto: e.target.value }) : x))), style: { width: '100%', boxSizing: 'border-box' } })) : (React.createElement("span", { onClick: () => podeCoroar && alternarCoroaMomentum(r.id), style: {
                                             display: 'block', fontSize: 13.5, color: '#232323', wordBreak: 'break-word',
                                             cursor: podeCoroar ? 'pointer' : 'default',
                                             outline: podeCoroar ? '1px dashed #C9A22766' : 'none', outlineOffset: 3,
@@ -4744,7 +4819,7 @@ function App() {
             (batalhaNotas[chave] || []).length === 0 && React.createElement("p", { className: "mt-empty", style: { fontSize: 11 } }, "Nenhuma nota."),
             (batalhaNotas[chave] || []).map((n) => (React.createElement("div", { key: n.id, className: "mt-fixa-item", style: { padding: '6px 8px', flexDirection: 'column', alignItems: 'stretch' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start' } },
-                    mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: n.texto, onChange: (e) => setBatalhaNotas((m) => ({ ...m, [chave]: (m[chave] || []).map((x) => (x.id === n.id ? { ...x, texto: e.target.value } : x)) })), style: { flex: 1, minWidth: 0, fontSize: 12.5 } })) : (React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 12.5, wordBreak: 'break-word' } }, n.texto)),
+                    mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: n.texto, onChange: (e) => setBatalhaNotas((m) => (Object.assign(Object.assign({}, m), { [chave]: (m[chave] || []).map((x) => (x.id === n.id ? Object.assign(Object.assign({}, x), { texto: e.target.value }) : x)) }))), style: { flex: 1, minWidth: 0, fontSize: 12.5 } })) : (React.createElement("span", { style: { flex: 1, minWidth: 0, fontSize: 12.5, wordBreak: 'break-word' } }, n.texto)),
                     mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerNotaBatalha(chave, n.id) }, "\u00D7")),
                 React.createElement("div", { style: { display: 'flex', gap: 2, marginTop: 4 } }, [1, 2, 3].map((estrela) => (React.createElement("button", { key: estrela, onClick: () => definirEstrelaBatalha(chave, n.id, estrela), title: `${estrela} estrela${estrela > 1 ? 's' : ''}`, style: { padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, color: (n.estrelas || 0) >= estrela ? (chave.toLowerCase().includes('contras') ? '#D64545' : '#D9B23C') : '#ddd8c9' } }, "\u2605"))))))))));
     // Batalha: uma coluna de país — bandeira + nome, com Prós e Contras dentro
@@ -4792,7 +4867,7 @@ function App() {
                 const dias = diasRestantesContador(c);
                 return (React.createElement("div", { key: c.id, className: "mt-fixa-item", style: { padding: '10px 8px', alignItems: 'center' } },
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: c.nome, onChange: (e) => setContadoresRegressivos((l) => l.map((x) => (x.id === c.id ? { ...x, nome: e.target.value } : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (React.createElement("span", { style: { fontSize: 13, fontWeight: 700, wordBreak: 'break-word' } }, c.nome)),
+                        mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: c.nome, onChange: (e) => setContadoresRegressivos((l) => l.map((x) => (x.id === c.id ? Object.assign(Object.assign({}, x), { nome: e.target.value }) : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (React.createElement("span", { style: { fontSize: 13, fontWeight: 700, wordBreak: 'break-word' } }, c.nome)),
                         React.createElement("div", { style: { fontSize: 22, fontWeight: 800, color: dias <= 0 ? '#D9483C' : '#232323', marginTop: 2 } },
                             dias,
                             " ",
@@ -4872,7 +4947,7 @@ function App() {
                     r.foto && React.createElement("img", { src: r.foto, className: "mt-alerta-img-preview", alt: "", onClick: () => setMidiaAmpliada({ tipo: 'foto', url: r.foto }) }),
                     r.video && React.createElement("video", { src: r.video, className: "mt-alerta-img-preview", muted: true, onClick: () => setMidiaAmpliada({ tipo: 'video', url: r.video }) }),
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        faceRegistroConfigAberto ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setFaceRegistro((l) => l.map((x) => (x.id === r.id ? { ...x, comentario: e.target.value } : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, r.comentario)),
+                        faceRegistroConfigAberto ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setFaceRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { comentario: e.target.value }) : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, r.comentario)),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
                     faceRegistroConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerRegistroFace(r.id) }, "\u00D7"))))))))));
     // Linha do tempo gráfica da aba História: reta horizontal com um ponto por evento,
@@ -4883,27 +4958,32 @@ function App() {
         if (eventos.length === 0) {
             return React.createElement("p", { className: "mt-empty", style: { marginTop: 10 } }, "Nenhum evento neste tipo ainda \u2014 a linha do tempo aparece aqui assim que voc\u00EA registrar o primeiro.");
         }
-        const pxPorAno = histEscala === 'seculo' ? 0.5 : 4;
+        const pxPorAno = 4;
         const anos = eventos.map((e) => e.ano);
-        const margem = histEscala === 'seculo' ? 200 : 20;
+        const margem = 20;
         const anoMin = Math.min(...anos, 0) - margem;
         const anoMax = Math.max(...anos, 0) + margem;
         const largura = Math.max(320, (anoMax - anoMin) * pxPorAno);
         const y = 42;
         const anoParaX = (ano) => (ano - anoMin) * pxPorAno;
-        const passo = histEscala === 'seculo' ? 100 : 10;
+        const passo = 10;
         const marcas = [];
         for (let a = Math.ceil(anoMin / passo) * passo; a <= anoMax; a += passo)
             marcas.push(a);
         return (React.createElement("div", { style: { overflowX: 'auto', marginTop: 12, background: '#FBFAF6', borderRadius: 10, border: '1px solid #ddd8c9', WebkitOverflowScrolling: 'touch' } },
-            React.createElement("svg", { width: largura, height: 92, style: { display: 'block' } },
+            React.createElement("svg", { width: largura, height: 104, style: { display: 'block' } },
                 React.createElement("line", { x1: 0, y1: y, x2: largura, y2: y, stroke: "#ddd8c9", strokeWidth: 2 }),
-                marcas.map((a) => (React.createElement("g", { key: a },
-                    React.createElement("line", { x1: anoParaX(a), y1: y - 4, x2: anoParaX(a), y2: y + 4, stroke: a === 0 ? '#C0492E' : '#c9c4b4', strokeWidth: a === 0 ? 2 : 1 }),
-                    React.createElement("text", { x: anoParaX(a), y: y + 18, fontSize: "9", textAnchor: "middle", fill: a === 0 ? '#C0492E' : '#999' }, formatAnoHistoria(a))))),
+                marcas.map((a) => {
+                    const marcaDeSeculo = a % 100 === 0;
+                    return (React.createElement("g", { key: a },
+                        React.createElement("line", { x1: anoParaX(a), y1: y - (marcaDeSeculo ? 6 : 4), x2: anoParaX(a), y2: y + (marcaDeSeculo ? 6 : 4), stroke: a === 0 ? '#C0492E' : (marcaDeSeculo ? '#8A6D3B' : '#c9c4b4'), strokeWidth: a === 0 ? 2 : (marcaDeSeculo ? 1.5 : 1) }),
+                        React.createElement("text", { x: anoParaX(a), y: y + 18, fontSize: "9", textAnchor: "middle", fill: a === 0 ? '#C0492E' : '#999' }, formatAnoHistoria(a)),
+                        marcaDeSeculo && (React.createElement("text", { x: anoParaX(a), y: y + 30, fontSize: "8", fontWeight: "700", textAnchor: "middle", fill: "#8A6D3B" }, formatSeculoHistoria(a === 0 ? 1 : a)))));
+                }),
                 eventos.map((e) => (React.createElement("g", { key: e.id },
                     React.createElement("circle", { cx: anoParaX(e.ano), cy: y, r: 5, fill: "#8A6D3B", stroke: "#fff", strokeWidth: 1.5 }),
-                    React.createElement("text", { x: anoParaX(e.ano), y: y - 12, fontSize: "9", textAnchor: "middle", fill: "#232323" }, formatAnoHistoria(e.ano))))))));
+                    React.createElement("text", { x: anoParaX(e.ano), y: y - 12, fontSize: "9", textAnchor: "middle", fill: "#232323" }, formatAnoHistoria(e.ano)),
+                    React.createElement("text", { x: anoParaX(e.ano), y: y - 22, fontSize: "7.5", textAnchor: "middle", fill: "#8A6D3B" }, formatSeculoHistoria(e.ano))))))));
     };
     // Painel "💰 Bank": mora dentro da aba Finanças, no botão "Bank" ao lado das sessões.
     const renderBank = () => {
@@ -5007,8 +5087,7 @@ function App() {
     const alternarStatusLista = (id) => {
         setLista((l) => l.map((item) => item.id === id
             ? item.status === 'aguardando'
-                ? { ...item, status: 'feito', feitoEm: new Date().toISOString() }
-                : { ...item, status: 'aguardando', feitoEm: null }
+                ? Object.assign(Object.assign({}, item), { status: 'feito', feitoEm: new Date().toISOString() }) : Object.assign(Object.assign({}, item), { status: 'aguardando', feitoEm: null })
             : item));
         marcarSujo();
     };
@@ -5041,7 +5120,7 @@ function App() {
         const isCustomFreq = gruposCustom.some((g) => g.id === freq);
         const historico = Array(isCustomFreq ? 1 : (slots[freq] || 7)).fill(false);
         setFixas((fs) => inserirNovasFixas(fs, [{ id: genId(), texto, freq, feitoEm: null, historico }], freq));
-        setFixasCardNovoTexto((m) => ({ ...m, [freq]: '' }));
+        setFixasCardNovoTexto((m) => (Object.assign(Object.assign({}, m), { [freq]: '' })));
         marcarSujo();
     };
     // ---- banco de reservas: a tarefa fica guardada em segundo plano até você elevá-la ----
@@ -5050,7 +5129,7 @@ function App() {
         if (!texto)
             return;
         setReservas((rs) => [...rs, { id: genId(), texto, freq }]);
-        setReservaNovoTexto((m) => ({ ...m, [freq]: '' }));
+        setReservaNovoTexto((m) => (Object.assign(Object.assign({}, m), { [freq]: '' })));
         marcarSujo();
     };
     const removerReserva = (id) => {
@@ -5092,7 +5171,7 @@ function App() {
     // muda o contador de uma tarefa já existente (em dias a partir de hoje)
     const definirPrazoFixa = (id, dias) => {
         const n = parseInt(dias, 10);
-        setFixas((fs) => fs.map((t) => (t.id === id ? { ...t, prazoISO: Number.isFinite(n) && n > 0 ? dataMaisDias(n) : null } : t)));
+        setFixas((fs) => fs.map((t) => (t.id === id ? Object.assign(Object.assign({}, t), { prazoISO: Number.isFinite(n) && n > 0 ? dataMaisDias(n) : null }) : t)));
         marcarSujo();
     };
     // reordena dentro de cada lista: quem tem menos dias para vencer sobe para o topo;
@@ -5159,7 +5238,7 @@ function App() {
         setFixasGruposOrdem((ord) => ord.filter((x) => x !== id));
         setFixasGruposOcultos((ocultos) => ocultos.filter((x) => x !== id));
         setFixasGruposComoCard((cards) => cards.filter((x) => x !== id));
-        setQuadroMedalhas((q) => { const { [id]: _removido, ...resto } = q; return resto; });
+        setQuadroMedalhas((q) => { const _a = q, _b = id, _removido = _a[_b], resto = __rest(_a, [typeof _b === "symbol" ? _b : _b + ""]); return resto; });
         marcarSujo();
     };
     // ids válidos de grupos de tarefas fixas neste momento (padrão + listas custom)
@@ -5337,7 +5416,7 @@ function App() {
                 // desmarcar: remove a marca do histórico também
                 const historico = t.historico ? [...t.historico] : [];
                 historico[idxHistorico(t.freq)] = false;
-                return { ...t, feitoEm: null, feitoDia: null, historico };
+                return Object.assign(Object.assign({}, t), { feitoEm: null, feitoDia: null, historico });
             }
             // marcar: atualiza feitoEm E já marca o histórico
             const mapa = {
@@ -5347,15 +5426,12 @@ function App() {
             const isCustomFreq = gruposCustom.some((g) => g.id === t.freq);
             const historico = t.historico ? [...t.historico] : Array(isCustomFreq ? 1 : (SLOTS[t.freq] || 7)).fill(false);
             historico[idxHistorico(t.freq)] = true;
-            return { ...t, feitoEm: mapa[t.freq] || hoje(), feitoDia: hoje(), historico, atrasos: 0 };
+            return Object.assign(Object.assign({}, t), { feitoEm: mapa[t.freq] || hoje(), feitoDia: hoje(), historico, atrasos: 0 });
         }));
         // se esta fixa veio do botão Priority de um item do Livro Razão, marca o item lá também
         if (tarefa.origemChk) {
             const { chkId, itemId } = tarefa.origemChk;
-            setChecklistItens((m) => ({
-                ...m,
-                [chkId]: (m[chkId] || []).map((i) => (i.id === itemId ? { ...i, feito: !jaEstavaFeita } : i)),
-            }));
+            setChecklistItens((m) => (Object.assign(Object.assign({}, m), { [chkId]: (m[chkId] || []).map((i) => (i.id === itemId ? Object.assign(Object.assign({}, i), { feito: !jaEstavaFeita }) : i)) })));
         }
         marcarSujo();
     };
@@ -5377,14 +5453,14 @@ function App() {
             const atual = Array.isArray(q[freq]) ? [...q[freq]] : Array(tamanhoPadrao).fill(null);
             if (idx >= 0 && idx < atual.length)
                 atual[idx] = medalha;
-            return { ...q, [freq]: atual };
+            return Object.assign(Object.assign({}, q), { [freq]: atual });
         });
         setQuadroPercentuais((q) => {
             const tamanhoPadrao = SLOTS[freq] || 1;
             const atual = Array.isArray(q[freq]) ? [...q[freq]] : Array(tamanhoPadrao).fill(null);
             if (idx >= 0 && idx < atual.length)
                 atual[idx] = pct;
-            return { ...q, [freq]: atual };
+            return Object.assign(Object.assign({}, q), { [freq]: atual });
         });
     };
     // MEDALHA PROVISÓRIA: recalcula a medalha do período em andamento (hoje, esta semana, este mês…)
@@ -5461,7 +5537,7 @@ function App() {
                 historico[idxAtual(freq)] = true;
                 novosRegistros.push({ id: genId(), tipo: 'fixa', tarefa: t.texto, dia: labelPorFreq(freq, idxAtual(freq)), freq, data: dataHoje, dataISO: hoje() });
             }
-            return { ...t, feitoEm: null, historico };
+            return Object.assign(Object.assign({}, t), { feitoEm: null, historico });
         }));
         // comentários do grupo também vão para o livro e saem da tela
         const comentariosDaFreq = comentariosFixas.filter((c) => c.freq === freq);
@@ -5509,7 +5585,7 @@ function App() {
                 return t;
             const historico = t.historico ? [...t.historico] : [];
             historico[colIdx] = !historico[colIdx];
-            return { ...t, historico };
+            return Object.assign(Object.assign({}, t), { historico });
         }));
         marcarSujo();
     };
@@ -5517,7 +5593,7 @@ function App() {
         setHistoricoColunasOcultas((prev) => {
             const atual = prev[freq] || [];
             const jaOculta = atual.includes(colIdx);
-            return { ...prev, [freq]: jaOculta ? atual.filter((i) => i !== colIdx) : [...atual, colIdx] };
+            return Object.assign(Object.assign({}, prev), { [freq]: jaOculta ? atual.filter((i) => i !== colIdx) : [...atual, colIdx] });
         });
     };
     // ---- janela de alertas ----
@@ -5620,7 +5696,7 @@ function App() {
             return;
         }
         const t = setTimeout(() => {
-            setContagemPasta((c) => (c ? { ...c, restante: c.restante - 1 } : null));
+            setContagemPasta((c) => (c ? Object.assign(Object.assign({}, c), { restante: c.restante - 1 }) : null));
         }, 1000);
         return () => clearTimeout(t);
     }, [contagemPasta, novoTextoRapido]);
@@ -5672,7 +5748,7 @@ function App() {
             const destino = n.subpastaId || n.pastaId || 'geral';
             const base = { id: n.id, texto: typeof n.texto === 'string' ? n.texto : '', pastaId: validos.has(destino) ? destino : 'geral' };
             // preserva a marca de origem das notas criadas pelo PocketScribe (usada pra não duplicar transcrição)
-            return typeof n.origemPocketscribeTs === 'number' ? { ...base, origemPocketscribeTs: n.origemPocketscribeTs } : base;
+            return typeof n.origemPocketscribeTs === 'number' ? Object.assign(Object.assign({}, base), { origemPocketscribeTs: n.origemPocketscribeTs }) : base;
         });
     };
     // devolve o caminho de ids do topo até o nó procurado, ou null
@@ -5698,8 +5774,8 @@ function App() {
         return null;
     };
     // aplica fn no nó de id indicado, preservando o resto da árvore
-    const atualizarNo = (nos, id, fn) => (Array.isArray(nos) ? nos : []).map((n) => (n.id === id ? fn(n) : { ...n, subpastas: atualizarNo(n.subpastas, id, fn) }));
-    const removerNo = (nos, id) => (Array.isArray(nos) ? nos : []).filter((n) => n.id !== id).map((n) => ({ ...n, subpastas: removerNo(n.subpastas, id) }));
+    const atualizarNo = (nos, id, fn) => (Array.isArray(nos) ? nos : []).map((n) => (n.id === id ? fn(n) : Object.assign(Object.assign({}, n), { subpastas: atualizarNo(n.subpastas, id, fn) })));
+    const removerNo = (nos, id) => (Array.isArray(nos) ? nos : []).filter((n) => n.id !== id).map((n) => (Object.assign(Object.assign({}, n), { subpastas: removerNo(n.subpastas, id) })));
     // acha em que pai (null = raiz) e em que posição um nó está, pra poder devolvê-lo no desfazer
     const acharPosicaoNo = (nos, id, paiId = null) => {
         const lista = Array.isArray(nos) ? nos : [];
@@ -5723,7 +5799,7 @@ function App() {
         return atualizarNo(nos, paiId, (n) => {
             const subs = [...(n.subpastas || [])];
             subs.splice(Math.max(0, Math.min(idx, subs.length)), 0, novoNo);
-            return { ...n, subpastas: subs };
+            return Object.assign(Object.assign({}, n), { subpastas: subs });
         });
     };
     // procura em qualquer profundidade uma pasta cuja palavra-chave seja exatamente o texto digitado
@@ -5820,7 +5896,7 @@ function App() {
             return;
         const novo = { id: genId(), nome, palavraChave: '', subpastas: [] };
         if (paiId) {
-            setNotasPastas((ps) => atualizarNo(ps, paiId, (n) => ({ ...n, subpastas: [...n.subpastas, novo] })));
+            setNotasPastas((ps) => atualizarNo(ps, paiId, (n) => (Object.assign(Object.assign({}, n), { subpastas: [...n.subpastas, novo] }))));
             setSubNovoNome('');
             setSubNovoPara(null);
         }
@@ -5831,7 +5907,7 @@ function App() {
         marcarSujo();
     };
     const definirChavePasta = (id, chave) => {
-        setNotasPastas((ps) => atualizarNo(ps, id, (n) => ({ ...n, palavraChave: chave })));
+        setNotasPastas((ps) => atualizarNo(ps, id, (n) => (Object.assign(Object.assign({}, n), { palavraChave: chave }))));
         marcarSujo();
     };
     // apagar uma pasta manda as notas dela E as de todas as descendentes para a Geral — nada é perdido
@@ -5854,7 +5930,7 @@ function App() {
             caminhoSelAntes: notaCaminhoSel,
         });
         setNotasPastas((ps) => removerNo(ps, id));
-        setNotasRapidas((ns) => ns.map((n) => (afetados.has(n.pastaId) ? { ...n, pastaId: 'geral' } : n)));
+        setNotasRapidas((ns) => ns.map((n) => (afetados.has(n.pastaId) ? Object.assign(Object.assign({}, n), { pastaId: 'geral' }) : n)));
         // tira do histórico de uso as pastas que deixaram de existir, para não ocupar as 15 vagas à toa
         setNotasPastasUsos((u) => u.map((c) => c.filter((x) => !afetados.has(x))).filter((c) => c.length));
         setNotaCaminhoSel((c) => {
@@ -5895,7 +5971,7 @@ function App() {
     // edição de nota já criada — disponível só com o ⚙ das Notas rápidas aberto
     const editarNotaRapida = (id, texto) => {
         const limpo = String(texto);
-        setNotasRapidas((ns) => ns.map((n) => (n.id === id ? { ...n, texto: limpo } : n)));
+        setNotasRapidas((ns) => ns.map((n) => (n.id === id ? Object.assign(Object.assign({}, n), { texto: limpo }) : n)));
         marcarSujo();
     };
     const removerNotaRapida = (id) => {
@@ -6721,14 +6797,11 @@ function App() {
             setComentariosFixas(Array.isArray(dados.comentariosFixas) ? dados.comentariosFixas : []);
             comentariosFixasRef.current = Array.isArray(dados.comentariosFixas) ? dados.comentariosFixas : [];
             setQuadroMedalhas(dados.quadroMedalhas && typeof dados.quadroMedalhas === 'object'
-                ? { ...QUADRO_MEDALHAS_PADRAO, ...dados.quadroMedalhas }
-                : QUADRO_MEDALHAS_PADRAO);
+                ? Object.assign(Object.assign({}, QUADRO_MEDALHAS_PADRAO), dados.quadroMedalhas) : QUADRO_MEDALHAS_PADRAO);
             setQuadroPercentuais(dados.quadroPercentuais && typeof dados.quadroPercentuais === 'object'
-                ? { ...QUADRO_PERCENTUAIS_PADRAO, ...dados.quadroPercentuais }
-                : QUADRO_PERCENTUAIS_PADRAO);
+                ? Object.assign(Object.assign({}, QUADRO_PERCENTUAIS_PADRAO), dados.quadroPercentuais) : QUADRO_PERCENTUAIS_PADRAO);
             setResumoMedalhas(dados.resumoMedalhas && typeof dados.resumoMedalhas === 'object'
-                ? { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [], ...dados.resumoMedalhas }
-                : { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] });
+                ? Object.assign({ diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] }, dados.resumoMedalhas) : { diaria: [], semanal: [], mensal: [], trimestral: [], semestral: [] });
             setFrases(Array.isArray(dados.frases) ? dados.frases : []);
             setAlertasSemana(Array.isArray(dados.alertasSemana) ? dados.alertasSemana.map(migrarItemAgenda) : []);
             setAlertasNotas(Array.isArray(dados.alertasNotas) ? dados.alertasNotas : []);
@@ -6745,7 +6818,7 @@ function App() {
             setAutoSalvarSegundos(typeof dados.autoSalvarSegundos === 'number' ? dados.autoSalvarSegundos : 1);
             setNotaAutoSalvarAtivo(typeof dados.notaAutoSalvarAtivo === 'boolean' ? dados.notaAutoSalvarAtivo : true);
             setNotaAutoSalvarSegundos(typeof dados.notaAutoSalvarSegundos === 'number' ? dados.notaAutoSalvarSegundos : 4);
-            setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? { ...REGRAS_ESTRELAS_PADRAO, ...dados.regrasEstrelas } : REGRAS_ESTRELAS_PADRAO);
+            setRegrasEstrelas(dados.regrasEstrelas && typeof dados.regrasEstrelas === 'object' ? Object.assign(Object.assign({}, REGRAS_ESTRELAS_PADRAO), dados.regrasEstrelas) : REGRAS_ESTRELAS_PADRAO);
             setGruposCustom(Array.isArray(dados.gruposCustom) ? dados.gruposCustom : []);
             {
                 const versaoOrd = typeof dados.ordemJanelasVersao === 'number' ? dados.ordemJanelasVersao : 1;
@@ -6790,7 +6863,7 @@ function App() {
             setGoalsConcluidos(Array.isArray(dados.goalsConcluidos) ? dados.goalsConcluidos : []);
             setEraDeOuroRegistro(Array.isArray(dados.eraDeOuroRegistro) ? dados.eraDeOuroRegistro : []);
             setMomentumRegistro(Array.isArray(dados.momentumRegistro) ? dados.momentumRegistro : []);
-            setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [], ...dados.batalhaNotas } : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
+            setBatalhaNotas(dados.batalhaNotas && typeof dados.batalhaNotas === 'object' && !Array.isArray(dados.batalhaNotas) ? Object.assign({ brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] }, dados.batalhaNotas) : { brasilPros: [], brasilContras: [], euaPros: [], euaContras: [] });
             setContadoresRegressivos(Array.isArray(dados.contadoresRegressivos) ? dados.contadoresRegressivos : []);
             setModoConcluir(!!dados.modoConcluir);
             setModoDone(dados.modoDone && typeof dados.modoDone === 'object' && !Array.isArray(dados.modoDone) ? dados.modoDone : {});
@@ -6888,6 +6961,35 @@ function App() {
             React.createElement("button", { className: "mt-check", onClick: () => alternarFixa(t.id), title: "Marcar como feita" }, ''),
             React.createElement("span", { className: "mt-fixa-texto", style: corTexto ? { color: corTexto, fontWeight: 600 } : undefined }, t.texto),
             React.createElement("span", { style: { flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: '#a8a293', letterSpacing: 0.3 } }, nomeGrupoFixa(t.freq).toUpperCase())));
+    };
+    // Medalhas ganhas para exibir no final do Script do Sucesso: cada chave de resumoMedalhas
+    // guarda, na verdade, a medalha do período SEGUINTE ao nome da chave (ex: resumoMedalhas.diaria
+    // guarda a medalha SEMANAL calculada a partir das diárias — daí a descrição usar o período de
+    // cima). Sempre a entrada mais recente de cada categoria; Bronze nunca aparece aqui.
+    const MEDALHAS_SCRIPT_SUCESSO_MAP = [
+        { chave: 'diaria', descricao: 'Medalha semanal' },
+        { chave: 'semanal', descricao: 'Medalha mensal' },
+        { chave: 'mensal', descricao: 'Medalha trimestral' },
+        { chave: 'trimestral', descricao: 'Medalha semestral' },
+        { chave: 'semestral', descricao: 'Medalha anual' },
+    ];
+    const itensMedalhasScriptSucesso = MEDALHAS_SCRIPT_SUCESSO_MAP
+        .map(({ chave, descricao }) => {
+        const maisRecente = (resumoMedalhas[chave] || [])[0];
+        if (!maisRecente || !maisRecente.medalha || maisRecente.medalha === 'bronze')
+            return null;
+        return Object.assign(Object.assign({}, maisRecente), { chave, descricao });
+    })
+        .filter(Boolean);
+    const renderItemMedalhaScriptSucesso = (item) => {
+        const info = MEDALHAS_INFO[item.medalha];
+        return (React.createElement("div", { key: 'medalha-' + item.chave, className: "mt-fixa-item" },
+            React.createElement("span", { style: { fontSize: 18, flexShrink: 0 } }, info === null || info === void 0 ? void 0 : info.emoji),
+            React.createElement("span", { className: "mt-fixa-texto", style: { color: info === null || info === void 0 ? void 0 : info.cor, fontWeight: 600 } },
+                item.label,
+                " \u2014 ", info === null || info === void 0 ? void 0 :
+                info.nome),
+            React.createElement("span", { style: { flexShrink: 0, fontSize: 9.5, fontWeight: 700, color: '#a8a293', letterSpacing: 0.3 } }, item.descricao.toUpperCase())));
     };
     return (React.createElement("div", { className: "mt-app" },
         React.createElement("style", null, `
@@ -7641,8 +7743,9 @@ function App() {
                     renderJanelaHandle('scriptSucesso'),
                     React.createElement("h2", { className: "mt-section-title" }, "\uD83C\uDFC6 Script do Sucesso"),
                     React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
-                        itensScriptSucesso.length === 0 && (React.createElement("p", { className: "mt-empty" }, "Nada urgente por aqui agora. \uD83C\uDF89")),
-                        itensScriptSucesso.map((t) => renderItemScriptSucesso(t)))),
+                        itensScriptSucesso.length === 0 && itensMedalhasScriptSucesso.length === 0 && (React.createElement("p", { className: "mt-empty" }, "Nada urgente por aqui agora. \uD83C\uDF89")),
+                        itensScriptSucesso.map((t) => renderItemScriptSucesso(t)),
+                        itensMedalhasScriptSucesso.map((m) => renderItemMedalhaScriptSucesso(m)))),
                 React.createElement("div", { className: `mt-janela-wrap ${draggingJanelaId === 'tarefasFixas' ? 'dragging' : ''} ${dragOverJanelaId === 'tarefasFixas' && draggingJanelaId !== 'tarefasFixas' ? 'drag-over' : ''}`, "data-janela-id": "tarefasFixas", style: { order: ordemJanelas.indexOf('tarefasFixas') } },
                     renderJanelaHandle('tarefasFixas'),
                     React.createElement("h2", { className: "mt-section-title" }, "Tarefas fixas"),
@@ -7699,7 +7802,7 @@ function App() {
                                     React.createElement("b", null, "Done"),
                                     ". Ao tocar nele o item sai da lista na hora \u2014 tendo sido marcado ou n\u00E3o \u2014 e fica arquivado com a data aqui no \uD83D\uDCD6 Livro de Registro."),
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
-                                    React.createElement("button", { onClick: () => { setModoDone((m) => ({ ...m, [freq]: !m[freq] })); marcarSujo(); }, style: {
+                                    React.createElement("button", { onClick: () => { setModoDone((m) => (Object.assign(Object.assign({}, m), { [freq]: !m[freq] }))); marcarSujo(); }, style: {
                                             fontSize: 12, fontWeight: 700, padding: '7px 15px', borderRadius: 20,
                                             border: '1.5px solid #C9A227', cursor: 'pointer',
                                             background: ligado ? '#C9A227' : '#fff',
@@ -7743,13 +7846,13 @@ function App() {
                                     React.createElement("span", { style: { color: '#C0492E', fontWeight: 700 } }, "vermelho"),
                                     "."),
                                 React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' } },
-                                    React.createElement("select", { value: (contadorTarefaId[freq] || ''), onChange: (e) => setContadorTarefaId((m) => ({ ...m, [freq]: e.target.value })), style: {
+                                    React.createElement("select", { value: (contadorTarefaId[freq] || ''), onChange: (e) => setContadorTarefaId((m) => (Object.assign(Object.assign({}, m), { [freq]: e.target.value }))), style: {
                                             flex: 1, minWidth: 130, fontSize: 13, padding: '7px 8px',
                                             border: '1px solid #ddd8c9', borderRadius: 8, background: '#fff', color: '#232323',
                                         } },
                                         React.createElement("option", { value: "" }, "Escolher tarefa\u2026"),
                                         doGrupo.map((t) => (React.createElement("option", { key: t.id, value: t.id }, t.texto)))),
-                                    React.createElement("input", { type: "text", inputMode: "numeric", placeholder: "dias", value: (contadorDias[freq] || ''), onChange: (e) => setContadorDias((m) => ({ ...m, [freq]: e.target.value })), style: {
+                                    React.createElement("input", { type: "text", inputMode: "numeric", placeholder: "dias", value: (contadorDias[freq] || ''), onChange: (e) => setContadorDias((m) => (Object.assign(Object.assign({}, m), { [freq]: e.target.value }))), style: {
                                             width: 62, fontSize: 13, padding: '7px 8px', textAlign: 'center',
                                             border: '1px solid #ddd8c9', borderRadius: 8, background: '#fff', color: '#232323',
                                         } }),
@@ -7758,8 +7861,8 @@ function App() {
                                             if (!id)
                                                 return;
                                             definirPrazoFixa(id, contadorDias[freq] || '');
-                                            setContadorTarefaId((m) => ({ ...m, [freq]: '' }));
-                                            setContadorDias((m) => ({ ...m, [freq]: '' }));
+                                            setContadorTarefaId((m) => (Object.assign(Object.assign({}, m), { [freq]: '' })));
+                                            setContadorDias((m) => (Object.assign(Object.assign({}, m), { [freq]: '' })));
                                         } }, "Definir")),
                                 ordenadas.length === 0 ? (React.createElement("p", { className: "mt-empty", style: { margin: '10px 0 0' } }, "Nenhuma tarefa desta lista com contador.")) : (React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } }, ordenadas.map((t) => {
                                     const d = diasRestantes(t);
@@ -7779,7 +7882,7 @@ function App() {
                                     doGrupo.length > 0 ? ` (${doGrupo.length})` : ''),
                                 React.createElement("p", { className: "mt-config-item-desc", style: { marginBottom: 8 } }, "Guardadas em segundo plano nesta lista. N\u00E3o contam em nada at\u00E9 voc\u00EA tocar em \u2191 para elev\u00E1-las."),
                                 React.createElement("div", { className: "mt-row" },
-                                    React.createElement("input", { className: "mt-input", placeholder: "Nova reserva\u2026", value: reservaNovoTexto[freq] || '', onChange: (e) => setReservaNovoTexto((m) => ({ ...m, [freq]: e.target.value })), onKeyDown: (e) => e.key === 'Enter' && adicionarReserva(freq) }),
+                                    React.createElement("input", { className: "mt-input", placeholder: "Nova reserva\u2026", value: reservaNovoTexto[freq] || '', onChange: (e) => setReservaNovoTexto((m) => (Object.assign(Object.assign({}, m), { [freq]: e.target.value }))), onKeyDown: (e) => e.key === 'Enter' && adicionarReserva(freq) }),
                                     React.createElement("button", { className: "mt-add-btn", onClick: () => adicionarReserva(freq) }, "+")),
                                 React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                                     doGrupo.length === 0 && React.createElement("p", { className: "mt-empty" }, "Banco vazio."),
@@ -7826,9 +7929,9 @@ function App() {
                                         React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0 } }, "Coment\u00E1rio do per\u00EDodo"),
                                         React.createElement("button", { className: "mt-discreto-btn", onClick: () => alternarComentario(freq), title: aberto ? 'Fechar' : (cAtual ? 'Editar comentário' : 'Escrever comentário') }, aberto ? '×' : '💬')),
                                     aberto ? (React.createElement(React.Fragment, null,
-                                        React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Como foi este per\u00EDodo\u2026", value: comentarioRascunho[freq] || '', onChange: (e) => setComentarioRascunho((r) => ({ ...r, [freq]: e.target.value })), style: { minHeight: 70, marginTop: 6 } }),
+                                        React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Como foi este per\u00EDodo\u2026", value: comentarioRascunho[freq] || '', onChange: (e) => setComentarioRascunho((r) => (Object.assign(Object.assign({}, r), { [freq]: e.target.value }))), style: { minHeight: 70, marginTop: 6 } }),
                                         React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '8px 0 4px' } }, "Solu\u00E7\u00E3o"),
-                                        React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "O que fazer a respeito\u2026", value: comentarioSolucao[freq] || '', onChange: (e) => setComentarioSolucao((r) => ({ ...r, [freq]: e.target.value })), style: { minHeight: 60 } }),
+                                        React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "O que fazer a respeito\u2026", value: comentarioSolucao[freq] || '', onChange: (e) => setComentarioSolucao((r) => (Object.assign(Object.assign({}, r), { [freq]: e.target.value }))), style: { minHeight: 60 } }),
                                         React.createElement("button", { className: "mt-btn-sm primary", onClick: () => salvarComentario(freq) }, "Salvar"))) : cAtual ? (React.createElement("div", { className: "mt-fixa-item", style: { borderBottom: 'none' } },
                                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                             React.createElement("span", { style: { display: 'block', fontSize: 13, color: '#232323', whiteSpace: 'pre-wrap' } }, cAtual.texto),
@@ -7849,7 +7952,7 @@ function App() {
                                 return (React.createElement("div", { className: "mt-card", key: freq, "data-grupo-fixa": freq },
                                     React.createElement("div", { className: "mt-fixa-grupo-head" },
                                         React.createElement("p", { className: "mt-fixa-grupo-label" }, label),
-                                        React.createElement("button", { className: "mt-discreto-btn", onClick: () => setFixasCardAberto((m) => ({ ...m, [freq]: !m[freq] })), title: fixasCardAberto[freq] ? 'Fechar edição' : 'Adicionar ou remover tarefas' }, fixasCardAberto[freq] ? '×' : '+')),
+                                        React.createElement("button", { className: "mt-discreto-btn", onClick: () => setFixasCardAberto((m) => (Object.assign(Object.assign({}, m), { [freq]: !m[freq] }))), title: fixasCardAberto[freq] ? 'Fechar edição' : 'Adicionar ou remover tarefas' }, fixasCardAberto[freq] ? '×' : '+')),
                                     total > 0 && (React.createElement("div", { style: { marginBottom: 10 } },
                                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 } },
                                             React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: '#232323' } },
@@ -7870,7 +7973,7 @@ function App() {
                                         React.createElement("div", { style: { marginBottom: 10 } },
                                             React.createElement(BotaoDesfazer, { janela: "tarefasFixas" })),
                                         React.createElement("div", { className: "mt-row", style: { marginTop: 10 } },
-                                            React.createElement("input", { className: "mt-input", placeholder: "Nova tarefa\u2026", value: fixasCardNovoTexto[freq] || '', onChange: (e) => setFixasCardNovoTexto((m) => ({ ...m, [freq]: e.target.value })), onKeyDown: (e) => e.key === 'Enter' && adicionarFixaDireto(freq, fixasCardNovoTexto[freq] || '') }),
+                                            React.createElement("input", { className: "mt-input", placeholder: "Nova tarefa\u2026", value: fixasCardNovoTexto[freq] || '', onChange: (e) => setFixasCardNovoTexto((m) => (Object.assign(Object.assign({}, m), { [freq]: e.target.value }))), onKeyDown: (e) => e.key === 'Enter' && adicionarFixaDireto(freq, fixasCardNovoTexto[freq] || '') }),
                                             React.createElement("button", { className: "mt-add-btn", onClick: () => adicionarFixaDireto(freq, fixasCardNovoTexto[freq] || '') }, "+")),
                                         renderModoDone(freq),
                                         renderContadorDias(freq),
@@ -7907,7 +8010,7 @@ function App() {
                                                 if (abrindo)
                                                     setFixasUnicaExpandida(true);
                                                 if (atual)
-                                                    setFixasCardAberto((m) => ({ ...m, [atual.freq]: !m[atual.freq] }));
+                                                    setFixasCardAberto((m) => (Object.assign(Object.assign({}, m), { [atual.freq]: !m[atual.freq] })));
                                             }, title: mostrarAdicionarFixa ? 'Fechar' : 'Adicionar ou remover tarefas' }, mostrarAdicionarFixa ? '×' : '+')),
                                         React.createElement("button", { className: "mt-discreto-btn", onClick: () => {
                                                 const abrindo = !mostrarConfigFixas;
@@ -8056,12 +8159,7 @@ function App() {
                                 return null;
                             const arrastando = draggingAbaRazao === a.id;
                             const alvo = dragOverAbaRazao === a.id && draggingAbaRazao !== a.id;
-                            return (React.createElement("button", { key: a.id, "data-aba-razao-id": a.id, className: `mt-cat-tab-btn ${razaoTabSelecionada === a.id ? 'ativo' : ''}`, style: {
-                                    '--cor': a.cor,
-                                    ...(modoMoverAbasRazao ? { touchAction: 'none', cursor: 'grab' } : null),
-                                    opacity: arrastando ? 0.45 : 1,
-                                    boxShadow: alvo ? '0 0 0 2px #C9A227' : 'none',
-                                }, onClick: () => { if (!modoMoverAbasRazao)
+                            return (React.createElement("button", { key: a.id, "data-aba-razao-id": a.id, className: `mt-cat-tab-btn ${razaoTabSelecionada === a.id ? 'ativo' : ''}`, style: Object.assign(Object.assign({ '--cor': a.cor }, (modoMoverAbasRazao ? { touchAction: 'none', cursor: 'grab' } : null)), { opacity: arrastando ? 0.45 : 1, boxShadow: alvo ? '0 0 0 2px #C9A227' : 'none' }), onClick: () => { if (!modoMoverAbasRazao)
                                     setRazaoTabSelecionada(a.id); }, onTouchStart: modoMoverAbasRazao ? (e) => onAbaRazaoTouchStart(e, a.id) : undefined, onTouchMove: modoMoverAbasRazao ? onAbaRazaoTouchMove : undefined, onTouchEnd: modoMoverAbasRazao ? onAbaRazaoTouchEnd : undefined },
                                 a.emoji,
                                 " ",
@@ -8128,7 +8226,7 @@ function App() {
                                     pumpRegistro.map((r, i) => (React.createElement("div", { key: r.id, className: "mt-fixa-item", style: mesmoDiaRegistro(r, pumpRegistro[i + 1]) ? { borderBottom: 'none' } : undefined },
                                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                             r.nome && React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, r.nome),
-                                            mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setPumpRegistro((l) => l.map((x) => (x.id === r.id ? { ...x, comentario: e.target.value } : x))), placeholder: "Coment\u00E1rio\u2026", style: { width: '100%', marginTop: 2, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: r.nome ? '#666' : '#232323', fontWeight: r.nome ? 400 : 600, whiteSpace: 'pre-wrap' } }, r.comentario)),
+                                            mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setPumpRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { comentario: e.target.value }) : x))), placeholder: "Coment\u00E1rio\u2026", style: { width: '100%', marginTop: 2, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: r.nome ? '#666' : '#232323', fontWeight: r.nome ? 400 : 600, whiteSpace: 'pre-wrap' } }, r.comentario)),
                                             typeof r.pele === 'number' && r.pele !== 0 && (React.createElement("span", { style: { display: 'block', fontSize: 11.5, fontWeight: 700, color: r.pele > 0 ? '#3E8E5A' : '#C0492E' } },
                                                 "Sensibilidade da pele ",
                                                 r.pele > 0 ? `+${r.pele}` : r.pele)),
@@ -8306,7 +8404,7 @@ function App() {
                                             r.causa && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#232323' } },
                                                 "Causa: ",
                                                 r.causa),
-                                            mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setPsoRegistro((l) => l.map((x) => (x.id === r.id ? { ...x, comentario: e.target.value } : x))), placeholder: "Coment\u00E1rio\u2026", style: { width: '100%', marginTop: 2, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#232323' } }, r.comentario)),
+                                            mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setPsoRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { comentario: e.target.value }) : x))), placeholder: "Coment\u00E1rio\u2026", style: { width: '100%', marginTop: 2, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#232323' } }, r.comentario)),
                                             React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
                                         mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroPso(r.id) }, "\u00D7"))))))))),
                         razaoTabSelecionada === 'premiacao' && (React.createElement(React.Fragment, null,
@@ -8340,8 +8438,9 @@ function App() {
                                     React.createElement("div", null,
                                         React.createElement("p", { className: "mt-config-item-label" }, n === 0 ? 'Sem estrelas' : `${n} estrela${n > 1 ? 's' : ''}`),
                                         React.createElement("p", { className: "mt-config-item-desc" }, "Multiplicador aplicado ao tempo gasto ao premiar.")),
-                                    React.createElement("input", { type: "number", step: "0.1", className: "mt-premio-config-input", value: regrasEstrelas[n], onChange: (e) => { const v = parseFloat(e.target.value) || 0; setRegrasEstrelas((r) => ({ ...r, [n]: v })); marcarSujo(); } })))))))),
+                                    React.createElement("input", { type: "number", step: "0.1", className: "mt-premio-config-input", value: regrasEstrelas[n], onChange: (e) => { const v = parseFloat(e.target.value) || 0; setRegrasEstrelas((r) => (Object.assign(Object.assign({}, r), { [n]: v }))); marcarSujo(); } })))))))),
                         razaoTabSelecionada === 'historia' && (() => {
+                            var _a;
                             const eventosFiltrados = histEventos
                                 .filter((e) => e.tipo === histTipoSelecionado)
                                 .slice()
@@ -8352,6 +8451,22 @@ function App() {
                                     React.createElement("p", { className: "mt-premio-secao-titulo", style: { flex: 1, margin: 0 } }, "\uD83D\uDCDC Hist\u00F3ria"),
                                     React.createElement("button", { className: "mt-discreto-btn", onClick: () => setHistConfigAberto((v) => !v), title: histConfigAberto ? 'Fechar configurações' : 'Configurações — editar textos, apagar e criar tipos' }, histConfigAberto ? '×' : '⚙️')),
                                 React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 } }, histTipos.map((t) => (React.createElement("button", { key: t.id, className: "mt-btn-sm", style: histTipoSelecionado === t.id ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B' } : undefined, onClick: () => setHistTipoSelecionado(t.id) }, t.nome)))),
+                                histTipoSelecionado === 'civilizacoes' && (React.createElement("div", { style: { marginTop: 10 } },
+                                    React.createElement("button", { className: "mt-btn-sm", style: histRegioesPainelAberto ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B' } : undefined, onClick: () => setHistRegioesPainelAberto((v) => !v) },
+                                        "\uD83C\uDF0D Regi\u00F5es",
+                                        histRegioesSelecionadas.length > 0 ? ` (${histRegioesSelecionadas.length})` : ''),
+                                    histRegioesPainelAberto && (React.createElement("div", { style: { marginTop: 8 } },
+                                        React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } }, REGIOES_CIVILIZACOES.map((c) => {
+                                            const marcado = histRegioesSelecionadas.includes(c.id);
+                                            const expandido = histContinenteExpandido === c.id;
+                                            return (React.createElement("button", { key: c.id, className: "mt-btn-sm", style: marcado ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B' } : (expandido ? { borderColor: '#8A6D3B' } : undefined), onClick: () => toggleHistContinente(c) },
+                                                c.nome,
+                                                c.subs.length > 0 ? (expandido ? ' ▾' : ' ▸') : ''));
+                                        })),
+                                        histContinenteExpandido && (React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, paddingLeft: 10, borderLeft: '2px solid #eee' } }, (_a = REGIOES_CIVILIZACOES.find((c) => c.id === histContinenteExpandido)) === null || _a === void 0 ? void 0 : _a.subs.map((s) => {
+                                            const marcado = histRegioesSelecionadas.includes(s.id);
+                                            return (React.createElement("button", { key: s.id, className: "mt-btn-sm", style: marcado ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B' } : { background: '#EDE3C8', color: '#6B5636', borderColor: '#d8c9a0' }, onClick: () => toggleHistRegiao(s.id) }, s.nome));
+                                        }))))))),
                                 histConfigAberto && (React.createElement(React.Fragment, null,
                                     React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
                                         React.createElement("input", { className: "mt-nota-input", style: { flex: 1 }, placeholder: "Nome do novo tipo de evento\u2026", value: histNovoTipoNome, onChange: (e) => setHistNovoTipoNome(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarTipoHistoria() }),
@@ -8360,9 +8475,6 @@ function App() {
                                         "\uD83D\uDDD1\uFE0F Apagar tipo \"", tipoAtual === null || tipoAtual === void 0 ? void 0 :
                                         tipoAtual.nome,
                                         "\" (e os eventos dele)")))),
-                                React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
-                                    React.createElement("button", { className: "mt-btn-sm", style: histEscala === 'anos' ? { background: '#232323', color: '#fff', borderColor: '#232323' } : undefined, onClick: () => setHistEscala('anos') }, "Anos"),
-                                    React.createElement("button", { className: "mt-btn-sm", style: histEscala === 'seculo' ? { background: '#232323', color: '#fff', borderColor: '#232323' } : undefined, onClick: () => setHistEscala('seculo') }, "S\u00E9culo")),
                                 renderLinhaDoTempoHistoria(),
                                 React.createElement("div", { style: { marginTop: 14 } },
                                     React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Texto do evento\u2026", value: histNovoTexto, onChange: (e) => setHistNovoTexto(e.target.value), style: { minHeight: 50 } }),
@@ -8380,7 +8492,8 @@ function App() {
                                     eventosFiltrados.map((e) => (React.createElement("div", { key: e.id, className: "mt-fixa-item" },
                                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                             React.createElement("span", { style: { fontSize: 11.5, color: '#8A6D3B', fontWeight: 700 } }, formatAnoHistoria(e.ano)),
-                                            histConfigAberto ? (React.createElement("textarea", { className: "mt-bloco-textarea", style: { minHeight: 36, marginTop: 4 }, value: e.texto, onChange: (ev) => editarTextoEventoHistoria(e.id, ev.target.value) })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, e.texto))),
+                                            histConfigAberto ? (React.createElement("textarea", { className: "mt-bloco-textarea", style: { minHeight: 36, marginTop: 4 }, value: e.texto, onChange: (ev) => editarTextoEventoHistoria(e.id, ev.target.value) })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, e.texto)),
+                                            Array.isArray(e.regioes) && e.regioes.length > 0 && (React.createElement("div", { style: { display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 } }, e.regioes.map((rid) => (React.createElement("span", { key: rid, style: { fontSize: 10.5, color: '#8A6D3B', background: '#F5EFE0', border: '1px solid #8A6D3B', borderRadius: 10, padding: '1px 7px' } }, nomeRegiaoCivilizacao(rid))))))),
                                         histConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerEventoHistoria(e.id) }, "\u00D7"))))))));
                         })(),
                         CHECKLISTS.map((c) => {
@@ -8534,22 +8647,22 @@ function App() {
                                             React.createElement("button", { className: "mt-fazer-btn", onClick: () => fazerTarefa(cat, t) }, "Fazer"),
                                             React.createElement("button", { className: `mt-prioritario-btn${prioritarioFeito[t.id] ? ' feito' : ''}`, onClick: () => priorizarTarefa(cat, t) }, prioritarioFeito[t.id] ? '✓ Adicionado' : 'Priority'),
                                             categoriasEdicaoAtiva && (React.createElement("button", { className: "mt-del", onClick: () => removerTarefa(cat.id, t.id) }, "\u00D7"))))))),
-                                React.createElement("button", { className: "mt-add-tarefa-toggle-btn", onClick: () => setMostrarAdicionarTarefaCat((m) => ({ ...m, [cat.id]: !m[cat.id] })), title: mostrarAdicionarTarefaCat[cat.id] ? 'Fechar' : 'Adicionar tarefa' }, mostrarAdicionarTarefaCat[cat.id] ? '×' : '+'),
+                                React.createElement("button", { className: "mt-add-tarefa-toggle-btn", onClick: () => setMostrarAdicionarTarefaCat((m) => (Object.assign(Object.assign({}, m), { [cat.id]: !m[cat.id] }))), title: mostrarAdicionarTarefaCat[cat.id] ? 'Fechar' : 'Adicionar tarefa' }, mostrarAdicionarTarefaCat[cat.id] ? '×' : '+'),
                                 mostrarAdicionarTarefaCat[cat.id] && (React.createElement("div", { className: "mt-row", style: { marginTop: 6 } },
-                                    React.createElement("input", { className: "mt-input", placeholder: "Adicionar tarefa\u2026", value: rascunhoTarefa[cat.id] || '', onChange: (e) => setRascunhoTarefa((r) => ({ ...r, [cat.id]: e.target.value })), onKeyDown: (e) => e.key === 'Enter' && adicionarTarefa(cat), autoFocus: true }),
+                                    React.createElement("input", { className: "mt-input", placeholder: "Adicionar tarefa\u2026", value: rascunhoTarefa[cat.id] || '', onChange: (e) => setRascunhoTarefa((r) => (Object.assign(Object.assign({}, r), { [cat.id]: e.target.value }))), onKeyDown: (e) => e.key === 'Enter' && adicionarTarefa(cat), autoFocus: true }),
                                     React.createElement("button", { className: "mt-add-btn", onClick: () => adicionarTarefa(cat) }, "+"))),
                                 (React.createElement(React.Fragment, null,
                                     React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginTop: 10 } },
                                         "Dura\u00E7\u00E3o ",
                                         React.createElement("span", { style: { textTransform: 'none', fontStyle: 'italic', color: '#b0aa98' } }, "(usada no sorteio e ao adicionar tarefas)")),
                                     React.createElement("div", { className: "mt-duracao-pills" },
-                                        React.createElement("button", { className: `mt-duracao-pill ${filtroSortear[cat.id] == null ? 'ativo' : ''}`, style: { '--cor': cat.cor }, onClick: () => setFiltroSortear((f) => ({ ...f, [cat.id]: null })) }, "Qualquer"),
-                                        DURACOES.map((min) => (React.createElement("button", { key: min, className: `mt-duracao-pill ${filtroSortear[cat.id] === min ? 'ativo' : ''}`, style: { '--cor': cat.cor }, onClick: () => setFiltroSortear((f) => ({ ...f, [cat.id]: min })) }, min < 60 ? `${min} min` : '1 hora')))),
+                                        React.createElement("button", { className: `mt-duracao-pill ${filtroSortear[cat.id] == null ? 'ativo' : ''}`, style: { '--cor': cat.cor }, onClick: () => setFiltroSortear((f) => (Object.assign(Object.assign({}, f), { [cat.id]: null }))) }, "Qualquer"),
+                                        DURACOES.map((min) => (React.createElement("button", { key: min, className: `mt-duracao-pill ${filtroSortear[cat.id] === min ? 'ativo' : ''}`, style: { '--cor': cat.cor }, onClick: () => setFiltroSortear((f) => (Object.assign(Object.assign({}, f), { [cat.id]: min }))) }, min < 60 ? `${min} min` : '1 hora')))),
                                     React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginTop: 10 } },
                                         "Premia\u00E7\u00E3o ",
                                         React.createElement("span", { style: { textTransform: 'none', fontStyle: 'italic', color: '#b0aa98' } }, "(usada no sorteio e ao adicionar tarefas)")),
                                     React.createElement("div", { className: "mt-star-picker" },
-                                        [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-star-btn", onClick: () => setPremiacaoDraft((d) => ({ ...d, [cat.id]: (d[cat.id] || 0) === n ? 0 : n })), "aria-label": `${n} estrela${n > 1 ? 's' : ''}` }, n <= (premiacaoDraft[cat.id] || 0) ? '⭐️' : '☆'))),
+                                        [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-star-btn", onClick: () => setPremiacaoDraft((d) => (Object.assign(Object.assign({}, d), { [cat.id]: (d[cat.id] || 0) === n ? 0 : n }))), "aria-label": `${n} estrela${n > 1 ? 's' : ''}` }, n <= (premiacaoDraft[cat.id] || 0) ? '⭐️' : '☆'))),
                                         !(premiacaoDraft[cat.id] > 0) && React.createElement("span", { style: { fontSize: 11.5, color: '#b0aa98', fontStyle: 'italic', marginLeft: 4 } }, "qualquer")))),
                                 React.createElement("button", { className: "mt-sortear-btn", style: { '--cor': cat.cor }, disabled: cat.tarefas.length === 0, onClick: () => sortear(cat) },
                                     "\uD83C\uDFB2 Sortear",
@@ -8614,13 +8727,13 @@ function App() {
                                                 "Dura\u00E7\u00E3o ",
                                                 React.createElement("span", { style: { textTransform: 'none', fontStyle: 'italic', color: '#b0aa98' } }, "(usada no sorteio da mistura)")),
                                             React.createElement("div", { className: "mt-duracao-pills" },
-                                                React.createElement("button", { className: `mt-duracao-pill ${filtroSortear[MISTURA_ID] == null ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, onClick: () => setFiltroSortear((f) => ({ ...f, [MISTURA_ID]: null })) }, "Qualquer"),
-                                                DURACOES.map((min) => (React.createElement("button", { key: min, className: `mt-duracao-pill ${filtroSortear[MISTURA_ID] === min ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, onClick: () => setFiltroSortear((f) => ({ ...f, [MISTURA_ID]: min })) }, min < 60 ? `${min} min` : '1 hora')))),
+                                                React.createElement("button", { className: `mt-duracao-pill ${filtroSortear[MISTURA_ID] == null ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, onClick: () => setFiltroSortear((f) => (Object.assign(Object.assign({}, f), { [MISTURA_ID]: null }))) }, "Qualquer"),
+                                                DURACOES.map((min) => (React.createElement("button", { key: min, className: `mt-duracao-pill ${filtroSortear[MISTURA_ID] === min ? 'ativo' : ''}`, style: { '--cor': '#8E6BAE' }, onClick: () => setFiltroSortear((f) => (Object.assign(Object.assign({}, f), { [MISTURA_ID]: min }))) }, min < 60 ? `${min} min` : '1 hora')))),
                                             React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginTop: 10 } },
                                                 "Premia\u00E7\u00E3o ",
                                                 React.createElement("span", { style: { textTransform: 'none', fontStyle: 'italic', color: '#b0aa98' } }, "(usada no sorteio da mistura)")),
                                             React.createElement("div", { className: "mt-star-picker" },
-                                                [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-star-btn", onClick: () => setPremiacaoDraft((d) => ({ ...d, [MISTURA_ID]: (d[MISTURA_ID] || 0) === n ? 0 : n })), "aria-label": `${n} estrela${n > 1 ? 's' : ''}` }, n <= (premiacaoDraft[MISTURA_ID] || 0) ? '⭐️' : '☆'))),
+                                                [1, 2, 3].map((n) => (React.createElement("button", { key: n, className: "mt-star-btn", onClick: () => setPremiacaoDraft((d) => (Object.assign(Object.assign({}, d), { [MISTURA_ID]: (d[MISTURA_ID] || 0) === n ? 0 : n }))), "aria-label": `${n} estrela${n > 1 ? 's' : ''}` }, n <= (premiacaoDraft[MISTURA_ID] || 0) ? '⭐️' : '☆'))),
                                                 !(premiacaoDraft[MISTURA_ID] > 0) && React.createElement("span", { style: { fontSize: 11.5, color: '#b0aa98', fontStyle: 'italic', marginLeft: 4 } }, "qualquer")),
                                             React.createElement("button", { className: "mt-sortear-btn", style: { '--cor': '#8E6BAE' }, disabled: poolDaMistura().length === 0, onClick: sortearDaMistura },
                                                 "\uD83C\uDFB2 Sortear",
@@ -8838,7 +8951,7 @@ function App() {
                                     React.createElement("div", { className: "mt-fixa-grupo-head", style: { marginBottom: 10 } },
                                         React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: 0, textTransform: 'uppercase' } }, labelHist),
                                         React.createElement("div", { style: { display: 'flex', gap: 6, alignItems: 'center' } },
-                                            React.createElement("button", { className: "mt-gear-btn", title: editandoHist ? 'Sair da edição' : 'Editar', onClick: () => setHistoricoEditando((h) => ({ ...h, [freqHist]: !h[freqHist] })) }, editandoHist ? '×' : '+'),
+                                            React.createElement("button", { className: "mt-gear-btn", title: editandoHist ? 'Sair da edição' : 'Editar', onClick: () => setHistoricoEditando((h) => (Object.assign(Object.assign({}, h), { [freqHist]: !h[freqHist] }))) }, editandoHist ? '×' : '+'),
                                             React.createElement("button", { className: "mt-recarregar-btn", onClick: () => arquivarTabela(freqHist), title: "Recarregar" }, "\uD83D\uDD04"))),
                                     itemsHist.length > 0 && (React.createElement("div", { style: { background: '#f6f5f2', borderRadius: 10, padding: '10px 14px', marginBottom: 12 } },
                                         React.createElement("p", { style: { margin: 0, fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 } }, "Rela\u00E7\u00E3o de tarefas completas"),
@@ -9038,6 +9151,4 @@ function App() {
         React.createElement(VisualizadorMidia, { midia: midiaAmpliada, onFechar: () => setMidiaAmpliada(null) })));
 }
 
-
-const __root = ReactDOM.createRoot(document.getElementById('root'));
-__root.render(React.createElement(App));
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
