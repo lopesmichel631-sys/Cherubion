@@ -805,6 +805,17 @@ const css = `
 .sd-btn-p:hover { background: #8E6417; border-color: #8E6417; color: #FFFDF7; }
 .sd-chip { font-size: 13px; padding: 6px 11px; border-radius: 3px; border: 1px solid ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
 .sd-chip[data-on="1"] { background: ${T.ink}; border-color: ${T.ink}; color: #F2F3EF; }
+.sd-seg { font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 999px; border: 1.5px solid ${T.ink}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.ink}; white-space: nowrap; }
+.sd-seg[data-on="1"] { background: ${T.ink}; border-color: ${T.ink}; color: #F2F3EF; }
+.sd-tag-status { font-size: 12.5px; padding: 5px 12px; border-radius: 3px; border: 1px solid ${T.line}; border-bottom: 3px solid ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
+.sd-tag-status[data-on="1"] { background: ${T.surface}; border-color: ${T.line}; border-bottom-color: ${T.action}; color: ${T.ink}; font-weight: 700; }
+.sd-tag-tipo { font-size: 12.5px; padding: 5px 12px; border-radius: 999px; border: 1.5px solid ${T.action}; background: transparent; cursor: pointer; font-family: 'Fraunces', Georgia, serif; font-style: italic; color: ${T.action}; white-space: nowrap; }
+.sd-tag-tipo[data-on="1"] { background: ${T.action}; color: #FFFDF7; }
+.sd-tag-cor { font-size: 12.5px; padding: 5px 12px 5px 9px; border-radius: 6px; border: 1px dashed ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.sd-tag-voto { font-size: 12.5px; padding: 5px 12px; border-radius: 6px; border: 1px dashed ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
+.sd-tag-voto[data-on="1"] { background: #E1EBF3; border-color: #2F6FA8; border-style: solid; color: #21507A; font-weight: 700; }
+.sd-limpar { font-size: 12px; padding: 5px 4px; border: none; border-bottom: 1px solid #8A3A2C; background: transparent; cursor: pointer; font-family: inherit; color: #8A3A2C; white-space: nowrap; }
+.sd-limpar:hover { color: #6E2E23; border-color: #6E2E23; }
 .sd-row { display: flex; width: 100%; align-items: flex-start; gap: 10px; text-align: left; background: none; border: none; font-family: inherit; cursor: pointer; padding: 12px 0; color: ${T.ink}; }
 .sd-row:hover .sd-rowlabel { color: ${T.action}; }
 .sd-sep { border-top: 1px solid ${T.line}; }
@@ -853,12 +864,71 @@ function emptyIdea(title) {
     metas: {},
     anexos: [],
     notas: [],
+    quadro: quadroVazio(),
     status: "ideia",
     prioridade: "media",
+    tipo: "",
     metodosSugeridos: [],
     pasta: "",
     createdAt: Date.now()
   };
+}
+function quadroVazio() {
+  return { blocos: [], setas: [] };
+}
+function navegarQuadro(quadroRaiz, caminho) {
+  let atual = quadroRaiz || quadroVazio();
+  for (const blocoId of caminho) {
+    const bloco = (atual.blocos || []).find((b) => b.id === blocoId);
+    atual = bloco && bloco.quadro || quadroVazio();
+  }
+  return atual;
+}
+function atualizarQuadroEmCaminho(quadroRaiz, caminho, mutador) {
+  const atual = quadroRaiz || quadroVazio();
+  if (caminho.length === 0) return mutador(atual);
+  const [primeiroId, ...resto] = caminho;
+  return {
+    ...atual,
+    blocos: (atual.blocos || []).map(
+      (b) => b.id === primeiroId ? { ...b, quadro: atualizarQuadroEmCaminho(b.quadro, resto, mutador) } : b
+    )
+  };
+}
+function tituloDoBoardNoCaminho(quadroRaiz, caminhoParcial) {
+  let atual = quadroRaiz || quadroVazio();
+  let titulo = "";
+  for (const id of caminhoParcial) {
+    const bloco = (atual.blocos || []).find((b) => b.id === id);
+    titulo = bloco && bloco.titulo || "";
+    atual = bloco && bloco.quadro || quadroVazio();
+  }
+  return titulo;
+}
+const QUADRO_LARGURA_CARD = 180;
+const QUADRO_LARGURA_CANVAS = 1600;
+const QUADRO_ALTURA_CANVAS = 1e3;
+function quadroAlturaEstimada(bloco) {
+  if (bloco.tipo === "imagem") return bloco.url ? 190 : 90;
+  if (bloco.tipo === "checklist") return 46 + Math.min((bloco.checklist || []).length, 6) * 24;
+  if (bloco.tipo === "tarefa") return 60;
+  if (bloco.tipo === "link") return 96;
+  if (bloco.tipo === "board") return 96;
+  return 100;
+}
+function quadroCentroBloco(bloco) {
+  return { x: bloco.x + QUADRO_LARGURA_CARD / 2, y: bloco.y + quadroAlturaEstimada(bloco) / 2 };
+}
+const QUADRO_TIPOS = [
+  { tipo: "nota", icone: "\u{1F4DD}", rotulo: "Nota", corFundo: "#EFE9DD" },
+  { tipo: "imagem", icone: "\u{1F5BC}", rotulo: "Imagem", corFundo: "#E3E9E3" },
+  { tipo: "link", icone: "\u{1F517}", rotulo: "Link", corFundo: "#E4E7EE" },
+  { tipo: "checklist", icone: "\u2611", rotulo: "Checklist", corFundo: "#EDE3E9" },
+  { tipo: "tarefa", icone: "\u2705", rotulo: "Tarefa", corFundo: "#E9EADB" },
+  { tipo: "board", icone: "\u{1F5C2}", rotulo: "Board", corFundo: "#E6DED2" }
+];
+function quadroInfoTipo(tipo) {
+  return QUADRO_TIPOS.find((t) => t.tipo === tipo) || QUADRO_TIPOS[0];
 }
 function Row({ rowId, label, hint, value, open, onToggle, onChange, tint, indent }) {
   const preview = (value || "").trim();
@@ -1036,6 +1106,554 @@ function AnexoMini({ anexo, onRemove }) {
       "Apagar"
     )
   );
+}
+const APP_ESTADOS = ["off", "meio", "on"];
+const APP_ESTADO_VISUAL = {
+  off: { corTrilho: "#E4E1D6", corBolinha: "#B9B4A5", corRotulo: "#6B7269", posBolinha: 2 },
+  meio: { corTrilho: "#F3E6BE", corBolinha: "#C9971E", corRotulo: "#8A6D1A", posBolinha: 8.5 },
+  on: { corTrilho: "#CFE8D3", corBolinha: "#2E7D46", corRotulo: "#2E7D46", posBolinha: 15 }
+};
+const APP_ESTADO_ROTULO_ARIA = { off: "desligado", meio: "no meio", on: "ativo" };
+function proximoEstadoApp(estadoAtual) {
+  const idx = APP_ESTADOS.indexOf(estadoAtual);
+  return APP_ESTADOS[(idx + 1) % APP_ESTADOS.length];
+}
+function InterruptorApp({ estado, onToggle }) {
+  const v = APP_ESTADO_VISUAL[estado] || APP_ESTADO_VISUAL.off;
+  const proximo = APP_ESTADO_ROTULO_ARIA[proximoEstadoApp(estado)];
+  return /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: onToggle,
+      "aria-label": "App est\xE1 " + APP_ESTADO_ROTULO_ARIA[estado] + " nesta nota \u2014 toque para deixar " + proximo,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        border: "none",
+        background: "transparent",
+        cursor: "pointer",
+        padding: 0,
+        flexShrink: 0
+      }
+    },
+    /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: v.corRotulo } }, "App"),
+    /* @__PURE__ */ React.createElement(
+      "span",
+      {
+        style: {
+          width: 30,
+          height: 17,
+          borderRadius: 999,
+          background: v.corTrilho,
+          position: "relative",
+          display: "inline-block",
+          flexShrink: 0,
+          transition: "background 150ms ease"
+        }
+      },
+      /* @__PURE__ */ React.createElement(
+        "span",
+        {
+          style: {
+            position: "absolute",
+            top: 2,
+            left: v.posBolinha,
+            width: 13,
+            height: 13,
+            borderRadius: "50%",
+            background: v.corBolinha,
+            transition: "left 150ms ease, background 150ms ease"
+          }
+        }
+      )
+    )
+  );
+}
+function Checklist({ itens, valorInput, onInputChange, onAdicionar, onToggle, onRemover }) {
+  const lista = itens || [];
+  const feitos = lista.filter((it) => it.feito).length;
+  return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8 } }, lista.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10.5, color: T.muted, marginBottom: 4 } }, "\u2611 ", feitos, "/", lista.length, " feito", feitos === 1 ? "" : "s"), lista.map((it) => /* @__PURE__ */ React.createElement("div", { key: it.id, style: { display: "flex", alignItems: "center", gap: 7, padding: "2px 0" } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => onToggle(it.id),
+      "aria-label": it.feito ? "Desmarcar item do checklist" : "Marcar item do checklist como feito",
+      style: {
+        width: 16,
+        height: 16,
+        flexShrink: 0,
+        borderRadius: 3,
+        border: "1px solid " + T.line,
+        background: it.feito ? T.action : "transparent",
+        color: "#fff",
+        fontSize: 11,
+        lineHeight: "14px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        padding: 0
+      }
+    },
+    it.feito ? "\u2713" : ""
+  ), /* @__PURE__ */ React.createElement(
+    "span",
+    {
+      style: {
+        fontSize: 13,
+        flex: 1,
+        wordBreak: "break-word",
+        textDecoration: it.feito ? "line-through" : "none",
+        color: it.feito ? T.muted : T.ink
+      }
+    },
+    it.texto
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-chip",
+      style: { fontSize: 10, padding: "1px 6px", flexShrink: 0 },
+      "aria-label": "Remover item do checklist",
+      onClick: () => onRemover(it.id)
+    },
+    "\u2715"
+  ))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginTop: lista.length > 0 ? 4 : 0 } }, /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      className: "sd-ta",
+      style: { padding: "4px 8px", fontSize: 12.5 },
+      placeholder: "Novo item do checklist\u2026",
+      "aria-label": "Novo item do checklist",
+      value: valorInput || "",
+      onChange: (e) => onInputChange(e.target.value),
+      onKeyDown: (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onAdicionar();
+        }
+      }
+    }
+  ), /* @__PURE__ */ React.createElement("button", { className: "sd-chip", style: { fontSize: 11, flexShrink: 0 }, onClick: onAdicionar }, "+ item")));
+}
+function QuadroLivre({ idea, onChange }) {
+  const [caminho, setCaminho] = useState([]);
+  const [arrastando, setArrastando] = useState(null);
+  const [modoConectar, setModoConectar] = useState(false);
+  const [origemConexao, setOrigemConexao] = useState(null);
+  const [checklistCardInput, setChecklistCardInput] = useState({});
+  const [imagemEnviando, setImagemEnviando] = useState({});
+  const [imagemErro, setImagemErro] = useState({});
+  const canvasRef = useRef(null);
+  const nivel = navegarQuadro(idea.quadro, caminho);
+  const blocos = nivel.blocos || [];
+  const setas = nivel.setas || [];
+  function mudarNivel(mutador) {
+    onChange(atualizarQuadroEmCaminho(idea.quadro, caminho, mutador));
+  }
+  function adicionarBloco(tipo) {
+    const id = "qb" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const coluna = blocos.length % 4;
+    const linha = Math.floor(blocos.length / 4);
+    const x = 20 + coluna * 210;
+    const y = 20 + linha * 190;
+    const novo = { id, tipo, x, y, titulo: "", texto: "", feito: false, url: "", key: "", checklist: [] };
+    if (tipo === "board") novo.quadro = quadroVazio();
+    mudarNivel((n) => ({ ...n, blocos: [...n.blocos || [], novo] }));
+  }
+  function moverBloco(blocoId, x, y) {
+    mudarNivel((n) => ({ ...n, blocos: (n.blocos || []).map((b) => b.id === blocoId ? { ...b, x, y } : b) }));
+  }
+  function atualizarBloco(blocoId, patch) {
+    mudarNivel((n) => ({ ...n, blocos: (n.blocos || []).map((b) => b.id === blocoId ? { ...b, ...patch } : b) }));
+  }
+  function removerBloco(bloco) {
+    mudarNivel((n) => ({
+      ...n,
+      blocos: (n.blocos || []).filter((b) => b.id !== bloco.id),
+      setas: (n.setas || []).filter((s) => s.de !== bloco.id && s.para !== bloco.id)
+    }));
+    if (bloco.tipo === "imagem" && bloco.key) apagarArquivoDoR2Sondagem(bloco.key);
+  }
+  function abrirBoard(blocoId) {
+    setCaminho((p) => [...p, blocoId]);
+    setModoConectar(false);
+    setOrigemConexao(null);
+  }
+  function voltarNivel(indice) {
+    setCaminho((p) => p.slice(0, indice));
+  }
+  function alternarModoConectar() {
+    setModoConectar((v) => !v);
+    setOrigemConexao(null);
+  }
+  function tocarBlocoParaConexao(blocoId) {
+    if (!origemConexao) {
+      setOrigemConexao(blocoId);
+      return;
+    }
+    if (origemConexao === blocoId) {
+      setOrigemConexao(null);
+      return;
+    }
+    const id = "qs" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    mudarNivel((n) => ({ ...n, setas: [...n.setas || [], { id, de: origemConexao, para: blocoId }] }));
+    setOrigemConexao(null);
+  }
+  function removerSeta(setaId) {
+    mudarNivel((n) => ({ ...n, setas: (n.setas || []).filter((s) => s.id !== setaId) }));
+  }
+  function iniciarArrasto(e, bloco) {
+    if (!canvasRef.current) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = canvasRef.current.getBoundingClientRect();
+    const px = e.clientX - rect.left + canvasRef.current.scrollLeft;
+    const py = e.clientY - rect.top + canvasRef.current.scrollTop;
+    setArrastando({ blocoId: bloco.id, offsetX: px - bloco.x, offsetY: py - bloco.y });
+  }
+  function moverArrasto(e) {
+    if (!arrastando || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const px = e.clientX - rect.left + canvasRef.current.scrollLeft;
+    const py = e.clientY - rect.top + canvasRef.current.scrollTop;
+    const novoX = Math.max(0, Math.min(QUADRO_LARGURA_CANVAS - QUADRO_LARGURA_CARD, px - arrastando.offsetX));
+    const novoY = Math.max(0, py - arrastando.offsetY);
+    moverBloco(arrastando.blocoId, novoX, novoY);
+  }
+  function finalizarArrasto() {
+    setArrastando(null);
+  }
+  async function processarImagemBloco(blocoId, fileList) {
+    const file = (fileList || [])[0];
+    if (!file) return;
+    setImagemEnviando((p) => ({ ...p, [blocoId]: true }));
+    setImagemErro((p) => ({ ...p, [blocoId]: null }));
+    try {
+      const blob = await comprimirImagemParaUpload(file);
+      const { url, key } = await subirArquivoParaR2Sondagem(blob, file.name);
+      atualizarBloco(blocoId, { url, key });
+    } catch (e) {
+      setImagemErro((p) => ({
+        ...p,
+        [blocoId]: e && e.message === "sem-config" ? "Configure o Worker do Cloudflare em Minha Tela \u2192 Configura\xE7\xF5es gerais antes de enviar imagens aqui." : e && e.message || "N\xE3o deu para enviar a imagem."
+      }));
+    }
+    setImagemEnviando((p) => ({ ...p, [blocoId]: false }));
+  }
+  function removerImagemBloco(bloco) {
+    if (bloco.key) apagarArquivoDoR2Sondagem(bloco.key);
+    atualizarBloco(bloco.id, { url: "", key: "" });
+  }
+  function adicionarItemChecklistBloco(blocoId) {
+    const texto = (checklistCardInput[blocoId] || "").trim();
+    if (!texto) return;
+    const item = { id: "ck" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, feito: false };
+    mudarNivel((n) => ({
+      ...n,
+      blocos: (n.blocos || []).map((b) => b.id === blocoId ? { ...b, checklist: [...b.checklist || [], item] } : b)
+    }));
+    setChecklistCardInput((p) => ({ ...p, [blocoId]: "" }));
+  }
+  function toggleItemChecklistBloco(blocoId, itemId) {
+    mudarNivel((n) => ({
+      ...n,
+      blocos: (n.blocos || []).map(
+        (b) => b.id === blocoId ? { ...b, checklist: (b.checklist || []).map((it) => it.id === itemId ? { ...it, feito: !it.feito } : it) } : b
+      )
+    }));
+  }
+  function removerItemChecklistBloco(blocoId, itemId) {
+    mudarNivel((n) => ({
+      ...n,
+      blocos: (n.blocos || []).map(
+        (b) => b.id === blocoId ? { ...b, checklist: (b.checklist || []).filter((it) => it.id !== itemId) } : b
+      )
+    }));
+  }
+  return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" } }, QUADRO_TIPOS.map((t) => /* @__PURE__ */ React.createElement(Tooltip, { key: t.tipo, texto: "Acrescenta um card de " + t.rotulo.toLowerCase() + " neste quadro." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", style: { fontSize: 12 }, onClick: () => adicionarBloco(t.tipo) }, t.icone, " ", t.rotulo))), /* @__PURE__ */ React.createElement(
+    Tooltip,
+    {
+      texto: modoConectar ? "Toque em dois cards, em sequ\xEAncia, pra ligar um ao outro com uma seta. Toque de novo aqui pra sair do modo." : "Ativa o modo de ligar cards com setas: depois de ativar, toque em dois cards em sequ\xEAncia."
+    },
+    /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "sd-chip",
+        style: modoConectar ? { fontSize: 12, background: T.action, color: "#fff" } : { fontSize: 12 },
+        onClick: alternarModoConectar
+      },
+      "\u279C ",
+      modoConectar ? "Conectando\u2026 (toque em 2 cards)" : "Conectar com seta"
+    )
+  )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginBottom: 8, fontSize: 11.5 } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-chip",
+      style: { fontSize: 11, fontWeight: caminho.length === 0 ? 600 : 400 },
+      onClick: () => voltarNivel(0)
+    },
+    "\u{1F5C2} Quadro principal"
+  ), caminho.map((id, idx) => /* @__PURE__ */ React.createElement(React.Fragment, { key: id }, /* @__PURE__ */ React.createElement("span", { style: { color: T.muted } }, "\u203A"), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-chip",
+      style: { fontSize: 11, fontWeight: idx === caminho.length - 1 ? 600 : 400 },
+      onClick: () => voltarNivel(idx + 1)
+    },
+    tituloDoBoardNoCaminho(idea.quadro, caminho.slice(0, idx + 1)) || "(board sem nome)"
+  )))), blocos.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted, padding: "16px 4px" } }, "Quadro vazio \u2014 toque num dos bot\xF5es acima pra soltar o primeiro card aqui.") : /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      ref: canvasRef,
+      style: {
+        position: "relative",
+        width: "100%",
+        maxWidth: QUADRO_LARGURA_CANVAS,
+        height: 420,
+        overflow: "auto",
+        border: "1px solid " + T.line,
+        borderRadius: 8,
+        background: "repeating-linear-gradient(0deg, #FBFAF7, #FBFAF7 19px, #F3F1EA 20px), repeating-linear-gradient(90deg, #FBFAF7, #FBFAF7 19px, #F3F1EA 20px)"
+      }
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { position: "relative", width: QUADRO_LARGURA_CANVAS, height: QUADRO_ALTURA_CANVAS } }, /* @__PURE__ */ React.createElement(
+      "svg",
+      {
+        width: QUADRO_LARGURA_CANVAS,
+        height: QUADRO_ALTURA_CANVAS,
+        style: { position: "absolute", top: 0, left: 0, pointerEvents: "none" }
+      },
+      /* @__PURE__ */ React.createElement("defs", null, /* @__PURE__ */ React.createElement("marker", { id: "quadro-seta-ponta-" + idea.id, markerWidth: "8", markerHeight: "8", refX: "6", refY: "3", orient: "auto" }, /* @__PURE__ */ React.createElement("path", { d: "M0,0 L6,3 L0,6 Z", fill: T.action }))),
+      setas.map((s) => {
+        const de = blocos.find((b) => b.id === s.de);
+        const para = blocos.find((b) => b.id === s.para);
+        if (!de || !para) return null;
+        const p1 = quadroCentroBloco(de);
+        const p2 = quadroCentroBloco(para);
+        return /* @__PURE__ */ React.createElement(
+          "line",
+          {
+            key: s.id,
+            x1: p1.x,
+            y1: p1.y,
+            x2: p2.x,
+            y2: p2.y,
+            stroke: T.action,
+            strokeWidth: 2,
+            markerEnd: "url(#quadro-seta-ponta-" + idea.id + ")"
+          }
+        );
+      })
+    ), setas.map((s) => {
+      const de = blocos.find((b) => b.id === s.de);
+      const para = blocos.find((b) => b.id === s.para);
+      if (!de || !para) return null;
+      const p1 = quadroCentroBloco(de);
+      const p2 = quadroCentroBloco(para);
+      const mx = (p1.x + p2.x) / 2;
+      const my = (p1.y + p2.y) / 2;
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: s.id,
+          onClick: () => removerSeta(s.id),
+          "aria-label": "Remover esta seta",
+          style: {
+            position: "absolute",
+            left: mx - 9,
+            top: my - 9,
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            border: "1px solid " + T.line,
+            background: T.surface,
+            fontSize: 10,
+            lineHeight: "16px",
+            padding: 0,
+            cursor: "pointer"
+          }
+        },
+        "\u2715"
+      );
+    }), blocos.map((b) => {
+      const info = quadroInfoTipo(b.tipo);
+      const emConexao = modoConectar && origemConexao === b.id;
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: b.id,
+          style: {
+            position: "absolute",
+            left: b.x,
+            top: b.y,
+            width: QUADRO_LARGURA_CARD,
+            border: "1px solid " + T.line,
+            borderRadius: 8,
+            background: T.surface,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)"
+          }
+        },
+        /* @__PURE__ */ React.createElement(
+          "div",
+          {
+            onPointerDown: (e) => {
+              if (!modoConectar) iniciarArrasto(e, b);
+            },
+            onPointerMove: (e) => {
+              if (!modoConectar) moverArrasto(e);
+            },
+            onPointerUp: finalizarArrasto,
+            onClick: () => {
+              if (modoConectar) tocarBlocoParaConexao(b.id);
+            },
+            style: {
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "4px 6px",
+              background: info.corFundo,
+              borderRadius: "7px 7px 0 0",
+              cursor: modoConectar ? "pointer" : "grab",
+              touchAction: "none",
+              outline: emConexao ? "2px solid " + T.action : "none"
+            }
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 600 } }, info.icone, " ", info.rotulo),
+          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, b.tipo === "board" && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onPointerDown: (e) => e.stopPropagation(),
+              onClick: () => abrirBoard(b.id),
+              "aria-label": "Abrir este board",
+              style: { border: "none", background: "transparent", cursor: "pointer", fontSize: 12, padding: "0 2px" }
+            },
+            "Abrir \u25B8"
+          ), /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onPointerDown: (e) => e.stopPropagation(),
+              onClick: () => removerBloco(b),
+              "aria-label": "Remover este card",
+              style: { border: "none", background: "transparent", cursor: "pointer", fontSize: 11, padding: "0 2px" }
+            },
+            "\u2715"
+          ))
+        ),
+        /* @__PURE__ */ React.createElement("div", { style: { padding: 8 } }, b.tipo === "nota" && /* @__PURE__ */ React.createElement(
+          "textarea",
+          {
+            className: "sd-ta",
+            value: b.texto || "",
+            onChange: (e) => atualizarBloco(b.id, { texto: e.target.value }),
+            rows: 3,
+            placeholder: "Escreva\u2026",
+            style: { width: "100%", fontSize: 12.5, resize: "vertical" }
+          }
+        ), b.tipo === "link" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            className: "sd-ta",
+            value: b.url || "",
+            onChange: (e) => atualizarBloco(b.id, { url: e.target.value }),
+            placeholder: "URL",
+            style: { width: "100%", fontSize: 12, marginBottom: 4 }
+          }
+        ), /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            className: "sd-ta",
+            value: b.titulo || "",
+            onChange: (e) => atualizarBloco(b.id, { titulo: e.target.value }),
+            placeholder: "T\xEDtulo (opcional)",
+            style: { width: "100%", fontSize: 12, marginBottom: 4 }
+          }
+        ), b.url && /* @__PURE__ */ React.createElement(
+          "a",
+          {
+            href: b.url,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            style: { fontSize: 11.5, color: T.action, textDecoration: "underline", wordBreak: "break-word" }
+          },
+          b.titulo || b.url
+        )), b.tipo === "imagem" && (b.url ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(
+          "img",
+          {
+            src: b.url,
+            alt: b.titulo || "imagem",
+            style: { width: "100%", borderRadius: 4, display: "block", marginBottom: 4 }
+          }
+        ), /* @__PURE__ */ React.createElement("button", { className: "sd-chip", style: { fontSize: 10 }, onClick: () => removerImagemBloco(b) }, "Trocar/remover")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("label", { className: "sd-chip", style: { fontSize: 11, cursor: "pointer", display: "inline-block" } }, "\u{1F4F7} Enviar imagem", /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            type: "file",
+            accept: "image/*",
+            "aria-label": "Enviar imagem para este card",
+            style: { display: "none" },
+            onChange: (e) => {
+              processarImagemBloco(b.id, e.target.files);
+              e.target.value = "";
+            }
+          }
+        )), imagemEnviando[b.id] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10.5, color: T.muted, marginTop: 4 } }, "enviando\u2026"), imagemErro[b.id] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10.5, color: "#8A3A2C", marginTop: 4 } }, imagemErro[b.id]))), b.tipo === "checklist" && /* @__PURE__ */ React.createElement(
+          Checklist,
+          {
+            itens: b.checklist || [],
+            valorInput: checklistCardInput[b.id] || "",
+            onInputChange: (v) => setChecklistCardInput((p) => ({ ...p, [b.id]: v })),
+            onAdicionar: () => adicionarItemChecklistBloco(b.id),
+            onToggle: (itemId) => toggleItemChecklistBloco(b.id, itemId),
+            onRemover: (itemId) => removerItemChecklistBloco(b.id, itemId)
+          }
+        ), b.tipo === "tarefa" && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => atualizarBloco(b.id, { feito: !b.feito }),
+            "aria-label": b.feito ? "Desmarcar tarefa" : "Marcar tarefa como feita",
+            style: {
+              width: 16,
+              height: 16,
+              flexShrink: 0,
+              borderRadius: 3,
+              border: "1px solid " + T.line,
+              background: b.feito ? T.action : "transparent",
+              color: "#fff",
+              fontSize: 11,
+              lineHeight: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              padding: 0
+            }
+          },
+          b.feito ? "\u2713" : ""
+        ), /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            className: "sd-ta",
+            value: b.texto || "",
+            onChange: (e) => atualizarBloco(b.id, { texto: e.target.value }),
+            placeholder: "O que precisa ser feito?",
+            style: {
+              flex: 1,
+              fontSize: 12.5,
+              textDecoration: b.feito ? "line-through" : "none",
+              color: b.feito ? T.muted : T.ink
+            }
+          }
+        )), b.tipo === "board" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            className: "sd-ta",
+            value: b.titulo || "",
+            onChange: (e) => atualizarBloco(b.id, { titulo: e.target.value }),
+            placeholder: "Nome do board",
+            style: { width: "100%", fontSize: 12.5, marginBottom: 6 }
+          }
+        ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.muted } }, (b.quadro && b.quadro.blocos || []).length, " card(s) dentro")))
+      );
+    }))
+  ));
 }
 function encontrarNotaPorId(ideas, notaId) {
   for (const idea of ideas) {
@@ -4934,6 +5552,11 @@ const PRIORIDADE_OPTS = [
   { id: "baixa", label: "Baixa" }
 ];
 const ORDEM_PRIORIDADE = { alta: 0, media: 1, baixa: 2 };
+const TIPO_OPTS = [
+  { id: "app", label: "App" },
+  { id: "produto", label: "Produto" },
+  { id: "servico", label: "Servi\xE7o" }
+];
 function compararIdeias(a, b, ordenacao) {
   if (ordenacao === "prioridade") {
     const pa = ORDEM_PRIORIDADE[a.prioridade || "media"] ?? 1;
@@ -5011,7 +5634,7 @@ const COMO_USAR = [
       },
       {
         titulo: "Vis\xE3o Quadro (Kanban)",
-        texto: 'Toque em "\u25A4 Quadro" pra ver os projetos em 3 colunas por status. As setas \u25C0/\u25B6 em cada card movem entre colunas, sem precisar arrastar.'
+        texto: 'Toque em "\u25A4 Quadro" pra ver os projetos em 3 colunas por status. As setas \u25C0/\u25B6 em cada card movem entre colunas, sem precisar arrastar. O bot\xE3o "Abrir" leva pro modo "\u2630 Lista" com aquele projeto j\xE1 selecionado e expandido (notas, checklist etc.) \u2014 n\xE3o pula direto pra Camadas/M\xE9todos.'
       },
       {
         titulo: "Pastas",
@@ -5060,7 +5683,7 @@ const COMO_USAR = [
       },
       {
         titulo: "Mapa do projeto",
-        texto: 'Na tela de um projeto aberto, toque em "\u{1F578} Mapa do projeto" pra ver um grafo: o projeto no centro, notas e m\xE9todos linkados ao redor. Toque num n\xF3 pra navegar at\xE9 ele.'
+        texto: 'Toque em "\u{1F578} Mapa" (direto no card do projeto em "Meus projetos", ao lado de "Abrir" \u2014 ou em "\u{1F578} Mapa do projeto", dentro de Camadas/M\xE9todos) pra ver um grafo: o projeto no centro, notas e m\xE9todos linkados ao redor. Toque num n\xF3 pra navegar at\xE9 ele.'
       },
       {
         titulo: "Se\xE7\xF5es (frames)",
@@ -5069,6 +5692,34 @@ const COMO_USAR = [
       {
         titulo: "Vota\xE7\xE3o por pontinho (dot voting)",
         texto: 'Cada nota tem um bot\xE3o "\u{1F535} N" \u2014 toque pra somar um voto (n\xE3o d\xE1 pra tirar um por um, s\xF3 zerar tudo com "\u21BA", igual vota\xE7\xE3o por adesivo). Serve pra marcar visualmente quais notas pesam mais, sem precisar mexer em status ou prioridade.'
+      },
+      {
+        titulo: "Checklist dentro da nota",
+        texto: 'Toque em "\u2611 Checklist" (no rascunho de nota nova ou numa nota j\xE1 salva) pra acrescentar uma lista de itens marc\xE1veis dentro dela \u2014 tipo lista de tarefas dentro da nota, sem precisar abrir outro app. Toque no quadradinho pra marcar/desmarcar um item, e \u2715 pra apagar. Uma nota pode ser s\xF3 o checklist, sem nenhum texto.'
+      },
+      {
+        titulo: "Quadro livre",
+        texto: 'Toque em "\u{1F5FA} Quadro" (direto no card do projeto em "Meus projetos", ao lado de "Abrir" \u2014 ou em "\u{1F5FA} Quadro livre", dentro de Camadas/M\xE9todos) pra abrir um quadro totalmente solto: uma tela rol\xE1vel onde voc\xEA arrasta e solta cards de 6 tipos (\u{1F4DD} Nota, \u{1F5BC} Imagem, \u{1F517} Link, \u2611 Checklist, \u2705 Tarefa e \u{1F5C2} Board), em qualquer posi\xE7\xE3o. Cada card \xE9 dono do pr\xF3prio conte\xFAdo \u2014 n\xE3o \xE9 espelho de uma nota da aba "Meus projetos". Toque em "\u279C Conectar com seta" e depois em dois cards, em sequ\xEAncia, pra ligar um ao outro; toque no "\u2715" no meio da seta pra desfazer. Um card do tipo \u{1F5C2} Board pode conter seu pr\xF3prio quadro dentro \u2014 toque em "Abrir \u25B8" nele pra entrar, e use as migalhas de p\xE3o acima do quadro pra voltar aos n\xEDveis anteriores (sem limite de quantos boards cabem um dentro do outro).'
+      },
+      {
+        titulo: "Salvamento autom\xE1tico ao editar uma nota",
+        texto: 'Ao tocar em "Editar" numa nota j\xE1 salva, tudo que voc\xEA digitar \xE9 salvo sozinho \u2014 n\xE3o existe mais bot\xE3o "Salvar" nem "Cancelar" nessa tela. Um aviso pequeno embaixo do texto mostra "salvando\u2026" enquanto voc\xEA digita e volta pra "salvo automaticamente" cerca de 1 segundo depois que voc\xEA para de digitar. Toque em "\u2713 Conclu\xEDdo" s\xF3 pra fechar a caixa de edi\xE7\xE3o \u2014 o conte\xFAdo j\xE1 est\xE1 salvo de qualquer forma, mesmo se voc\xEA sair sem tocar em nada.'
+      },
+      {
+        titulo: "Bot\xE3o App \u2014 copiar a nota inteira",
+        texto: 'Todo canto superior direito de uma nota tem um interruptor "App", com 3 posi\xE7\xF5es \u2014 toque nele pra passar de uma pra outra, em ciclo: cinza/desligado, amarelo/intermedi\xE1rio (sem fun\xE7\xE3o pr\xF3pria ainda, s\xF3 um estado visual do meio), e verde/ativo (bolinha do lado direito). S\xF3 no estado verde/ativo aparece um bot\xE3o "\u{1F4CB} Copiar" nesse mesmo canto \u2014 toque nele e o texto inteiro da nota (junto com os itens do checklist, se tiver, marcados como "[x]" ou "[ ]") vai direto pra \xE1rea de transfer\xEAncia do aparelho, pronto pra colar em outro app. O estado do interruptor \xE9 salvo nota por nota, junto com o resto da nota.'
+      },
+      {
+        titulo: "Filtrar notas por App e por voto",
+        texto: 'Ao tocar em "Ver notas", aparece uma pequena faixa de filtro acima da lista: "\u{1F7E2} Verde", "\u{1F7E1} Amarela" e "\u26AA Cinza" filtram pelas 3 cores do interruptor App, e "\u{1F535} Com voto" mostra s\xF3 notas que j\xE1 receberam pelo menos 1 voto (dot voting). Toque de novo no mesmo filtro pra desligar ele e voltar a ver todas; "Limpar filtro" aparece quando algum filtro est\xE1 ativo e desliga todos de uma vez. Se nenhuma nota bater com o filtro escolhido, aparece um aviso "Nenhuma nota com esse filtro" em vez da lista vazia.'
+      },
+      {
+        titulo: "Filtrar PROJETOS por App e por voto",
+        texto: 'Na barra de cima de "Meus projetos" (modo "\u2630 Lista"), ao lado dos filtros de status ("Todos", "Ideia", "Em andamento", "Conclu\xEDdo"), os mesmos filtros "\u{1F7E2} Verde", "\u{1F7E1} Amarela", "\u26AA Cinza" e "\u{1F535} Com voto" tamb\xE9m existem \u2014 s\xF3 que aqui filtram quais PROJETOS aparecem na lista, n\xE3o quais notas: um projeto passa no filtro se tiver pelo menos uma nota com aquela cor de App ou com voto. \xC9 diferente do filtro dentro de "Ver notas" (que filtra as notas de um projeto j\xE1 aberto) \u2014 este de cima ajuda a achar, entre muitos projetos, quais t\xEAm alguma nota marcada de um jeito espec\xEDfico, sem precisar abrir um por um. Combina com o filtro de status normalmente (ex.: "Em andamento" + "\u{1F7E2} Verde" mostra s\xF3 projetos em andamento que tenham nota verde).'
+      },
+      {
+        titulo: "Campo Tipo do projeto (App / Produto / Servi\xE7o)",
+        texto: 'Cada projeto ganhou um terceiro seletor, ao lado de Status e Prioridade, chamado "Tipo" \u2014 com as op\xE7\xF5es "App", "Produto" e "Servi\xE7o" (ou "Sem tipo", se ainda n\xE3o escolheu nenhum). Na barra de cima de "Meus projetos" (modo "\u2630 Lista"), logo depois dos filtros de status, tem um chip pra cada tipo \u2014 toque pra mostrar s\xF3 os projetos daquele tipo; toque de novo no mesmo chip pra desligar o filtro. Combina com todos os outros filtros da mesma barra (status, App das notas, voto).'
       }
     ]
   },
@@ -5090,12 +5741,7 @@ const COMO_USAR = [
     ]
   }
 ];
-const FUNCOES_FUTURAS = [
-  {
-    titulo: "Quadro livre infinito",
-    texto: 'Um quadro totalmente livre por projeto: notas, m\xE9todos e camadas viram blocos que voc\xEA arrasta pra qualquer posi\xE7\xE3o da tela, sem depender de nenhum link j\xE1 existir \u2014 diferente do "Mapa do projeto" (que s\xF3 desenha conex\xF5es que j\xE1 existem, em posi\xE7\xE3o fixa). Pede guardar a posi\xE7\xE3o de cada bloco e um sistema de arrastar-e-soltar; \xE9 o maior passo de esfor\xE7o de tudo que j\xE1 foi constru\xEDdo no Sondagem at\xE9 aqui (equivalente ao Canvas do Obsidian, ou ao quadro do Miro/Milanote/FigJam).'
-  }
-];
+const FUNCOES_FUTURAS = [];
 function Sondagem() {
   const [ideas, setIdeas] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -5110,9 +5756,13 @@ function Sondagem() {
   const [templatePickerAberto, setTemplatePickerAberto] = useState(false);
   const [viewMeusProjetos, setViewMeusProjetos] = useState("lista");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroProjetoApp, setFiltroProjetoApp] = useState("todos");
+  const [filtroProjetoVoto, setFiltroProjetoVoto] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState("todos");
   const [ordenacao, setOrdenacao] = useState("recentes");
   const [metodosLinkadosAbertos, setMetodosLinkadosAbertos] = useState({});
   const [grafoAberto, setGrafoAberto] = useState({});
+  const [quadroAberto, setQuadroAberto] = useState({});
   const [tagBuscaAtiva, setTagBuscaAtiva] = useState(null);
   const [pastasAbertas, setPastasAbertas] = useState({});
   const [lembretesPainelAberto, setLembretesPainelAberto] = useState(false);
@@ -5126,12 +5776,22 @@ function Sondagem() {
   const [notasAbertas, setNotasAbertas] = useState({});
   const [notaDraft, setNotaDraft] = useState({});
   const [notaEditando, setNotaEditando] = useState({});
+  const [notaCopiada, setNotaCopiada] = useState({});
+  const [notaFiltroApp, setNotaFiltroApp] = useState({});
+  const [notaFiltroVoto, setNotaFiltroVoto] = useState({});
   const [notaEditDraft, setNotaEditDraft] = useState({});
+  const [notaAutoSalvando, setNotaAutoSalvando] = useState({});
+  const notaAutoSaveTimers = useRef({});
   const [notaAnexoDraft, setNotaAnexoDraft] = useState({});
   const [notaAnexoEnviando, setNotaAnexoEnviando] = useState({});
   const [notaAnexoErro, setNotaAnexoErro] = useState({});
   const [notaEditAnexoEnviando, setNotaEditAnexoEnviando] = useState({});
   const [notaEditAnexoErro, setNotaEditAnexoErro] = useState({});
+  const [checklistDraft, setChecklistDraft] = useState({});
+  const [checklistDraftInput, setChecklistDraftInput] = useState({});
+  const [checklistDraftAberto, setChecklistDraftAberto] = useState({});
+  const [checklistNotaAberto, setChecklistNotaAberto] = useState({});
+  const [checklistInput, setChecklistInput] = useState({});
   const [linkPickerAberto, setLinkPickerAberto] = useState(null);
   const [linkPickerBusca, setLinkPickerBusca] = useState("");
   const [notaDestaque, setNotaDestaque] = useState(null);
@@ -5150,7 +5810,7 @@ function Sondagem() {
         const res = await window.storage.get(STORE_KEY);
         const parsed = res ? JSON.parse(res.value) : null;
         if (parsed && Array.isArray(parsed.ideas) && parsed.ideas.length) {
-          setIdeas(parsed.ideas.map((i) => ({ ...i, hoshin: i.hoshin || blankHoshin(), toc: i.toc || {}, v2mom: i.v2mom || blankV2(), pmi: i.pmi || blankPmi(), gold: i.gold || blankGold(), okr: i.okr || blankOkr(), cabala: i.cabala || {}, metas: i.metas || {}, anexos: i.anexos || [], notas: (i.notas || []).map((n) => ({ ...n, anexos: n.anexos || [], lembrete: n.lembrete || "", secao: n.secao || "", votos: n.votos || 0 })), status: i.status || "ideia", prioridade: i.prioridade || "media", metodosSugeridos: i.metodosSugeridos || [], pasta: i.pasta || "" })));
+          setIdeas(parsed.ideas.map((i) => ({ ...i, hoshin: i.hoshin || blankHoshin(), toc: i.toc || {}, v2mom: i.v2mom || blankV2(), pmi: i.pmi || blankPmi(), gold: i.gold || blankGold(), okr: i.okr || blankOkr(), cabala: i.cabala || {}, metas: i.metas || {}, anexos: i.anexos || [], notas: (i.notas || []).map((n) => ({ ...n, anexos: n.anexos || [], lembrete: n.lembrete || "", secao: n.secao || "", votos: n.votos || 0, checklist: n.checklist || [], app: n.app === true ? "on" : n.app === false || n.app === void 0 ? "off" : n.app })), quadro: i.quadro || quadroVazio(), status: i.status || "ideia", prioridade: i.prioridade || "media", tipo: i.tipo || "", metodosSugeridos: i.metodosSugeridos || [], pasta: i.pasta || "" })));
           setActiveId(parsed.activeId || parsed.ideas[0].id);
         } else {
           const idea = emptyIdea();
@@ -5202,7 +5862,13 @@ function Sondagem() {
   const okr = active ? active.okr || blankOkr() : blankOkr();
   const cab = active ? active.cabala || {} : {};
   const met = active ? active.metas || {} : {};
-  const ideasFiltradas = filtroStatus === "todos" ? ideas : ideas.filter((i) => (i.status || "ideia") === filtroStatus);
+  const ideasFiltradas = ideas.filter((i) => {
+    if (filtroStatus !== "todos" && (i.status || "ideia") !== filtroStatus) return false;
+    if (filtroTipo !== "todos" && (i.tipo || "") !== filtroTipo) return false;
+    if (filtroProjetoApp !== "todos" && !(i.notas || []).some((n) => (n.app || "off") === filtroProjetoApp)) return false;
+    if (filtroProjetoVoto && !(i.notas || []).some((n) => (n.votos || 0) > 0)) return false;
+    return true;
+  });
   const ideasOrdenadas = [...ideasFiltradas].sort((a, b) => compararIdeias(a, b, ordenacao));
   const gruposPasta = {};
   ideasOrdenadas.forEach((i) => {
@@ -5306,6 +5972,12 @@ function Sondagem() {
     setConfirmDelete(null);
     setConfigAberta(null);
   }
+  function selecionarProjetoNaLista(id) {
+    setActiveId(id);
+    setOpenRows({});
+    setOpenLayers({ direcao: true });
+    setViewMeusProjetos("lista");
+  }
   function removeIdeaById(id) {
     const rest = ideas.filter((i) => i.id !== id);
     setIdeas(rest);
@@ -5325,6 +5997,9 @@ function Sondagem() {
   }
   function mudarPrioridade(id, prioridade) {
     setIdeas((p) => p.map((i) => i.id === id ? { ...i, prioridade } : i));
+  }
+  function mudarTipo(id, tipo) {
+    setIdeas((p) => p.map((i) => i.id === id ? { ...i, tipo } : i));
   }
   function mudarPasta(id, pasta) {
     setIdeas((p) => p.map((i) => i.id === id ? { ...i, pasta } : i));
@@ -5356,6 +6031,47 @@ function Sondagem() {
         (i) => i.id === ideaId ? { ...i, notas: (i.notas || []).map((n) => n.id === notaId ? { ...n, votos: 0 } : n) } : i
       )
     );
+  }
+  function toggleAppNota(ideaId, notaId) {
+    setIdeas(
+      (p) => p.map(
+        (i) => i.id === ideaId ? { ...i, notas: (i.notas || []).map((n) => n.id === notaId ? { ...n, app: proximoEstadoApp(n.app || "off") } : n) } : i
+      )
+    );
+  }
+  async function copiarTextoNota(nota) {
+    let texto = (nota.texto || "").trim();
+    if ((nota.checklist || []).length > 0) {
+      const linhasChecklist = nota.checklist.map((it) => (it.feito ? "[x] " : "[ ] ") + it.texto).join("\n");
+      texto = texto ? texto + "\n\n" + linhasChecklist : linhasChecklist;
+    }
+    let copiou = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(texto);
+        copiou = true;
+      }
+    } catch (e) {
+      copiou = false;
+    }
+    if (!copiou) {
+      try {
+        const temp = document.createElement("textarea");
+        temp.value = texto;
+        temp.style.position = "fixed";
+        temp.style.opacity = "0";
+        document.body.appendChild(temp);
+        temp.focus();
+        temp.select();
+        document.execCommand("copy");
+        document.body.removeChild(temp);
+        copiou = true;
+      } catch (e) {
+        copiou = false;
+      }
+    }
+    setNotaCopiada((p) => ({ ...p, [nota.id]: copiou ? "ok" : "erro" }));
+    setTimeout(() => setNotaCopiada((p) => ({ ...p, [nota.id]: null })), 1600);
   }
   function notasComLembrete() {
     const alvo = [];
@@ -5525,14 +6241,75 @@ function Sondagem() {
     );
     if (anexo && anexo.key) apagarArquivoDoR2Sondagem(anexo.key);
   }
+  function alternarChecklistDraft(ideaId) {
+    setChecklistDraftAberto((p) => ({ ...p, [ideaId]: !p[ideaId] }));
+  }
+  function adicionarItemChecklistDraft(ideaId) {
+    const texto = (checklistDraftInput[ideaId] || "").trim();
+    if (!texto) return;
+    const item = { id: "ck" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, feito: false };
+    setChecklistDraft((p) => ({ ...p, [ideaId]: [...p[ideaId] || [], item] }));
+    setChecklistDraftInput((p) => ({ ...p, [ideaId]: "" }));
+  }
+  function removerItemChecklistDraft(ideaId, itemId) {
+    setChecklistDraft((p) => ({ ...p, [ideaId]: (p[ideaId] || []).filter((it) => it.id !== itemId) }));
+  }
+  function toggleItemChecklistDraft(ideaId, itemId) {
+    setChecklistDraft((p) => ({
+      ...p,
+      [ideaId]: (p[ideaId] || []).map((it) => it.id === itemId ? { ...it, feito: !it.feito } : it)
+    }));
+  }
+  function toggleChecklistNota(notaId) {
+    setChecklistNotaAberto((p) => ({ ...p, [notaId]: !p[notaId] }));
+  }
+  function adicionarItemChecklist(ideaId, notaId) {
+    const texto = (checklistInput[notaId] || "").trim();
+    if (!texto) return;
+    const item = { id: "ck" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, feito: false };
+    setIdeas(
+      (p) => p.map(
+        (i) => i.id === ideaId ? { ...i, notas: (i.notas || []).map((n) => n.id === notaId ? { ...n, checklist: [...n.checklist || [], item] } : n) } : i
+      )
+    );
+    setChecklistInput((p) => ({ ...p, [notaId]: "" }));
+  }
+  function toggleItemChecklist(ideaId, notaId, itemId) {
+    setIdeas(
+      (p) => p.map(
+        (i) => i.id === ideaId ? {
+          ...i,
+          notas: (i.notas || []).map(
+            (n) => n.id === notaId ? { ...n, checklist: (n.checklist || []).map((it) => it.id === itemId ? { ...it, feito: !it.feito } : it) } : n
+          )
+        } : i
+      )
+    );
+  }
+  function removerItemChecklist(ideaId, notaId, itemId) {
+    setIdeas(
+      (p) => p.map(
+        (i) => i.id === ideaId ? {
+          ...i,
+          notas: (i.notas || []).map(
+            (n) => n.id === notaId ? { ...n, checklist: (n.checklist || []).filter((it) => it.id !== itemId) } : n
+          )
+        } : i
+      )
+    );
+  }
   function salvarNota(ideaId) {
     const texto = (notaDraft[ideaId] || "").trim();
-    if (!texto) return;
+    const checklist = checklistDraft[ideaId] || [];
+    if (!texto && checklist.length === 0) return;
     const anexos = notaAnexoDraft[ideaId] || [];
-    const nota = { id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, ts: Date.now(), anexos, lembrete: "", secao: "", votos: 0 };
+    const nota = { id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, ts: Date.now(), anexos, lembrete: "", secao: "", votos: 0, checklist, app: "off" };
     setIdeas((p) => p.map((i) => i.id === ideaId ? { ...i, notas: [nota, ...i.notas || []] } : i));
     setNotaDraft((p) => ({ ...p, [ideaId]: "" }));
     setNotaAnexoDraft((p) => ({ ...p, [ideaId]: [] }));
+    setChecklistDraft((p) => ({ ...p, [ideaId]: [] }));
+    setChecklistDraftInput((p) => ({ ...p, [ideaId]: "" }));
+    setChecklistDraftAberto((p) => ({ ...p, [ideaId]: false }));
     setNotasAbertas((p) => ({ ...p, [ideaId]: true }));
   }
   function abrirLinkPicker(ideaId, alvo, tipo) {
@@ -5638,25 +6415,59 @@ function Sondagem() {
   function toggleNotas(ideaId) {
     setNotasAbertas((p) => ({ ...p, [ideaId]: !p[ideaId] }));
   }
+  function alternarFiltroApp(ideaId, valor) {
+    setNotaFiltroApp((p) => ({ ...p, [ideaId]: p[ideaId] === valor ? "todas" : valor }));
+  }
+  function alternarFiltroVoto(ideaId) {
+    setNotaFiltroVoto((p) => ({ ...p, [ideaId]: !p[ideaId] }));
+  }
+  function limparFiltrosNotas(ideaId) {
+    setNotaFiltroApp((p) => ({ ...p, [ideaId]: "todas" }));
+    setNotaFiltroVoto((p) => ({ ...p, [ideaId]: false }));
+  }
+  function alternarFiltroProjetoApp(valor) {
+    setFiltroProjetoApp((p) => p === valor ? "todos" : valor);
+  }
+  function alternarFiltroProjetoVoto() {
+    setFiltroProjetoVoto((v) => !v);
+  }
   function iniciarEdicaoNota(ideaId, nota) {
     setNotaEditando((p) => ({ ...p, [ideaId]: nota.id }));
     setNotaEditDraft((p) => ({ ...p, [nota.id]: nota.texto }));
   }
-  function cancelarEdicaoNota(ideaId) {
-    setNotaEditando((p) => ({ ...p, [ideaId]: null }));
+  function editarTextoNota(ideaId, notaId, valor) {
+    setNotaEditDraft((p) => ({ ...p, [notaId]: valor }));
+    setNotaAutoSalvando((p) => ({ ...p, [notaId]: true }));
+    if (notaAutoSaveTimers.current[notaId]) clearTimeout(notaAutoSaveTimers.current[notaId]);
+    notaAutoSaveTimers.current[notaId] = setTimeout(() => {
+      commitarEdicaoNota(ideaId, notaId, valor);
+    }, 700);
   }
-  function salvarEdicaoNota(ideaId, notaId) {
-    const texto = (notaEditDraft[notaId] || "").trim();
-    if (!texto) return;
-    setIdeas(
-      (p) => p.map(
-        (i) => i.id === ideaId ? { ...i, notas: (i.notas || []).map((n) => n.id === notaId ? { ...n, texto, editedAt: Date.now() } : n) } : i
-      )
-    );
+  function commitarEdicaoNota(ideaId, notaId, valor) {
+    const texto = (valor || "").trim();
+    if (texto) {
+      setIdeas(
+        (p) => p.map(
+          (i) => i.id === ideaId ? { ...i, notas: (i.notas || []).map((n) => n.id === notaId ? { ...n, texto, editedAt: Date.now() } : n) } : i
+        )
+      );
+    }
+    setNotaAutoSalvando((p) => ({ ...p, [notaId]: false }));
+    notaAutoSaveTimers.current[notaId] = null;
+  }
+  function fecharEdicaoNota(ideaId, notaId) {
+    if (notaAutoSaveTimers.current[notaId]) {
+      clearTimeout(notaAutoSaveTimers.current[notaId]);
+      notaAutoSaveTimers.current[notaId] = null;
+      commitarEdicaoNota(ideaId, notaId, notaEditDraft[notaId]);
+    }
     setNotaEditando((p) => ({ ...p, [ideaId]: null }));
   }
   function updateActive(patch) {
     setIdeas((p) => p.map((i) => i.id === activeId ? { ...i, ...patch } : i));
+  }
+  function atualizarProjeto(ideaId, patch) {
+    setIdeas((p) => p.map((i) => i.id === ideaId ? { ...i, ...patch } : i));
   }
   function setField(fid, val) {
     if (!active) return;
@@ -5966,7 +6777,7 @@ function Sondagem() {
     const items = hx[h.key];
     return /* @__PURE__ */ React.createElement("div", { className: "sd-hxcell" }, /* @__PURE__ */ React.createElement("div", { className: "sd-serif", style: { fontSize: 15, fontWeight: 600, marginBottom: 2 } }, h.title), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11.5, color: T.muted, margin: "0 0 8px", lineHeight: 1.4 } }, h.sub), items.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: "#A2A79C", margin: 0 } }, "Adicione itens abaixo da matriz.") : /* @__PURE__ */ React.createElement("div", { style: { display: horizontal ? "flex" : "block", flexWrap: "wrap", gap: horizontal ? 6 : 0 } }, items.map((it, n) => /* @__PURE__ */ React.createElement("div", { key: it.id, style: { fontSize: 12.5, lineHeight: 1.4, marginBottom: horizontal ? 0 : 6, maxWidth: horizontal ? 150 : "none" } }, /* @__PURE__ */ React.createElement("span", { className: "sd-tag" }, h.code + (n + 1)), it.text))));
   }
-  return /* @__PURE__ */ React.createElement("div", { className: "sd" }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { className: "sd-wrap" }, /* @__PURE__ */ React.createElement("header", { style: { marginBottom: 26 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("h1", { className: "sd-serif", style: { fontSize: 30, fontWeight: 600, margin: "0 0 6px", letterSpacing: "-0.01em", flex: 1, minWidth: 0 } }, "Sondagem"), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { className: "sd" }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { className: "sd-wrap" }, /* @__PURE__ */ React.createElement("header", { style: { marginBottom: 26 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("h1", { className: "sd-serif", style: { fontSize: 30, fontWeight: 600, margin: "0 0 6px", letterSpacing: "-0.01em", flex: 1, minWidth: 0 } }, "Rosh Chanit"), /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-chip",
@@ -6173,7 +6984,7 @@ function Sondagem() {
   ), ideas.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra os projetos em lista, um abaixo do outro." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-chip",
+      className: "sd-seg",
       "data-on": viewMeusProjetos === "lista" ? "1" : "0",
       onClick: () => setViewMeusProjetos("lista")
     },
@@ -6181,7 +6992,7 @@ function Sondagem() {
   )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra os projetos em 3 colunas por status (Kanban). Mova entre colunas com \u25C0/\u25B6." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-chip",
+      className: "sd-seg",
       "data-on": viewMeusProjetos === "quadro" ? "1" : "0",
       onClick: () => setViewMeusProjetos("quadro")
     },
@@ -6189,7 +7000,7 @@ function Sondagem() {
   )), viewMeusProjetos === "lista" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra todos os projetos, sem filtrar por status." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-chip",
+      className: "sd-tag-status",
       "data-on": filtroStatus === "todos" ? "1" : "0",
       onClick: () => setFiltroStatus("todos")
     },
@@ -6197,12 +7008,74 @@ function Sondagem() {
   )), STATUS_OPTS.map((o) => /* @__PURE__ */ React.createElement(Tooltip, { key: o.id, texto: 'Mostra s\xF3 os projetos com status "' + o.label + '".' }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-chip",
+      className: "sd-tag-status",
       "data-on": filtroStatus === o.id ? "1" : "0",
       onClick: () => setFiltroStatus(o.id)
     },
     o.label
-  )))), /* @__PURE__ */ React.createElement(
+  ))), TIPO_OPTS.map((o) => /* @__PURE__ */ React.createElement(Tooltip, { key: o.id, texto: 'Mostra s\xF3 os projetos do tipo "' + o.label + '".' }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-tag-tipo",
+      "data-on": filtroTipo === o.id ? "1" : "0",
+      "aria-label": "Filtrar projetos por tipo: " + o.label,
+      onClick: () => setFiltroTipo((p) => p === o.id ? "todos" : o.id)
+    },
+    o.label
+  ))), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra s\xF3 projetos que t\xEAm pelo menos uma nota com o interruptor App verde." }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-tag-cor",
+      "data-on": filtroProjetoApp === "on" ? "1" : "0",
+      style: filtroProjetoApp === "on" ? { background: "#CFE8D3", borderColor: "#2E7D46", borderStyle: "solid", color: "#1D5C34", fontWeight: 700 } : void 0,
+      "aria-label": "Filtrar projetos: pelo menos uma nota verde",
+      onClick: () => alternarFiltroProjetoApp("on")
+    },
+    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#2E7D46", display: "inline-block", flexShrink: 0 } }),
+    "Verde"
+  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra s\xF3 projetos que t\xEAm pelo menos uma nota com o interruptor App amarelo (intermedi\xE1rio)." }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-tag-cor",
+      "data-on": filtroProjetoApp === "meio" ? "1" : "0",
+      style: filtroProjetoApp === "meio" ? { background: "#F3E6BE", borderColor: "#C9971E", borderStyle: "solid", color: "#8A6D1A", fontWeight: 700 } : void 0,
+      "aria-label": "Filtrar projetos: pelo menos uma nota amarela",
+      onClick: () => alternarFiltroProjetoApp("meio")
+    },
+    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#C9971E", display: "inline-block", flexShrink: 0 } }),
+    "Amarela"
+  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra s\xF3 projetos que t\xEAm pelo menos uma nota com o interruptor App cinza (desligado)." }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-tag-cor",
+      "data-on": filtroProjetoApp === "off" ? "1" : "0",
+      style: filtroProjetoApp === "off" ? { background: "#E4E1D6", borderColor: "#8F8A7C", borderStyle: "solid", color: "#5B5646", fontWeight: 700 } : void 0,
+      "aria-label": "Filtrar projetos: pelo menos uma nota cinza",
+      onClick: () => alternarFiltroProjetoApp("off")
+    },
+    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#B9B4A5", display: "inline-block", flexShrink: 0 } }),
+    "Cinza"
+  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra s\xF3 projetos que t\xEAm pelo menos uma nota com voto (dot voting)." }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-tag-voto",
+      "data-on": filtroProjetoVoto ? "1" : "0",
+      "aria-label": "Filtrar projetos: pelo menos uma nota com voto",
+      onClick: alternarFiltroProjetoVoto
+    },
+    "\u{1F535} Com voto"
+  )), (filtroTipo !== "todos" || filtroProjetoApp !== "todos" || filtroProjetoVoto) && /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-limpar",
+      onClick: () => {
+        setFiltroTipo("todos");
+        setFiltroProjetoApp("todos");
+        setFiltroProjetoVoto(false);
+      }
+    },
+    "\u2715 Limpar filtro"
+  )), /* @__PURE__ */ React.createElement(
     "select",
     {
       className: "sd-inp",
@@ -6248,7 +7121,7 @@ function Sondagem() {
         {
           className: "sd-btn",
           style: { flex: 1, textAlign: "center", fontSize: 12.5, padding: "5px 0" },
-          onClick: () => abrirProjeto(i.id)
+          onClick: () => selecionarProjetoNaLista(i.id)
         },
         "Abrir"
       ), /* @__PURE__ */ React.createElement(
@@ -6276,8 +7149,16 @@ function Sondagem() {
     const confirmando = confirmDelete === i.id;
     const metodosLinkados = metodosLinkadosDoProjeto(i);
     const notasDoProjeto = i.notas || [];
+    const filtroAppAtivo = notaFiltroApp[i.id] || "todas";
+    const filtroVotoAtivo = !!notaFiltroVoto[i.id];
+    const notasFiltradas = notasDoProjeto.filter((n) => {
+      if (filtroAppAtivo !== "todas" && (n.app || "off") !== filtroAppAtivo) return false;
+      if (filtroVotoAtivo && !((n.votos || 0) > 0)) return false;
+      return true;
+    });
+    const filtroNotasAtivo = filtroAppAtivo !== "todas" || filtroVotoAtivo;
     const gruposSecao = {};
-    notasDoProjeto.forEach((n) => {
+    notasFiltradas.forEach((n) => {
       const s = (n.secao || "").trim() || "Sem se\xE7\xE3o";
       if (!gruposSecao[s]) gruposSecao[s] = [];
       gruposSecao[s].push(n);
@@ -6349,6 +7230,17 @@ function Sondagem() {
           "aria-label": "Prioridade \u2014 " + (i.title || "projeto")
         },
         PRIORIDADE_OPTS.map((o) => /* @__PURE__ */ React.createElement("option", { key: o.id, value: o.id }, o.label))
+      )), /* @__PURE__ */ React.createElement("label", { style: { fontSize: 11.5, color: T.muted, display: "flex", alignItems: "center", gap: 4 } }, "Tipo", /* @__PURE__ */ React.createElement(
+        "select",
+        {
+          className: "sd-inp",
+          style: { width: "auto", fontSize: 12, padding: "3px 6px" },
+          value: i.tipo || "",
+          onChange: (e) => mudarTipo(i.id, e.target.value),
+          "aria-label": "Tipo \u2014 " + (i.title || "projeto")
+        },
+        /* @__PURE__ */ React.createElement("option", { value: "" }, "Sem tipo"),
+        TIPO_OPTS.map((o) => /* @__PURE__ */ React.createElement("option", { key: o.id, value: o.id }, o.label))
       )), /* @__PURE__ */ React.createElement("label", { style: { fontSize: 11.5, color: T.muted, display: "flex", alignItems: "center", gap: 4 } }, "\u{1F4C1} Pasta", /* @__PURE__ */ React.createElement(
         "input",
         {
@@ -6387,7 +7279,21 @@ function Sondagem() {
         },
         m.nome
       ))),
-      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Abre este projeto pra continuar trabalhando nele (Camadas)." }, /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: () => abrirProjeto(i.id) }, "Abrir")), confirmando ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#8A3A2C", alignSelf: "center" } }, "Excluir de vez?"), /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Abre este projeto pra continuar trabalhando nele (Camadas)." }, /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: () => abrirProjeto(i.id) }, "Abrir")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra um mapa visual de como as notas e os m\xE9todos deste projeto se conectam." }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "sd-chip",
+          onClick: () => setGrafoAberto((p) => ({ ...p, [i.id]: !p[i.id] }))
+        },
+        "\u{1F578} Mapa"
+      )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Um quadro totalmente livre deste projeto: cards de nota, imagem, link, checklist, tarefa e board soltos numa tela que voc\xEA arrasta e liga com setas." }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          className: "sd-chip",
+          onClick: () => setQuadroAberto((p) => ({ ...p, [i.id]: !p[i.id] }))
+        },
+        "\u{1F5FA} Quadro"
+      )), confirmando ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: "#8A3A2C", alignSelf: "center" } }, "Excluir de vez?"), /* @__PURE__ */ React.createElement(
         "button",
         {
           className: "sd-btn",
@@ -6414,6 +7320,15 @@ function Sondagem() {
         },
         "Excluir"
       ))),
+      grafoAberto[i.id] && /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 14, marginTop: 8 } }, /* @__PURE__ */ React.createElement(
+        GrafoProjeto,
+        {
+          idea: i,
+          onClickNota: (notaId) => irParaNota(i.id, notaId),
+          onClickMetodo: (mid) => irParaMetodoLink(mid)
+        }
+      ), (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: T.muted, textAlign: "center", marginTop: 6 } }, "Linha pontilhada = nota linkando nota. Linha s\xF3lida = nota linkando m\xE9todo.")),
+      quadroAberto[i.id] && /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 14, marginTop: 8 } }, /* @__PURE__ */ React.createElement(QuadroLivre, { idea: i, onChange: (novoQuadro) => atualizarProjeto(i.id, { quadro: novoQuadro }) })),
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement("label", { className: "sd-chip", style: { cursor: "pointer" }, title: "Tirar foto" }, "\u{1F4F7}", /* @__PURE__ */ React.createElement(
         "input",
         {
@@ -6533,11 +7448,11 @@ function Sondagem() {
             e.target.value = "";
           }
         }
-      ))), notaAnexoEnviando[i.id] && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: T.muted } }, "salvando\u2026"), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Cole um link (URL) como anexo da nota, sem precisar fazer upload." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => abrirLinkRef(i.id, "draft") }, "\u{1F517} Refer\xEAncia externa")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Busca e insere um link pra outra nota, de qualquer projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => abrirLinkPicker(i.id, "draft", "nota") }, "\u{1F517} Linkar nota")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Busca e insere um link direto pra um dos 172 m\xE9todos." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => abrirLinkPicker(i.id, "draft", "metodo") }, "\u{1F517} Linkar m\xE9todo")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Salva a nota que voc\xEA escreveu." }, /* @__PURE__ */ React.createElement(
+      ))), notaAnexoEnviando[i.id] && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: T.muted } }, "salvando\u2026"), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Cole um link (URL) como anexo da nota, sem precisar fazer upload." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => abrirLinkRef(i.id, "draft") }, "\u{1F517} Refer\xEAncia externa")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Busca e insere um link pra outra nota, de qualquer projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => abrirLinkPicker(i.id, "draft", "nota") }, "\u{1F517} Linkar nota")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Busca e insere um link direto pra um dos 172 m\xE9todos." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => abrirLinkPicker(i.id, "draft", "metodo") }, "\u{1F517} Linkar m\xE9todo")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Acrescenta uma lista de itens marc\xE1veis dentro desta nota." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => alternarChecklistDraft(i.id) }, "\u2611 Checklist")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Salva a nota que voc\xEA escreveu." }, /* @__PURE__ */ React.createElement(
         "button",
         {
           className: "sd-chip",
-          disabled: !(notaDraft[i.id] || "").trim(),
+          disabled: !(notaDraft[i.id] || "").trim() && (checklistDraft[i.id] || []).length === 0,
           onClick: () => salvarNota(i.id)
         },
         "\u{1F4BE} Salvar nota"
@@ -6596,7 +7511,84 @@ function Sondagem() {
             marginBottom: 6
           }
         }
-      ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", disabled: !linkRefUrl.trim(), onClick: salvarLinkRef }, "Salvar refer\xEAncia"), /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: fecharLinkRef }, "Cancelar"))), notaAnexoErro[i.id] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: "#8A3A2C", marginTop: 6 } }, notaAnexoErro[i.id]), (notaAnexoDraft[i.id] || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 } }, notaAnexoDraft[i.id].map((a) => /* @__PURE__ */ React.createElement(AnexoMini, { key: a.id, anexo: a, onRemove: () => removerAnexoNotaDraft(i.id, a.id) }))), notasAbertas[i.id] && (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 8 } }, nomesSecoes.map((nomeSecao) => /* @__PURE__ */ React.createElement("div", { key: nomeSecao }, usaSecoes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: T.muted, margin: "8px 0 4px" } }, "\u{1F4E6} ", nomeSecao, " (", gruposSecao[nomeSecao].length, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, gruposSecao[nomeSecao].map((n) => {
+      ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", disabled: !linkRefUrl.trim(), onClick: salvarLinkRef }, "Salvar refer\xEAncia"), /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: fecharLinkRef }, "Cancelar"))), notaAnexoErro[i.id] && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: "#8A3A2C", marginTop: 6 } }, notaAnexoErro[i.id]), (notaAnexoDraft[i.id] || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 } }, notaAnexoDraft[i.id].map((a) => /* @__PURE__ */ React.createElement(AnexoMini, { key: a.id, anexo: a, onRemove: () => removerAnexoNotaDraft(i.id, a.id) }))), (checklistDraftAberto[i.id] || (checklistDraft[i.id] || []).length > 0) && /* @__PURE__ */ React.createElement("div", { style: { border: "1px dashed " + T.line, borderRadius: 6, padding: "6px 8px", marginTop: 8 } }, /* @__PURE__ */ React.createElement(
+        Checklist,
+        {
+          itens: checklistDraft[i.id] || [],
+          valorInput: checklistDraftInput[i.id] || "",
+          onInputChange: (v) => setChecklistDraftInput((p) => ({ ...p, [i.id]: v })),
+          onAdicionar: () => adicionarItemChecklistDraft(i.id),
+          onToggle: (itemId) => toggleItemChecklistDraft(i.id, itemId),
+          onRemover: (itemId) => removerItemChecklistDraft(i.id, itemId)
+        }
+      )), notasAbertas[i.id] && (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 8 } }, /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: {
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            alignItems: "center",
+            padding: "6px 8px",
+            border: "1px dashed " + T.line,
+            borderRadius: 6
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: T.muted, marginRight: 2 } }, "Filtrar:"),
+        /* @__PURE__ */ React.createElement(Tooltip, { texto: "S\xF3 notas marcadas com o interruptor App verde." }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "sd-tag-cor",
+            "data-on": filtroAppAtivo === "on" ? "1" : "0",
+            style: {
+              fontSize: 11,
+              ...filtroAppAtivo === "on" ? { background: "#CFE8D3", borderColor: "#2E7D46", borderStyle: "solid", color: "#1D5C34", fontWeight: 700 } : {}
+            },
+            onClick: () => alternarFiltroApp(i.id, "on")
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { width: 7, height: 7, borderRadius: "50%", background: "#2E7D46", display: "inline-block", flexShrink: 0 } }),
+          "Verde"
+        )),
+        /* @__PURE__ */ React.createElement(Tooltip, { texto: "S\xF3 notas marcadas com o interruptor App amarelo (intermedi\xE1rio)." }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "sd-tag-cor",
+            "data-on": filtroAppAtivo === "meio" ? "1" : "0",
+            style: {
+              fontSize: 11,
+              ...filtroAppAtivo === "meio" ? { background: "#F3E6BE", borderColor: "#C9971E", borderStyle: "solid", color: "#8A6D1A", fontWeight: 700 } : {}
+            },
+            onClick: () => alternarFiltroApp(i.id, "meio")
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { width: 7, height: 7, borderRadius: "50%", background: "#C9971E", display: "inline-block", flexShrink: 0 } }),
+          "Amarela"
+        )),
+        /* @__PURE__ */ React.createElement(Tooltip, { texto: "S\xF3 notas com o interruptor App desligado (cinza)." }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "sd-tag-cor",
+            "data-on": filtroAppAtivo === "off" ? "1" : "0",
+            style: {
+              fontSize: 11,
+              ...filtroAppAtivo === "off" ? { background: "#E4E1D6", borderColor: "#8F8A7C", borderStyle: "solid", color: "#5B5646", fontWeight: 700 } : {}
+            },
+            onClick: () => alternarFiltroApp(i.id, "off")
+          },
+          /* @__PURE__ */ React.createElement("span", { style: { width: 7, height: 7, borderRadius: "50%", background: "#B9B4A5", display: "inline-block", flexShrink: 0 } }),
+          "Cinza"
+        )),
+        /* @__PURE__ */ React.createElement(Tooltip, { texto: "S\xF3 notas que j\xE1 receberam pelo menos 1 voto (dot voting)." }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "sd-tag-voto",
+            "data-on": filtroVotoAtivo ? "1" : "0",
+            style: { fontSize: 11 },
+            onClick: () => alternarFiltroVoto(i.id)
+          },
+          "\u{1F535} Com voto"
+        )),
+        filtroNotasAtivo && /* @__PURE__ */ React.createElement("button", { className: "sd-limpar", style: { fontSize: 11 }, onClick: () => limparFiltrosNotas(i.id) }, "\u2715 Limpar filtro")
+      ), filtroNotasAtivo && notasFiltradas.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12.5, color: T.muted, padding: "4px 2px" } }, "Nenhuma nota com esse filtro.") : nomesSecoes.map((nomeSecao) => /* @__PURE__ */ React.createElement("div", { key: nomeSecao }, usaSecoes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: T.muted, margin: "8px 0 4px" } }, "\u{1F4E6} ", nomeSecao, " (", gruposSecao[nomeSecao].length, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, gruposSecao[nomeSecao].map((n) => {
         const editando = notaEditando[i.id] === n.id;
         const backlinks = backlinksDaNota(n.id);
         return /* @__PURE__ */ React.createElement(
@@ -6614,6 +7606,15 @@ function Sondagem() {
               transition: "outline-color 200ms ease"
             }
           },
+          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 6 } }, n.app === "on" && /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              className: "sd-chip",
+              style: { fontSize: 11, padding: "2px 8px" },
+              onClick: () => copiarTextoNota(n)
+            },
+            notaCopiada[n.id] === "ok" ? "\u2713 Copiado" : notaCopiada[n.id] === "erro" ? "N\xE3o deu pra copiar" : "\u{1F4CB} Copiar"
+          ), /* @__PURE__ */ React.createElement(InterruptorApp, { estado: n.app || "off", onToggle: () => toggleAppNota(i.id, n.id) })),
           editando ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
             "textarea",
             {
@@ -6622,11 +7623,11 @@ function Sondagem() {
                 notaEditRefs.current[n.id] = el;
               },
               value: notaEditDraft[n.id] || "",
-              onChange: (e) => setNotaEditDraft((p) => ({ ...p, [n.id]: e.target.value })),
+              onChange: (e) => editarTextoNota(i.id, n.id, e.target.value),
               rows: 2,
               style: { width: "100%", resize: "vertical", fontFamily: "inherit", fontSize: 13.5 }
             }
-          ), /\[\[(nota|metodo):/.test(notaEditDraft[n.id] || "") && /* @__PURE__ */ React.createElement(
+          ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10.5, color: T.muted, marginTop: 3 } }, notaAutoSalvando[n.id] ? "salvando\u2026" : "salvo automaticamente"), /\[\[(nota|metodo):/.test(notaEditDraft[n.id] || "") && /* @__PURE__ */ React.createElement(
             "div",
             {
               style: {
@@ -6751,15 +7752,45 @@ function Sondagem() {
               anexo: a,
               onRemove: () => removerAnexoNotaExistente(i.id, n.id, a.id)
             }
-          ))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => cancelarEdicaoNota(i.id) }, "Cancelar"), /* @__PURE__ */ React.createElement(
+          ))), /* @__PURE__ */ React.createElement("div", { style: { border: "1px dashed " + T.line, borderRadius: 6, padding: "6px 8px", marginTop: 6 } }, /* @__PURE__ */ React.createElement(
+            Checklist,
+            {
+              itens: n.checklist || [],
+              valorInput: checklistInput[n.id] || "",
+              onInputChange: (v) => setChecklistInput((p) => ({ ...p, [n.id]: v })),
+              onAdicionar: () => adicionarItemChecklist(i.id, n.id),
+              onToggle: (itemId) => toggleItemChecklist(i.id, n.id, itemId),
+              onRemover: (itemId) => removerItemChecklist(i.id, n.id, itemId)
+            }
+          )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 6, justifyContent: "flex-end" } }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => fecharEdicaoNota(i.id, n.id) }, "\u2713 Conclu\xEDdo"))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, color: T.ink, lineHeight: 1.5, whiteSpace: "pre-wrap" } }, montarPartesNota(n.texto, ideas, irParaNota, irParaMetodoLink, abrirBuscaTag)), (n.anexos || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 } }, n.anexos.map((a) => /* @__PURE__ */ React.createElement(AnexoMini, { key: a.id, anexo: a }))), (n.checklist || []).length > 0 && /* @__PURE__ */ React.createElement(
+            Checklist,
+            {
+              itens: n.checklist,
+              valorInput: checklistInput[n.id] || "",
+              onInputChange: (v) => setChecklistInput((p) => ({ ...p, [n.id]: v })),
+              onAdicionar: () => adicionarItemChecklist(i.id, n.id),
+              onToggle: (itemId) => toggleItemChecklist(i.id, n.id, itemId),
+              onRemover: (itemId) => removerItemChecklist(i.id, n.id, itemId)
+            }
+          ), (n.checklist || []).length === 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Acrescenta uma lista de itens marc\xE1veis dentro desta nota." }, /* @__PURE__ */ React.createElement(
             "button",
             {
               className: "sd-chip",
-              disabled: !(notaEditDraft[n.id] || "").trim(),
-              onClick: () => salvarEdicaoNota(i.id, n.id)
+              style: { fontSize: 11, padding: "2px 8px", marginTop: 6 },
+              onClick: () => toggleChecklistNota(n.id)
             },
-            "\u{1F4BE} Salvar"
-          ))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, color: T.ink, lineHeight: 1.5, whiteSpace: "pre-wrap" } }, montarPartesNota(n.texto, ideas, irParaNota, irParaMetodoLink, abrirBuscaTag)), (n.anexos || []).length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 } }, n.anexos.map((a) => /* @__PURE__ */ React.createElement(AnexoMini, { key: a.id, anexo: a }))), backlinks.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.muted, marginTop: 6 } }, "\u{1F519} Referenciada por:", " ", backlinks.map((b, idx) => /* @__PURE__ */ React.createElement("span", { key: b.nota.id }, idx > 0 && ", ", /* @__PURE__ */ React.createElement(
+            "\u2611 Checklist"
+          )), (n.checklist || []).length === 0 && checklistNotaAberto[n.id] && /* @__PURE__ */ React.createElement("div", { style: { border: "1px dashed " + T.line, borderRadius: 6, padding: "6px 8px", marginTop: 6 } }, /* @__PURE__ */ React.createElement(
+            Checklist,
+            {
+              itens: [],
+              valorInput: checklistInput[n.id] || "",
+              onInputChange: (v) => setChecklistInput((p) => ({ ...p, [n.id]: v })),
+              onAdicionar: () => adicionarItemChecklist(i.id, n.id),
+              onToggle: (itemId) => toggleItemChecklist(i.id, n.id, itemId),
+              onRemover: (itemId) => removerItemChecklist(i.id, n.id, itemId)
+            }
+          )), backlinks.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: T.muted, marginTop: 6 } }, "\u{1F519} Referenciada por:", " ", backlinks.map((b, idx) => /* @__PURE__ */ React.createElement("span", { key: b.nota.id }, idx > 0 && ", ", /* @__PURE__ */ React.createElement(
             "button",
             {
               onClick: () => irParaNota(b.ideaId, b.nota.id),
@@ -6898,7 +7929,14 @@ function Sondagem() {
       onClickNota: (notaId) => irParaNota(active.id, notaId),
       onClickMetodo: (mid) => irParaMetodoLink(mid)
     }
-  ), (active.notas || []).length > 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: T.muted, textAlign: "center", marginTop: 6 } }, "Linha pontilhada = nota linkando nota. Linha s\xF3lida = nota linkando m\xE9todo."))), view === "camadas" && /* @__PURE__ */ React.createElement("section", null, LAYERS.map((l, idx) => {
+  ), (active.notas || []).length > 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: T.muted, textAlign: "center", marginTop: 6 } }, "Linha pontilhada = nota linkando nota. Linha s\xF3lida = nota linkando m\xE9todo."))), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 20 } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Um quadro totalmente livre deste projeto: cards de nota, imagem, link, checklist, tarefa e board (que pode conter outro board dentro), soltos numa tela que voc\xEA arrasta e liga com setas." }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-chip",
+      onClick: () => setQuadroAberto((p) => ({ ...p, [active.id]: !p[active.id] }))
+    },
+    "\u{1F5FA} Quadro livre"
+  )), quadroAberto[active.id] && /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 14, marginTop: 8 } }, /* @__PURE__ */ React.createElement(QuadroLivre, { idea: active, onChange: (novoQuadro) => updateActive({ quadro: novoQuadro }) }))), view === "camadas" && /* @__PURE__ */ React.createElement("section", null, LAYERS.map((l, idx) => {
     const done = filledCount(active, l);
     const pct = Math.round(done / l.fields.length * 100);
     const open = !!openLayers[l.id];
@@ -7524,7 +8562,7 @@ function Sondagem() {
   )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: copySummary }, copied ? "Copiado" : "Copiar resumo"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: T.muted } }, status)))) : /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, padding: "24px 4px" } }, 'Nenhum projeto aberto. Abra ou crie um em "Meus projetos".')))));
 }
 
-window.__SONDAGEM_VERSAO__ = "1.9.0";
+window.__SONDAGEM_VERSAO__ = "1.18.0";
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Sondagem, null));
 
   var __carr = document.getElementById('carregando');
