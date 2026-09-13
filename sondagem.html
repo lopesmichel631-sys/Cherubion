@@ -88,7 +88,10 @@
 <script>
 "use strict";
 const { useState, useEffect, useRef, useCallback } = React;
+const SONDAGEM_VERSAO = "1.28.0";
 const STORE_KEY = "sondagem:v1";
+const MISSAO_KEY = "sondagem:missao";
+const TOKENMAX_KEY = "sondagem:tokenmax";
 const R2_URL_KEY = "cherubion:r2workerurl";
 const R2_TOKEN_KEY = "cherubion:r2token";
 const R2_PASTA_SONDAGEM = "metodologias";
@@ -803,8 +806,8 @@ const css = `
 .sd-btn:hover { border-color: ${T.action}; color: ${T.action}; }
 .sd-btn-p { background: ${T.action}; border-color: ${T.action}; color: #FFFDF7; }
 .sd-btn-p:hover { background: #8E6417; border-color: #8E6417; color: #FFFDF7; }
-.sd-btn-feito { font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; border-radius: 4px; padding: 5px 13px; border: 1px solid ${T.action}; background: ${T.action}; color: #FFFDF7; white-space: nowrap; transition: background 150ms ease, border-color 150ms ease; }
-.sd-btn-feito:hover { background: #8E6417; border-color: #8E6417; }
+.sd-btn-feito { font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; border-radius: 4px; padding: 5px 13px; border: 1px solid #C9971E; background: #C9971E; color: #FFFDF7; white-space: nowrap; transition: background 150ms ease, border-color 150ms ease; }
+.sd-btn-feito:hover { background: #A97D18; border-color: #A97D18; }
 .sd-btn-feito[data-pressionado="1"] { background: #2E7D46; border-color: #2E7D46; }
 .sd-chip { font-size: 13px; padding: 6px 11px; border-radius: 3px; border: 1px solid ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
 .sd-chip[data-on="1"] { background: ${T.ink}; border-color: ${T.ink}; color: #F2F3EF; }
@@ -883,7 +886,9 @@ function emptyIdea(title) {
     tipo: "",
     metodosSugeridos: [],
     pasta: "",
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    destacadoEm: 0,
+    notaAtividadeEm: 0
   };
 }
 function quadroVazio() {
@@ -943,6 +948,14 @@ const QUADRO_TIPOS = [
 function quadroInfoTipo(tipo) {
   return QUADRO_TIPOS.find((t) => t.tipo === tipo) || QUADRO_TIPOS[0];
 }
+const QUADRO_CORES = [
+  { id: "amarelo", cor: "#F6E9A0" },
+  { id: "verde", cor: "#CFE8D3" },
+  { id: "azul", cor: "#D6E4F3" },
+  { id: "rosa", cor: "#F3D9E6" },
+  { id: "laranja", cor: "#F3DAB8" },
+  { id: "roxo", cor: "#E1D9F0" }
+];
 function Row({ rowId, label, hint, value, open, onToggle, onChange, tint, indent }) {
   const preview = (value || "").trim();
   return /* @__PURE__ */ React.createElement("div", { className: "sd-sep", style: { paddingLeft: indent || 0 } }, /* @__PURE__ */ React.createElement("button", { className: "sd-row", onClick: () => onToggle(rowId), "aria-expanded": open }, /* @__PURE__ */ React.createElement(
@@ -1248,7 +1261,7 @@ function Checklist({ itens, valorInput, onInputChange, onAdicionar, onToggle, on
     }
   ), /* @__PURE__ */ React.createElement("button", { className: "sd-chip", style: { fontSize: 11, flexShrink: 0 }, onClick: onAdicionar }, "+ item")));
 }
-function QuadroLivre({ idea, onChange }) {
+function QuadroLivre({ idea, onChange, onExcluir }) {
   const [caminho, setCaminho] = useState([]);
   const [arrastando, setArrastando] = useState(null);
   const [modoConectar, setModoConectar] = useState(false);
@@ -1269,7 +1282,7 @@ function QuadroLivre({ idea, onChange }) {
     const linha = Math.floor(blocos.length / 4);
     const x = 20 + coluna * 210;
     const y = 20 + linha * 190;
-    const novo = { id, tipo, x, y, titulo: "", texto: "", feito: false, url: "", key: "", checklist: [] };
+    const novo = { id, tipo, x, y, titulo: "", texto: "", feito: false, url: "", key: "", checklist: [], cor: "" };
     if (tipo === "board") novo.quadro = quadroVazio();
     mudarNivel((n) => ({ ...n, blocos: [...n.blocos || [], novo] }));
   }
@@ -1280,6 +1293,11 @@ function QuadroLivre({ idea, onChange }) {
     mudarNivel((n) => ({ ...n, blocos: (n.blocos || []).map((b) => b.id === blocoId ? { ...b, ...patch } : b) }));
   }
   function removerBloco(bloco) {
+    if (onExcluir) {
+      onExcluir(
+        'Card "' + quadroInfoTipo(bloco.tipo).rotulo + '" do quadro apagado' + (bloco.tipo === "imagem" && bloco.key ? " (imagem n\xE3o volta)" : "")
+      );
+    }
     mudarNivel((n) => ({
       ...n,
       blocos: (n.blocos || []).filter((b) => b.id !== bloco.id),
@@ -1313,6 +1331,7 @@ function QuadroLivre({ idea, onChange }) {
     setOrigemConexao(null);
   }
   function removerSeta(setaId) {
+    if (onExcluir) onExcluir("Seta do quadro apagada");
     mudarNivel((n) => ({ ...n, setas: (n.setas || []).filter((s) => s.id !== setaId) }));
   }
   function iniciarArrasto(e, bloco) {
@@ -1375,6 +1394,7 @@ function QuadroLivre({ idea, onChange }) {
     }));
   }
   function removerItemChecklistBloco(blocoId, itemId) {
+    if (onExcluir) onExcluir("Item do checklist do quadro apagado");
     mudarNivel((n) => ({
       ...n,
       blocos: (n.blocos || []).map(
@@ -1501,7 +1521,7 @@ function QuadroLivre({ idea, onChange }) {
             width: QUADRO_LARGURA_CARD,
             border: "1px solid " + T.line,
             borderRadius: 8,
-            background: T.surface,
+            background: b.cor || T.surface,
             boxShadow: "0 1px 3px rgba(0,0,0,0.08)"
           }
         },
@@ -1523,7 +1543,7 @@ function QuadroLivre({ idea, onChange }) {
               alignItems: "center",
               justifyContent: "space-between",
               padding: "4px 6px",
-              background: info.corFundo,
+              background: b.cor || info.corFundo,
               borderRadius: "7px 7px 0 0",
               cursor: modoConectar ? "pointer" : "grab",
               touchAction: "none",
@@ -1551,7 +1571,46 @@ function QuadroLivre({ idea, onChange }) {
             "\u2715"
           ))
         ),
-        /* @__PURE__ */ React.createElement("div", { style: { padding: 8 } }, b.tipo === "nota" && /* @__PURE__ */ React.createElement(
+        /* @__PURE__ */ React.createElement("div", { style: { padding: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 7, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: T.muted, marginRight: 1 } }, "Cor:"), /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: () => atualizarBloco(b.id, { cor: "" }),
+            "aria-label": "Cor padr\xE3o do tipo",
+            title: "Cor padr\xE3o do tipo",
+            style: {
+              width: 16,
+              height: 16,
+              boxSizing: "border-box",
+              borderRadius: "50%",
+              padding: 0,
+              cursor: "pointer",
+              appearance: "none",
+              WebkitAppearance: "none",
+              background: info.corFundo,
+              border: !b.cor ? "2px solid " + T.action : "1px solid rgba(0,0,0,0.28)"
+            }
+          }
+        ), QUADRO_CORES.map((c) => /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            key: c.id,
+            onClick: () => atualizarBloco(b.id, { cor: c.cor }),
+            "aria-label": "Pintar card de " + c.id,
+            title: c.id,
+            style: {
+              width: 16,
+              height: 16,
+              boxSizing: "border-box",
+              borderRadius: "50%",
+              padding: 0,
+              cursor: "pointer",
+              appearance: "none",
+              WebkitAppearance: "none",
+              background: c.cor,
+              border: b.cor === c.cor ? "2px solid " + T.action : "1px solid rgba(0,0,0,0.28)"
+            }
+          }
+        ))), b.tipo === "nota" && /* @__PURE__ */ React.createElement(
           "textarea",
           {
             className: "sd-ta",
@@ -5570,17 +5629,42 @@ const TIPO_OPTS = [
   { id: "produto", label: "Produto" },
   { id: "servico", label: "Servi\xE7o" }
 ];
+function agruparLogPorDia(log) {
+  const mapa = {};
+  (log || []).forEach((ts) => {
+    const d = new Date(ts);
+    const chave = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    if (!mapa[chave]) mapa[chave] = { chave, label: d.toLocaleDateString("pt-BR"), qtd: 0 };
+    mapa[chave].qtd++;
+  });
+  return Object.values(mapa).sort((a, b) => b.chave.localeCompare(a.chave));
+}
+function agruparLogPorSemana(log) {
+  const mapa = {};
+  (log || []).forEach((ts) => {
+    const inicio = new Date(ts);
+    inicio.setHours(0, 0, 0, 0);
+    inicio.setDate(inicio.getDate() - inicio.getDay());
+    const chave = inicio.getFullYear() + "-" + String(inicio.getMonth() + 1).padStart(2, "0") + "-" + String(inicio.getDate()).padStart(2, "0");
+    if (!mapa[chave]) mapa[chave] = { chave, label: "Semana de " + inicio.toLocaleDateString("pt-BR"), qtd: 0 };
+    mapa[chave].qtd++;
+  });
+  return Object.values(mapa).sort((a, b) => b.chave.localeCompare(a.chave));
+}
 function compararIdeias(a, b, ordenacao) {
+  var _a, _b;
   if (ordenacao === "prioridade") {
-    const pa = ORDEM_PRIORIDADE[a.prioridade || "media"] ?? 1;
-    const pb = ORDEM_PRIORIDADE[b.prioridade || "media"] ?? 1;
+    const pa = (_a = ORDEM_PRIORIDADE[a.prioridade || "media"]) != null ? _a : 1;
+    const pb = (_b = ORDEM_PRIORIDADE[b.prioridade || "media"]) != null ? _b : 1;
     if (pa !== pb) return pa - pb;
     return (b.createdAt || 0) - (a.createdAt || 0);
   }
   if (ordenacao === "nome") {
     return (a.title || "").localeCompare(b.title || "", "pt-BR");
   }
-  return (b.createdAt || 0) - (a.createdAt || 0);
+  const da = Math.max(a.destacadoEm || 0, a.notaAtividadeEm || 0, a.createdAt || 0);
+  const db = Math.max(b.destacadoEm || 0, b.notaAtividadeEm || 0, b.createdAt || 0);
+  return db - da;
 }
 function statusLembrete(dataStr) {
   if (!dataStr) return null;
@@ -5712,7 +5796,7 @@ const COMO_USAR = [
       },
       {
         titulo: "Quadro livre",
-        texto: 'Toque em "\u{1F5FA} Quadro" (direto no card do projeto em "Meus projetos", ao lado de "Abrir" \u2014 ou em "\u{1F5FA} Quadro livre", dentro de Camadas/M\xE9todos) pra abrir um quadro totalmente solto: uma tela rol\xE1vel onde voc\xEA arrasta e solta cards de 6 tipos (\u{1F4DD} Nota, \u{1F5BC} Imagem, \u{1F517} Link, \u2611 Checklist, \u2705 Tarefa e \u{1F5C2} Board), em qualquer posi\xE7\xE3o. Cada card \xE9 dono do pr\xF3prio conte\xFAdo \u2014 n\xE3o \xE9 espelho de uma nota da aba "Meus projetos". Toque em "\u279C Conectar com seta" e depois em dois cards, em sequ\xEAncia, pra ligar um ao outro; toque no "\u2715" no meio da seta pra desfazer. Um card do tipo \u{1F5C2} Board pode conter seu pr\xF3prio quadro dentro \u2014 toque em "Abrir \u25B8" nele pra entrar, e use as migalhas de p\xE3o acima do quadro pra voltar aos n\xEDveis anteriores (sem limite de quantos boards cabem um dentro do outro).'
+        texto: 'Toque em "\u{1F5FA} Quadro" (direto no card do projeto em "Meus projetos", ao lado de "Abrir" \u2014 ou em "\u{1F5FA} Quadro livre", dentro de Camadas/M\xE9todos) pra abrir um quadro totalmente solto: uma tela rol\xE1vel onde voc\xEA arrasta e solta cards de 6 tipos (\u{1F4DD} Nota, \u{1F5BC} Imagem, \u{1F517} Link, \u2611 Checklist, \u2705 Tarefa e \u{1F5C2} Board), em qualquer posi\xE7\xE3o. Cada card \xE9 dono do pr\xF3prio conte\xFAdo \u2014 n\xE3o \xE9 espelho de uma nota da aba "Meus projetos". Toque em "\u279C Conectar com seta" e depois em dois cards, em sequ\xEAncia, pra ligar um ao outro; toque no "\u2715" no meio da seta pra desfazer. Um card do tipo \u{1F5C2} Board pode conter seu pr\xF3prio quadro dentro \u2014 toque em "Abrir \u25B8" nele pra entrar, e use as migalhas de p\xE3o acima do quadro pra voltar aos n\xEDveis anteriores (sem limite de quantos boards cabem um dentro do outro). Cada card tamb\xE9m tem uma fileira de bolinhas coloridas no topo \u2014 toque numa cor pra pintar aquele card inteiro com ela (tipo sticky note), independente do tipo; a primeira bolinha volta pra cor padr\xE3o do tipo.'
       },
       {
         titulo: "Salvamento autom\xE1tico ao editar uma nota",
@@ -5724,11 +5808,11 @@ const COMO_USAR = [
       },
       {
         titulo: "Filtrar notas por App e por voto",
-        texto: 'Ao tocar em "Ver notas", aparece uma pequena faixa de filtro acima da lista: "\u{1F7E2} Verde", "\u{1F7E1} Amarela" e "\u26AA Cinza" filtram pelas 3 cores do interruptor App, e "\u{1F535} Com voto" mostra s\xF3 notas que j\xE1 receberam pelo menos 1 voto (dot voting). Toque de novo no mesmo filtro pra desligar ele e voltar a ver todas; "Limpar filtro" aparece quando algum filtro est\xE1 ativo e desliga todos de uma vez. Se nenhuma nota bater com o filtro escolhido, aparece um aviso "Nenhuma nota com esse filtro" em vez da lista vazia.'
+        texto: 'Ao tocar em "Ver notas", aparece uma pequena faixa de filtro acima da lista: "\u{1F7E2} Verde", "\u{1F7E1} Amarela" e "\u26AA Cinza" filtram pelas 3 cores do interruptor App; "\u{1F535} Com voto" mostra s\xF3 notas que j\xE1 receberam pelo menos 1 voto (dot voting), e "\u26AA Sem voto" mostra s\xF3 as que ainda n\xE3o receberam nenhum. Toque de novo no mesmo filtro pra desligar ele e voltar a ver todas; "Limpar filtro" aparece quando algum filtro est\xE1 ativo e desliga todos de uma vez. Se nenhuma nota bater com o filtro escolhido, aparece um aviso "Nenhuma nota com esse filtro" em vez da lista vazia.'
       },
       {
-        titulo: "Filtrar PROJETOS por App e por voto",
-        texto: 'Na barra de cima de "Meus projetos" (modo "\u2630 Lista"), ao lado dos filtros de status ("Todos", "Ideia", "Em andamento", "Conclu\xEDdo"), os mesmos filtros "\u{1F7E2} Verde", "\u{1F7E1} Amarela", "\u26AA Cinza" e "\u{1F535} Com voto" tamb\xE9m existem \u2014 s\xF3 que aqui filtram quais PROJETOS aparecem na lista, n\xE3o quais notas: um projeto passa no filtro se tiver pelo menos uma nota com aquela cor de App ou com voto. \xC9 diferente do filtro dentro de "Ver notas" (que filtra as notas de um projeto j\xE1 aberto) \u2014 este de cima ajuda a achar, entre muitos projetos, quais t\xEAm alguma nota marcada de um jeito espec\xEDfico, sem precisar abrir um por um. Combina com o filtro de status normalmente (ex.: "Em andamento" + "\u{1F7E2} Verde" mostra s\xF3 projetos em andamento que tenham nota verde).'
+        titulo: "Filtrar por App e por voto em qualquer projeto, direto do topo",
+        texto: 'Na barra de cima de "Meus projetos" (modo "\u2630 Lista"), ao lado dos filtros de status ("Todos", "Ideia", "Em andamento", "Conclu\xEDdo"), os mesmos filtros "\u{1F7E2} Verde", "\u{1F7E1} Amarela", "\u26AA Cinza", "\u{1F535} Com voto" e "\u26AA Sem voto" tamb\xE9m existem \u2014 s\xF3 que aqui agem em todos os projetos de uma vez: continuam escondendo projetos sem NENHUMA nota que bata (nada relevante pra mostrar), mas em cada projeto que sobra na lista, aplicam esse mesmo filtro \xE0s notas dele e abrem "Ver notas" sozinhos \u2014 assim voc\xEA s\xF3 v\xEA as notas que batem com o filtro, n\xE3o o projeto inteiro. Combina com o filtro de status e de tipo normalmente. "\u2715 Limpar filtro" desliga tudo de uma vez, tanto o filtro do topo quanto o de cada projeto.'
       },
       {
         titulo: "Campo Tipo do projeto (App / Produto / Servi\xE7o)",
@@ -5744,11 +5828,27 @@ const COMO_USAR = [
       },
       {
         titulo: 'Contador "Feito" \u2705',
-        texto: 'Cada nota tem um bot\xE3o dourado "Feito" no cabe\xE7alho. Cada toque soma 1 no contador do PROJETO (n\xE3o da nota) \u2014 o bot\xE3o vira verde por um instante como confirma\xE7\xE3o, e assim que "Feito" j\xE1 foi tocado ao menos uma vez, aparece ao lado de "Ver notas" um resumo "\u2705 X hoje \xB7 Y semana \xB7 Z m\xEAs", contando quantos toques ca\xEDram em cada per\xEDodo. N\xE3o guarda qual nota foi tocada nem o texto dela, s\xF3 a data e a hora \u2014 \xE9 s\xF3 um contador de frequ\xEAncia.'
+        texto: 'Cada nota tem um bot\xE3o dourado "Feito" no cabe\xE7alho. Cada toque soma 1 no contador do PROJETO (n\xE3o da nota) \u2014 o bot\xE3o vira verde por um instante como confirma\xE7\xE3o, e assim que "Feito" j\xE1 foi tocado ao menos uma vez, aparece ao lado de "Ver notas" um resumo "\u2705 X hoje \xB7 Y semana \xB7 Z m\xEAs", contando quantos toques ca\xEDram em cada per\xEDodo. N\xE3o guarda qual nota foi tocada nem o texto dela, s\xF3 a data e a hora \u2014 \xE9 s\xF3 um contador de frequ\xEAncia. A aba "\u2705 Atividades" (ao lado de "Como usar") mostra a mesma contagem reunida: o total do aplicativo inteiro no topo, e logo abaixo cada projeto que j\xE1 teve algum toque em "Feito", do maior pro menor.'
       },
       {
         titulo: "Ocultar todas as notas de dentro de qualquer nota",
         texto: 'Com "Ver notas" aberto, cada nota tem um link "\u25B2 Ocultar" no canto esquerdo do cabe\xE7alho, ao lado da alcinha de arrastar. Ele faz exatamente o que o bot\xE3o "Ocultar notas" l\xE1 em cima faz: fecha a lista inteira de notas do projeto de uma vez, n\xE3o s\xF3 aquela nota \u2014 \xFAtil pra n\xE3o precisar rolar a tela at\xE9 o topo depois de ler uma nota mais abaixo na lista.'
+      },
+      {
+        titulo: "Miss\xE3o",
+        texto: 'O letreiro no topo da aba "\u2605 Meus projetos" (que antes s\xF3 dizia "Todo projeto criado aqui fica salvo neste dispositivo...") agora se chama "Miss\xE3o" e \xE9 um espa\xE7o de texto livre, sem rela\xE7\xE3o com nenhum projeto espec\xEDfico \u2014 pra escrever um lembrete, um prop\xF3sito, uma frase de norte, o que fizer sentido pra voc\xEA. Toque em "+ Escrever texto" pra criar, ou em "\u270F\uFE0F Editar" pra mudar o que j\xE1 est\xE1 escrito.'
+      },
+      {
+        titulo: "Trazer um projeto pro topo da lista",
+        texto: 'A fileira de chips com o nome de cada projeto, bem no topo do app (acima das abas), agora tem fun\xE7\xE3o: tocar no nome de um projeto ali marca aquele projeto como "trazido pro topo" \u2014 na aba "\u2605 Meus projetos", com a ordena\xE7\xE3o em "Mais recentes", ele passa a aparecer em primeiro lugar na lista. Tocar em outro projeto depois passa a chave pra ele. Isso s\xF3 vale no modo "Mais recentes" \u2014 em "Prioridade" ou "Nome" a lista continua seguindo s\xF3 esse crit\xE9rio, sem interfer\xEAncia. Tamb\xE9m continua abrindo aquele projeto em Camadas/M\xE9todos, como j\xE1 fazia antes.'
+      },
+      {
+        titulo: "Ordenar por uso (criar uma nota traz o projeto pro topo)",
+        texto: 'Toda vez que voc\xEA cria uma nota nova num projeto (toca em "Salvar nota"), esse projeto passa a contar como "recente" tamb\xE9m, al\xE9m da data em que foi criado. Com a ordena\xE7\xE3o em "Mais recentes", ele sobe pro topo automaticamente, na frente de projetos sem nenhuma nota criada depois dele. Esse efeito \xE9 exclusivo do modo "Mais recentes" \u2014 os modos "Prioridade" e "Nome" ignoram isso e ordenam de forma pura, sem nenhuma nota ou clique interferindo.'
+      },
+      {
+        titulo: "\u{1F6CE}\uFE0F Tokenmax",
+        texto: 'Dentro do mesmo cart\xE3o da "Miss\xE3o", tem um bot\xE3o "\u{1F6CE}\uFE0F Tokenmax" \u2014 cada toque soma 1 num contador simples, sem rela\xE7\xE3o com nenhum projeto. Ao lado do bot\xE3o aparece "X hoje \xB7 Y esta semana \xB7 Z total". Toque em "\u{1F4D6} Livro de registro" pra abrir (fica fechado por padr\xE3o) uma lista com a quantidade de toques de cada dia e de cada semana, do mais recente pro mais antigo \u2014 nada \xE9 apagado quando o dia ou a semana viram: o total daquele per\xEDodo fica registrado ali pra sempre, e um dia/semana novo s\xF3 passa a somar a partir do momento em que muda.'
       }
     ]
   },
@@ -5773,6 +5873,12 @@ const COMO_USAR = [
 const FUNCOES_FUTURAS = [];
 function Sondagem() {
   const [ideas, setIdeas] = useState([]);
+  const [ultimaExclusao, setUltimaExclusao] = useState(null);
+  const [missao, setMissaoState] = useState("");
+  const [missaoDraft, setMissaoDraft] = useState("");
+  const [missaoEditando, setMissaoEditando] = useState(false);
+  const [tokenmaxLog, setTokenmaxLog] = useState([]);
+  const [tokenmaxLivroAberto, setTokenmaxLivroAberto] = useState(false);
   const [activeId, setActiveId] = useState(null);
   const [view, setView] = useState("meusprojetos");
   const [openLayers, setOpenLayers] = useState({ direcao: true });
@@ -5786,7 +5892,7 @@ function Sondagem() {
   const [viewMeusProjetos, setViewMeusProjetos] = useState("lista");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroProjetoApp, setFiltroProjetoApp] = useState("todos");
-  const [filtroProjetoVoto, setFiltroProjetoVoto] = useState(false);
+  const [filtroProjetoVoto, setFiltroProjetoVoto] = useState("todos");
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const [ordenacao, setOrdenacao] = useState("recentes");
   const [metodosLinkadosAbertos, setMetodosLinkadosAbertos] = useState({});
@@ -5843,10 +5949,27 @@ function Sondagem() {
   useEffect(() => {
     (async () => {
       try {
+        const res = await window.storage.get(MISSAO_KEY);
+        if (res && typeof res.value === "string") setMissaoState(res.value);
+      } catch (e) {
+      }
+    })();
+    (async () => {
+      try {
+        const res = await window.storage.get(TOKENMAX_KEY);
+        const parsed = res ? JSON.parse(res.value) : null;
+        if (Array.isArray(parsed)) setTokenmaxLog(parsed);
+      } catch (e) {
+      }
+    })();
+  }, []);
+  useEffect(() => {
+    (async () => {
+      try {
         const res = await window.storage.get(STORE_KEY);
         const parsed = res ? JSON.parse(res.value) : null;
         if (parsed && Array.isArray(parsed.ideas) && parsed.ideas.length) {
-          setIdeas(parsed.ideas.map((i) => ({ ...i, hoshin: i.hoshin || blankHoshin(), toc: i.toc || {}, v2mom: i.v2mom || blankV2(), pmi: i.pmi || blankPmi(), gold: i.gold || blankGold(), okr: i.okr || blankOkr(), cabala: i.cabala || {}, metas: i.metas || {}, anexos: i.anexos || [], pastasNotas: i.pastasNotas || [], feitoLog: i.feitoLog || [], notas: (i.notas || []).map((n) => ({ ...n, anexos: n.anexos || [], lembrete: n.lembrete || "", secao: n.secao || "", pastaId: n.pastaId || "", votos: n.votos || 0, checklist: n.checklist || [], app: n.app === true ? "on" : n.app === false || n.app === void 0 ? "off" : n.app })), quadro: i.quadro || quadroVazio(), status: i.status || "ideia", prioridade: i.prioridade || "media", tipo: i.tipo || "", metodosSugeridos: i.metodosSugeridos || [], pasta: i.pasta || "" })));
+          setIdeas(parsed.ideas.map((i) => ({ ...i, hoshin: i.hoshin || blankHoshin(), toc: i.toc || {}, v2mom: i.v2mom || blankV2(), pmi: i.pmi || blankPmi(), gold: i.gold || blankGold(), okr: i.okr || blankOkr(), cabala: i.cabala || {}, metas: i.metas || {}, anexos: i.anexos || [], pastasNotas: i.pastasNotas || [], feitoLog: i.feitoLog || [], notas: (i.notas || []).map((n) => ({ ...n, anexos: n.anexos || [], lembrete: n.lembrete || "", secao: n.secao || "", pastaId: n.pastaId || "", votos: n.votos || 0, checklist: n.checklist || [], app: n.app === true ? "on" : n.app === false || n.app === void 0 ? "off" : n.app })), quadro: i.quadro || quadroVazio(), status: i.status || "ideia", prioridade: i.prioridade || "media", tipo: i.tipo || "", metodosSugeridos: i.metodosSugeridos || [], pasta: i.pasta || "", destacadoEm: i.destacadoEm || 0, notaAtividadeEm: i.notaAtividadeEm || 0 })));
           setActiveId(parsed.activeId || parsed.ideas[0].id);
         } else {
           const idea = emptyIdea();
@@ -5854,7 +5977,7 @@ function Sondagem() {
           setActiveId(idea.id);
         }
         setStatus("pronto");
-      } catch {
+      } catch (e) {
         const idea = emptyIdea();
         setIdeas([idea]);
         setActiveId(idea.id);
@@ -5869,7 +5992,7 @@ function Sondagem() {
       try {
         await window.storage.set(STORE_KEY, JSON.stringify({ ideas: nextIdeas, activeId: nextActive }));
         setStatus("salvo");
-      } catch {
+      } catch (e) {
         setStatus("n\xE3o foi poss\xEDvel salvar");
       }
     }, 500);
@@ -5902,7 +6025,8 @@ function Sondagem() {
     if (filtroStatus !== "todos" && (i.status || "ideia") !== filtroStatus) return false;
     if (filtroTipo !== "todos" && (i.tipo || "") !== filtroTipo) return false;
     if (filtroProjetoApp !== "todos" && !(i.notas || []).some((n) => (n.app || "off") === filtroProjetoApp)) return false;
-    if (filtroProjetoVoto && !(i.notas || []).some((n) => (n.votos || 0) > 0)) return false;
+    if (filtroProjetoVoto === "com" && !(i.notas || []).some((n) => (n.votos || 0) > 0)) return false;
+    if (filtroProjetoVoto === "sem" && !(i.notas || []).some((n) => (n.votos || 0) === 0)) return false;
     return true;
   });
   const ideasOrdenadas = [...ideasFiltradas].sort((a, b) => compararIdeias(a, b, ordenacao));
@@ -6014,7 +6138,38 @@ function Sondagem() {
     setOpenLayers({ direcao: true });
     setViewMeusProjetos("lista");
   }
+  function salvarMissao(texto) {
+    const limpo = texto.trim();
+    setMissaoState(limpo);
+    setMissaoEditando(false);
+    (async () => {
+      try {
+        await window.storage.set(MISSAO_KEY, limpo);
+      } catch (e) {
+      }
+    })();
+  }
+  function registrarTokenmax() {
+    const novo = [...tokenmaxLog, Date.now()];
+    setTokenmaxLog(novo);
+    (async () => {
+      try {
+        await window.storage.set(TOKENMAX_KEY, JSON.stringify(novo));
+      } catch (e) {
+      }
+    })();
+  }
+  function registrarExclusao(label) {
+    setUltimaExclusao({ label, ideasAntes: ideas, ts: Date.now() });
+  }
+  function desfazerExclusao() {
+    if (!ultimaExclusao) return;
+    setIdeas(ultimaExclusao.ideasAntes);
+    setUltimaExclusao(null);
+  }
   function removeIdeaById(id) {
+    const alvo = ideas.find((i) => i.id === id);
+    registrarExclusao('Projeto "' + (alvo && alvo.title || "Sem t\xEDtulo") + '" apagado');
     const rest = ideas.filter((i) => i.id !== id);
     setIdeas(rest);
     if (activeId === id) setActiveId(rest.length ? rest[0].id : null);
@@ -6063,6 +6218,7 @@ function Sondagem() {
     );
   }
   function excluirPastaNota(ideaId, pastaId) {
+    registrarExclusao("Pasta de notas apagada");
     setIdeas(
       (p) => p.map(
         (i) => i.id === ideaId ? {
@@ -6382,6 +6538,7 @@ function Sondagem() {
     );
   }
   function removerItemChecklist(ideaId, notaId, itemId) {
+    registrarExclusao("Item do checklist apagado");
     setIdeas(
       (p) => p.map(
         (i) => i.id === ideaId ? {
@@ -6399,7 +6556,7 @@ function Sondagem() {
     if (!texto && checklist.length === 0) return;
     const anexos = notaAnexoDraft[ideaId] || [];
     const nota = { id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, ts: Date.now(), anexos, lembrete: "", secao: "", pastaId: "", votos: 0, checklist, app: "off" };
-    setIdeas((p) => p.map((i) => i.id === ideaId ? { ...i, notas: [nota, ...i.notas || []] } : i));
+    setIdeas((p) => p.map((i) => i.id === ideaId ? { ...i, notas: [nota, ...i.notas || []], notaAtividadeEm: Date.now() } : i));
     setNotaDraft((p) => ({ ...p, [ideaId]: "" }));
     setNotaAnexoDraft((p) => ({ ...p, [ideaId]: [] }));
     setChecklistDraft((p) => ({ ...p, [ideaId]: [] }));
@@ -6502,6 +6659,7 @@ function Sondagem() {
   function removerNota(ideaId, notaId) {
     const idea = ideas.find((i) => i.id === ideaId);
     const nota = idea && (idea.notas || []).find((n) => n.id === notaId);
+    registrarExclusao("Nota apagada" + (nota && nota.anexos && nota.anexos.length ? " (anexos n\xE3o voltam)" : ""));
     setIdeas((p) => p.map((i) => i.id === ideaId ? { ...i, notas: (i.notas || []).filter((n) => n.id !== notaId) } : i));
     (nota && nota.anexos ? nota.anexos : []).forEach((a) => {
       if (a.key) apagarArquivoDoR2Sondagem(a.key);
@@ -6529,19 +6687,74 @@ function Sondagem() {
   function alternarFiltroApp(ideaId, valor) {
     setNotaFiltroApp((p) => ({ ...p, [ideaId]: p[ideaId] === valor ? "todas" : valor }));
   }
-  function alternarFiltroVoto(ideaId) {
-    setNotaFiltroVoto((p) => ({ ...p, [ideaId]: !p[ideaId] }));
+  function alternarFiltroVoto(ideaId, valor) {
+    setNotaFiltroVoto((p) => ({ ...p, [ideaId]: p[ideaId] === valor ? "todos" : valor }));
   }
   function limparFiltrosNotas(ideaId) {
     setNotaFiltroApp((p) => ({ ...p, [ideaId]: "todas" }));
-    setNotaFiltroVoto((p) => ({ ...p, [ideaId]: false }));
+    setNotaFiltroVoto((p) => ({ ...p, [ideaId]: "todos" }));
     setFiltroPastaNota((p) => ({ ...p, [ideaId]: "todas" }));
   }
   function alternarFiltroProjetoApp(valor) {
-    setFiltroProjetoApp((p) => p === valor ? "todos" : valor);
+    setFiltroProjetoApp((p) => {
+      const novo = p === valor ? "todos" : valor;
+      if (novo === "todos") {
+        setNotaFiltroApp((fp) => {
+          const copy = { ...fp };
+          ideas.forEach((i) => {
+            copy[i.id] = "todas";
+          });
+          return copy;
+        });
+      } else {
+        setNotaFiltroApp((fp) => {
+          const copy = { ...fp };
+          ideas.forEach((i) => {
+            copy[i.id] = novo;
+          });
+          return copy;
+        });
+        setNotasAbertas((na) => {
+          const copy = { ...na };
+          ideas.forEach((i) => {
+            if ((i.notas || []).some((n) => (n.app || "off") === novo)) copy[i.id] = true;
+          });
+          return copy;
+        });
+      }
+      return novo;
+    });
   }
-  function alternarFiltroProjetoVoto() {
-    setFiltroProjetoVoto((v) => !v);
+  function alternarFiltroProjetoVoto(valor) {
+    setFiltroProjetoVoto((p) => {
+      const novo = p === valor ? "todos" : valor;
+      if (novo === "todos") {
+        setNotaFiltroVoto((fp) => {
+          const copy = { ...fp };
+          ideas.forEach((i) => {
+            copy[i.id] = "todos";
+          });
+          return copy;
+        });
+      } else {
+        setNotaFiltroVoto((fp) => {
+          const copy = { ...fp };
+          ideas.forEach((i) => {
+            copy[i.id] = novo;
+          });
+          return copy;
+        });
+        setNotasAbertas((na) => {
+          const copy = { ...na };
+          ideas.forEach((i) => {
+            const bate = novo === "com" ? (i.notas || []).some((n) => (n.votos || 0) > 0) : (i.notas || []).some((n) => (n.votos || 0) === 0);
+            if (bate) copy[i.id] = true;
+          });
+          return copy;
+        });
+      }
+      return novo;
+    });
   }
   function iniciarEdicaoNota(ideaId, nota) {
     setNotaEditando((p) => ({ ...p, [ideaId]: nota.id }));
@@ -6653,6 +6866,7 @@ function Sondagem() {
     setDraft((d) => ({ ...d, [key]: "" }));
   }
   function removePmi(level, id) {
+    registrarExclusao("Item da Hierarquia PMI apagado");
     if (level === "programas") {
       const projs = pmi.projetos.filter((x) => x.parent === id).map((x) => x.id);
       setPmi({
@@ -6715,6 +6929,7 @@ function Sondagem() {
     setDraft((d) => ({ ...d, [key]: "" }));
   }
   function removeHxItem(key, id) {
+    registrarExclusao("Item da Matriz X apagado");
     const corr = { ...hx.corr };
     Object.keys(corr).forEach((k) => {
       if (k.includes(":" + id)) delete corr[k];
@@ -6856,7 +7071,7 @@ function Sondagem() {
       navigator.clipboard.writeText(out);
       setCopied(true);
       setTimeout(() => setCopied(false), 2e3);
-    } catch {
+    } catch (e) {
       setCopied(false);
     }
   }
@@ -6911,6 +7126,7 @@ function Sondagem() {
         setActiveId(i.id);
         setOpenRows({});
         setOpenLayers({ direcao: true });
+        atualizarProjeto(i.id, { destacadoEm: Date.now() });
       }
     },
     i.title || "Sem t\xEDtulo"
@@ -6937,7 +7153,42 @@ function Sondagem() {
       onClick: () => setView("metodos")
     },
     "M\xE9todos"
-  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "\xCDndice de todas as fun\xE7\xF5es do app, explicando o que cada uma faz." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", "data-on": view === "comousar" ? "1" : "0", onClick: () => setView("comousar") }, "\u2753 Como usar"))), view === "comousar" && /* @__PURE__ */ React.createElement("section", null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "sd-serif", style: { fontSize: 23, fontWeight: 600, margin: "0 0 4px" } }, "Como usar"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.55 } }, "\xCDndice de todas as fun\xE7\xF5es do app. Vai crescendo sozinho conforme novas fun\xE7\xF5es s\xE3o acrescentadas.")), COMO_USAR.map((secao) => /* @__PURE__ */ React.createElement("div", { key: secao.secao, className: "sd-card", style: { padding: 18, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("h3", { className: "sd-serif", style: { fontSize: 17, fontWeight: 600, margin: "0 0 10px", color: T.ink } }, secao.secao), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, secao.itens.map((item) => /* @__PURE__ */ React.createElement("div", { key: item.titulo }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, fontWeight: 600, color: T.ink, marginBottom: 2 } }, item.titulo), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.muted, lineHeight: 1.55 } }, item.texto)))))), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "\xCDndice de todas as fun\xE7\xF5es do app, explicando o que cada uma faz." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", "data-on": view === "comousar" ? "1" : "0", onClick: () => setView("comousar") }, "\u2753 Como usar")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Quantas vezes o bot\xE3o 'Feito' foi tocado em cada projeto, e o total do app." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", "data-on": view === "atividades" ? "1" : "0", onClick: () => setView("atividades") }, "\u2705 Atividades")), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Ajustes gerais do app, incluindo desfazer a \xFAltima exclus\xE3o." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", "data-on": view === "config" ? "1" : "0", onClick: () => setView("config") }, "\u2699\uFE0F Configura\xE7\xF5es"))), view === "config" && /* @__PURE__ */ React.createElement("section", null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "sd-serif", style: { fontSize: 23, fontWeight: 600, margin: "0 0 4px" } }, "\u2699\uFE0F Configura\xE7\xF5es gerais"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.55 } }, "Ajustes do aplicativo que n\xE3o s\xE3o de nenhum projeto espec\xEDfico.")), /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14.5, fontWeight: 600, marginBottom: 6 } }, "\u21A9\uFE0F Desfazer excluir"), ultimaExclusao ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted, margin: "0 0 10px" } }, "\xDAltima exclus\xE3o: ", ultimaExclusao.label), /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: desfazerExclusao }, "\u21A9\uFE0F Desfazer exclus\xE3o")) : /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted, margin: 0 } }, "Nada para desfazer no momento. Assim que voc\xEA apagar um projeto, uma nota, uma pasta, um item de checklist, um item de PMI/Matriz X ou um card do quadro livre, a op\xE7\xE3o de desfazer aparece aqui."), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11.5, color: T.muted, marginTop: 12, lineHeight: 1.5, paddingTop: 10, borderTop: "1px solid " + T.line } }, "Guarda s\xF3 a exclus\xE3o mais recente, n\xE3o um hist\xF3rico \u2014 apagar outra coisa substitui o que estava aqui. Fotos e v\xEDdeos j\xE1 removidos do armazenamento (Cloudflare R2) n\xE3o voltam junto; s\xF3 o texto, os campos e a estrutura do que foi apagado s\xE3o restaurados."))), view === "atividades" && /* @__PURE__ */ React.createElement("section", null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "sd-serif", style: { fontSize: 23, fontWeight: 600, margin: "0 0 4px" } }, "\u2705 Atividades"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.55 } }, 'Cada toque no bot\xE3o "Feito", em qualquer nota de um projeto, fica registrado aqui \u2014 por projeto e no total do aplicativo.')), (() => {
+    const porProjeto = ideas.map((i) => ({ idea: i, contagem: contarFeitoPorPeriodo(i.feitoLog) })).filter((p) => p.contagem.total > 0).sort((a, b) => b.contagem.total - a.contagem.total);
+    const totalApp = porProjeto.reduce((soma, p) => soma + p.contagem.total, 0);
+    const hojeApp = porProjeto.reduce((soma, p) => soma + p.contagem.hoje, 0);
+    const semanaApp = porProjeto.reduce((soma, p) => soma + p.contagem.semana, 0);
+    const mesApp = porProjeto.reduce((soma, p) => soma + p.contagem.mes, 0);
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 16, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: T.muted, marginBottom: 4 } }, "Total do aplicativo"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 30, fontWeight: 700, lineHeight: 1 } }, totalApp), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.muted, marginTop: 6 } }, hojeApp, " hoje \xB7 ", semanaApp, " nesta semana \xB7 ", mesApp, " neste m\xEAs")), porProjeto.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13.5, color: T.muted } }, 'Nenhum toque em "Feito" registrado ainda. Toque em "Feito" numa nota de qualquer projeto pra come\xE7ar a contar.') : porProjeto.map(({ idea, contagem }) => /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        key: idea.id,
+        className: "sd-card",
+        style: {
+          padding: 14,
+          marginBottom: 8,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 10
+        }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: {
+            fontSize: 14.5,
+            fontWeight: 600,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }
+        },
+        idea.title || "Sem t\xEDtulo"
+      ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.muted, marginTop: 2 } }, contagem.hoje, " hoje \xB7 ", contagem.semana, " semana \xB7 ", contagem.mes, " m\xEAs")),
+      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 700, flexShrink: 0 } }, contagem.total)
+    )));
+  })()), view === "comousar" && /* @__PURE__ */ React.createElement("section", null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "sd-serif", style: { fontSize: 23, fontWeight: 600, margin: "0 0 4px" } }, "Como usar"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.55 } }, "\xCDndice de todas as fun\xE7\xF5es do app. Vai crescendo sozinho conforme novas fun\xE7\xF5es s\xE3o acrescentadas.")), COMO_USAR.map((secao) => /* @__PURE__ */ React.createElement("div", { key: secao.secao, className: "sd-card", style: { padding: 18, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("h3", { className: "sd-serif", style: { fontSize: 17, fontWeight: 600, margin: "0 0 10px", color: T.ink } }, secao.secao), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, secao.itens.map((item) => /* @__PURE__ */ React.createElement("div", { key: item.titulo }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, fontWeight: 600, color: T.ink, marginBottom: 2 } }, item.titulo), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.muted, lineHeight: 1.55 } }, item.texto)))))), /* @__PURE__ */ React.createElement(
     "div",
     {
       className: "sd-card",
@@ -6968,7 +7219,76 @@ function Sondagem() {
     },
     /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { className: "sd-serif", style: { fontSize: 17, fontWeight: 600, color: T.ink } }, col.titulo), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: T.muted } }, col.lista.length, " m\xE9todos")),
     col.sub && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, color: T.muted, lineHeight: 1.55, marginTop: 4 } }, col.sub)
-  ))), view === "meusprojetos" && /* @__PURE__ */ React.createElement("section", null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "sd-serif", style: { fontSize: 23, fontWeight: 600, margin: "0 0 4px" } }, "Meus projetos"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.55 } }, "Todo projeto criado aqui fica salvo neste dispositivo. Escolha um para continuar, ou comece um novo.")), /* @__PURE__ */ React.createElement("datalist", { id: "sd-pastas-existentes" }, pastasExistentes.map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }))), ideas.length > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Re\xFAne toda nota, de qualquer projeto, que tenha uma data de lembrete definida." }, /* @__PURE__ */ React.createElement(
+  ))), view === "meusprojetos" && /* @__PURE__ */ React.createElement("section", null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "sd-serif", style: { fontSize: 23, fontWeight: 600, margin: "0 0 4px" } }, "Miss\xE3o"), missaoEditando ? /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement(
+    "textarea",
+    {
+      className: "sd-ta",
+      value: missaoDraft,
+      onChange: (e) => setMissaoDraft(e.target.value),
+      placeholder: "Escreva aqui sua miss\xE3o\u2026",
+      rows: 3,
+      "aria-label": "Texto da miss\xE3o",
+      style: { marginBottom: 8, fontSize: 14 }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: () => salvarMissao(missaoDraft) }, "Salvar"), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-chip",
+      onClick: () => {
+        setMissaoDraft(missao);
+        setMissaoEditando(false);
+      }
+    },
+    "Cancelar"
+  ))) : missao ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 10 } }, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.55, flex: 1, whiteSpace: "pre-wrap" } }, missao), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-chip",
+      style: { fontSize: 11, flexShrink: 0 },
+      onClick: () => {
+        setMissaoDraft(missao);
+        setMissaoEditando(true);
+      }
+    },
+    "\u270F\uFE0F Editar"
+  )) : /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-chip",
+      onClick: () => {
+        setMissaoDraft("");
+        setMissaoEditando(true);
+      }
+    },
+    "+ Escrever texto"
+  ), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 14, paddingTop: 14, borderTop: "1px solid " + T.line } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: registrarTokenmax }, "\u{1F6CE}\uFE0F Tokenmax"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: T.muted } }, (() => {
+    const c = contarFeitoPorPeriodo(tokenmaxLog);
+    return c.hoje + " hoje \xB7 " + c.semana + " esta semana \xB7 " + c.total + " total";
+  })())), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-chip",
+      style: { fontSize: 11, marginTop: 8 },
+      onClick: () => setTokenmaxLivroAberto((v) => !v)
+    },
+    tokenmaxLivroAberto ? "\u25B2 Ocultar livro de registro" : "\u{1F4D6} Livro de registro"
+  ), tokenmaxLivroAberto && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10, display: "flex", gap: 20, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 160px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, fontWeight: 600, color: T.muted, marginBottom: 4 } }, "Por dia"), agruparLogPorDia(tokenmaxLog).length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: T.muted, margin: 0 } }, "Nada registrado ainda.") : agruparLogPorDia(tokenmaxLog).map((d) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      key: d.chave,
+      style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "2px 0" }
+    },
+    /* @__PURE__ */ React.createElement("span", null, d.label),
+    /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, d.qtd)
+  ))), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 160px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11.5, fontWeight: 600, color: T.muted, marginBottom: 4 } }, "Por semana"), agruparLogPorSemana(tokenmaxLog).length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: T.muted, margin: 0 } }, "Nada registrado ainda.") : agruparLogPorSemana(tokenmaxLog).map((s) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      key: s.chave,
+      style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "2px 0" }
+    },
+    /* @__PURE__ */ React.createElement("span", null, s.label),
+    /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600 } }, s.qtd)
+  )))))), /* @__PURE__ */ React.createElement("datalist", { id: "sd-pastas-existentes" }, pastasExistentes.map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }))), ideas.length > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Re\xFAne toda nota, de qualquer projeto, que tenha uma data de lembrete definida." }, /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-chip",
@@ -7122,7 +7442,13 @@ function Sondagem() {
     {
       className: "sd-tag-status",
       "data-on": filtroStatus === o.id ? "1" : "0",
-      onClick: () => setFiltroStatus(o.id)
+      onClick: () => setFiltroStatus(o.id),
+      style: o.id === "concluido" ? {
+        background: filtroStatus === o.id ? "#C9AD73" : "#EFE6D2",
+        borderColor: "#B8A272",
+        borderBottomColor: filtroStatus === o.id ? "#8C7B45" : "#B8A272",
+        color: filtroStatus === o.id ? "#3A2E14" : "#7A6A44"
+      } : void 0
     },
     o.label
   ))), TIPO_OPTS.map((o) => /* @__PURE__ */ React.createElement(Tooltip, { key: o.id, texto: 'Mostra s\xF3 os projetos do tipo "' + o.label + '".' }, /* @__PURE__ */ React.createElement(
@@ -7134,56 +7460,79 @@ function Sondagem() {
       onClick: () => setFiltroTipo((p) => p === o.id ? "todos" : o.id)
     },
     o.label
-  ))), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra s\xF3 projetos que t\xEAm pelo menos uma nota com o interruptor App verde." }, /* @__PURE__ */ React.createElement(
+  ))), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com o interruptor App verde (abre 'Ver notas' automaticamente)." }, /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-tag-cor",
       "data-on": filtroProjetoApp === "on" ? "1" : "0",
       style: filtroProjetoApp === "on" ? { background: "#CFE8D3", borderColor: "#2E7D46", borderStyle: "solid", color: "#1D5C34", fontWeight: 700 } : void 0,
-      "aria-label": "Filtrar projetos: pelo menos uma nota verde",
+      "aria-label": "Filtrar notas verdes, em qualquer projeto",
       onClick: () => alternarFiltroProjetoApp("on")
     },
     /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#2E7D46", display: "inline-block", flexShrink: 0 } }),
     "Verde"
-  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra s\xF3 projetos que t\xEAm pelo menos uma nota com o interruptor App amarelo (intermedi\xE1rio)." }, /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com o interruptor App amarelo (intermedi\xE1rio)." }, /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-tag-cor",
       "data-on": filtroProjetoApp === "meio" ? "1" : "0",
       style: filtroProjetoApp === "meio" ? { background: "#F3E6BE", borderColor: "#C9971E", borderStyle: "solid", color: "#8A6D1A", fontWeight: 700 } : void 0,
-      "aria-label": "Filtrar projetos: pelo menos uma nota amarela",
+      "aria-label": "Filtrar notas amarelas, em qualquer projeto",
       onClick: () => alternarFiltroProjetoApp("meio")
     },
     /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#C9971E", display: "inline-block", flexShrink: 0 } }),
     "Amarela"
-  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra s\xF3 projetos que t\xEAm pelo menos uma nota com o interruptor App cinza (desligado)." }, /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com o interruptor App cinza (desligado)." }, /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-tag-cor",
       "data-on": filtroProjetoApp === "off" ? "1" : "0",
       style: filtroProjetoApp === "off" ? { background: "#E4E1D6", borderColor: "#8F8A7C", borderStyle: "solid", color: "#5B5646", fontWeight: 700 } : void 0,
-      "aria-label": "Filtrar projetos: pelo menos uma nota cinza",
+      "aria-label": "Filtrar notas cinzas, em qualquer projeto",
       onClick: () => alternarFiltroProjetoApp("off")
     },
     /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#B9B4A5", display: "inline-block", flexShrink: 0 } }),
     "Cinza"
-  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra s\xF3 projetos que t\xEAm pelo menos uma nota com voto (dot voting)." }, /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com pelo menos 1 voto (dot voting)." }, /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-tag-voto",
-      "data-on": filtroProjetoVoto ? "1" : "0",
-      "aria-label": "Filtrar projetos: pelo menos uma nota com voto",
-      onClick: alternarFiltroProjetoVoto
+      "data-on": filtroProjetoVoto === "com" ? "1" : "0",
+      "aria-label": "Filtrar notas com voto, em qualquer projeto",
+      onClick: () => alternarFiltroProjetoVoto("com")
     },
     "\u{1F535} Com voto"
-  )), (filtroTipo !== "todos" || filtroProjetoApp !== "todos" || filtroProjetoVoto) && /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas sem nenhum voto." }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "sd-tag-voto",
+      "data-on": filtroProjetoVoto === "sem" ? "1" : "0",
+      "aria-label": "Filtrar notas sem voto, em qualquer projeto",
+      onClick: () => alternarFiltroProjetoVoto("sem")
+    },
+    "\u26AA Sem voto"
+  )), (filtroTipo !== "todos" || filtroProjetoApp !== "todos" || filtroProjetoVoto !== "todos") && /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-limpar",
       onClick: () => {
         setFiltroTipo("todos");
         setFiltroProjetoApp("todos");
-        setFiltroProjetoVoto(false);
+        setFiltroProjetoVoto("todos");
+        setNotaFiltroApp((fp) => {
+          const copy = { ...fp };
+          ideas.forEach((i) => {
+            copy[i.id] = "todas";
+          });
+          return copy;
+        });
+        setNotaFiltroVoto((fp) => {
+          const copy = { ...fp };
+          ideas.forEach((i) => {
+            copy[i.id] = "todos";
+          });
+          return copy;
+        });
       }
     },
     "\u2715 Limpar filtro"
@@ -7256,23 +7605,25 @@ function Sondagem() {
     },
     (pastasAbertas[nomePasta] === false ? "\u25B8 " : "\u25BE ") + "\u{1F4C1} " + nomePasta + " (" + gruposPasta[nomePasta].length + ")"
   ), (usaPastas ? pastasAbertas[nomePasta] !== false : true) && gruposPasta[nomePasta].map((i) => {
+    var _a, _b;
     const done = LAYERS.reduce((a, l) => a + filledCount(i, l), 0);
     const dataCriacao = i.createdAt ? new Date(i.createdAt).toLocaleDateString("pt-BR") : null;
     const confirmando = confirmDelete === i.id;
     const metodosLinkados = metodosLinkadosDoProjeto(i);
     const notasDoProjeto = i.notas || [];
     const filtroAppAtivo = notaFiltroApp[i.id] || "todas";
-    const filtroVotoAtivo = !!notaFiltroVoto[i.id];
+    const filtroVotoAtivo = notaFiltroVoto[i.id] || "todos";
     const pastasNotasDoProjeto = i.pastasNotas || [];
     const feitoContagem = contarFeitoPorPeriodo(i.feitoLog);
     const filtroPastaNotaAtiva = filtroPastaNota[i.id] || "todas";
     const notasFiltradas = notasDoProjeto.filter((n) => {
       if (filtroAppAtivo !== "todas" && (n.app || "off") !== filtroAppAtivo) return false;
-      if (filtroVotoAtivo && !((n.votos || 0) > 0)) return false;
+      if (filtroVotoAtivo === "com" && !((n.votos || 0) > 0)) return false;
+      if (filtroVotoAtivo === "sem" && (n.votos || 0) > 0) return false;
       if (filtroPastaNotaAtiva !== "todas" && (n.pastaId || "") !== filtroPastaNotaAtiva) return false;
       return true;
     });
-    const filtroNotasAtivo = filtroAppAtivo !== "todas" || filtroVotoAtivo || filtroPastaNotaAtiva !== "todas";
+    const filtroNotasAtivo = filtroAppAtivo !== "todas" || filtroVotoAtivo !== "todos" || filtroPastaNotaAtiva !== "todas";
     const gruposSecao = {};
     notasFiltradas.forEach((n) => {
       const s = (n.secao || "").trim() || "Sem se\xE7\xE3o";
@@ -7304,7 +7655,7 @@ function Sondagem() {
         {
           className: "sd-inp",
           style: { fontSize: 15, padding: "4px 8px", flex: "1 1 160px", minWidth: 120 },
-          value: tituloDraft[i.id] ?? i.title ?? "",
+          value: (_b = (_a = tituloDraft[i.id]) != null ? _a : i.title) != null ? _b : "",
           "aria-label": "Editar t\xEDtulo \u2014 " + (i.title || "projeto"),
           autoFocus: true,
           onChange: (e) => setTituloDraft((p) => ({ ...p, [i.id]: e.target.value })),
@@ -7444,7 +7795,7 @@ function Sondagem() {
           onClickMetodo: (mid) => irParaMetodoLink(mid)
         }
       ), (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11, color: T.muted, textAlign: "center", marginTop: 6 } }, "Linha pontilhada = nota linkando nota. Linha s\xF3lida = nota linkando m\xE9todo.")),
-      quadroAberto[i.id] && /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 14, marginTop: 8 } }, /* @__PURE__ */ React.createElement(QuadroLivre, { idea: i, onChange: (novoQuadro) => atualizarProjeto(i.id, { quadro: novoQuadro }) })),
+      quadroAberto[i.id] && /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 14, marginTop: 8 } }, /* @__PURE__ */ React.createElement(QuadroLivre, { idea: i, onChange: (novoQuadro) => atualizarProjeto(i.id, { quadro: novoQuadro }), onExcluir: registrarExclusao })),
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement("label", { className: "sd-chip", style: { cursor: "pointer" }, title: "Tirar foto" }, "\u{1F4F7}", /* @__PURE__ */ React.createElement(
         "input",
         {
@@ -7522,8 +7873,8 @@ function Sondagem() {
           value: notaDraft[i.id] || "",
           onChange: (e) => setNotaDraft((p) => ({ ...p, [i.id]: e.target.value })),
           placeholder: "Escrever uma nota sobre este projeto\u2026",
-          rows: 2,
-          style: { width: "100%", resize: "vertical", fontFamily: "inherit" }
+          rows: 6,
+          style: { width: "100%", minHeight: 130, resize: "vertical", fontFamily: "inherit" }
         }
       ), /\[\[(nota|metodo):/.test(notaDraft[i.id] || "") && /* @__PURE__ */ React.createElement(
         "div",
@@ -7569,7 +7920,8 @@ function Sondagem() {
         {
           className: "sd-chip",
           disabled: !(notaDraft[i.id] || "").trim() && (checklistDraft[i.id] || []).length === 0,
-          onClick: () => salvarNota(i.id)
+          onClick: () => salvarNota(i.id),
+          style: { background: "#F6DCD3", borderColor: "#D98B72", color: "#8A3A2C", fontWeight: 600 }
         },
         "\u{1F4BE} Salvar nota"
       )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Cria e gerencia pastas para agrupar as notas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-tag-pastanota", onClick: () => togglePastasNotas(i.id) }, "\u{1F5C2}\uFE0F Pastas", pastasNotasDoProjeto.length > 0 ? " (" + pastasNotasDoProjeto.length + ")" : "")), (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra ou esconde as notas j\xE1 salvas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-tag-notas", onClick: () => toggleNotas(i.id) }, (notasAbertas[i.id] ? "Ocultar " : "Ver ") + i.notas.length + " " + (i.notas.length === 1 ? "nota" : "notas"))), feitoContagem.total > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Total desde o in\xEDcio: " + feitoContagem.total + " toques em 'Feito'." }, /* @__PURE__ */ React.createElement(
@@ -7794,11 +8146,21 @@ function Sondagem() {
           "button",
           {
             className: "sd-tag-voto",
-            "data-on": filtroVotoAtivo ? "1" : "0",
+            "data-on": filtroVotoAtivo === "com" ? "1" : "0",
             style: { fontSize: 11 },
-            onClick: () => alternarFiltroVoto(i.id)
+            onClick: () => alternarFiltroVoto(i.id, "com")
           },
           "\u{1F535} Com voto"
+        )),
+        /* @__PURE__ */ React.createElement(Tooltip, { texto: "S\xF3 notas que ainda n\xE3o receberam nenhum voto." }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "sd-tag-voto",
+            "data-on": filtroVotoAtivo === "sem" ? "1" : "0",
+            style: { fontSize: 11 },
+            onClick: () => alternarFiltroVoto(i.id, "sem")
+          },
+          "\u26AA Sem voto"
         )),
         pastasNotasDoProjeto.map((pn) => /* @__PURE__ */ React.createElement(Tooltip, { key: pn.id, texto: 'S\xF3 notas dentro da pasta "' + pn.nome + '".' }, /* @__PURE__ */ React.createElement(
           "button",
@@ -7898,8 +8260,8 @@ function Sondagem() {
               },
               value: notaEditDraft[n.id] || "",
               onChange: (e) => editarTextoNota(i.id, n.id, e.target.value),
-              rows: 2,
-              style: { width: "100%", resize: "vertical", fontFamily: "inherit", fontSize: 13.5 }
+              rows: 6,
+              style: { width: "100%", minHeight: 130, resize: "vertical", fontFamily: "inherit", fontSize: 13.5 }
             }
           ), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10.5, color: T.muted, marginTop: 3 } }, notaAutoSalvando[n.id] ? "salvando\u2026" : "salvo automaticamente"), /\[\[(nota|metodo):/.test(notaEditDraft[n.id] || "") && /* @__PURE__ */ React.createElement(
             "div",
@@ -8168,7 +8530,7 @@ function Sondagem() {
         );
       }))))))
     );
-  }))))), view !== "meusprojetos" && view !== "comousar" && (active ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement(
+  }))))), view !== "meusprojetos" && view !== "comousar" && view !== "atividades" && view !== "config" && (active ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 24 } }, /* @__PURE__ */ React.createElement(
     "input",
     {
       className: "sd-inp",
@@ -8227,7 +8589,7 @@ function Sondagem() {
       onClick: () => setQuadroAberto((p) => ({ ...p, [active.id]: !p[active.id] }))
     },
     "\u{1F5FA} Quadro livre"
-  )), quadroAberto[active.id] && /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 14, marginTop: 8 } }, /* @__PURE__ */ React.createElement(QuadroLivre, { idea: active, onChange: (novoQuadro) => updateActive({ quadro: novoQuadro }) }))), view === "camadas" && /* @__PURE__ */ React.createElement("section", null, LAYERS.map((l, idx) => {
+  )), quadroAberto[active.id] && /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 14, marginTop: 8 } }, /* @__PURE__ */ React.createElement(QuadroLivre, { idea: active, onChange: (novoQuadro) => updateActive({ quadro: novoQuadro }), onExcluir: registrarExclusao }))), view === "camadas" && /* @__PURE__ */ React.createElement("section", null, LAYERS.map((l, idx) => {
     const done = filledCount(active, l);
     const pct = Math.round(done / l.fields.length * 100);
     const open = !!openLayers[l.id];
@@ -8853,11 +9215,12 @@ function Sondagem() {
   )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: copySummary }, copied ? "Copiado" : "Copiar resumo"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: T.muted } }, status)))) : /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, padding: "24px 4px" } }, 'Nenhum projeto aberto. Abra ou crie um em "Meus projetos".')))));
 }
 
-window.__SONDAGEM_VERSAO__ = "1.21.0";
+window.__SONDAGEM_VERSAO__ = "1.28.0";
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Sondagem, null));
 
   var __carr = document.getElementById('carregando');
   if (__carr && __carr.parentNode) __carr.parentNode.removeChild(__carr);
+
 </script>
 </body>
 </html>
