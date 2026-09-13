@@ -18568,6 +18568,17 @@ async function copiar(texto) {
         }
     }
 }
+async function traduzirTexto(texto, paraIdioma) {
+    const alvo = paraIdioma === "Espanhol" ? "es" : paraIdioma === "Inglês" ? "en" : null;
+    const t = (texto || "").trim();
+    if (!alvo || !t)
+        return "";
+    const resp = await fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(t) + "&langpair=pt-BR|" + alvo);
+    if (!resp.ok)
+        throw new Error("falha ao traduzir");
+    const dados = await resp.json();
+    return (dados && dados.responseData && dados.responseData.translatedText) || "";
+}
 /* ── app ───────────────────────────────────────────────── */
 function BaralhoDeContatos() {
     const [tela, setTela] = (0, react_1.useState)("baralho");
@@ -18577,6 +18588,7 @@ function BaralhoDeContatos() {
     const [msgs, setMsgs] = (0, react_1.useState)([]);
     const [minhaCidade, setMinhaCidade] = (0, react_1.useState)(CIDADE_PADRAO);
     const [desbloqueios, setDesbloqueios] = (0, react_1.useState)([]);
+    const [testes, setTestes] = (0, react_1.useState)([]);
     const [conhecimento, setConhecimento] = (0, react_1.useState)([]);
     const [objetivos, setObjetivos] = (0, react_1.useState)([]);
     const [acoes, setAcoes] = (0, react_1.useState)([]);
@@ -18600,6 +18612,7 @@ function BaralhoDeContatos() {
         msgs,
         minhaCidade,
         desbloqueios,
+        testes,
         conhecimento,
         objetivos,
         acoes,
@@ -18646,6 +18659,7 @@ function BaralhoDeContatos() {
                 setMsgs(d.msgs || []);
                 setMinhaCidade(d.minhaCidade || CIDADE_PADRAO);
                 setDesbloqueios(d.desbloqueios || []);
+                setTestes(d.testes || []);
                 setConhecimento(d.conhecimento || []);
                 setObjetivos(d.objetivos || []);
                 setAcoes(d.acoes || []);
@@ -18675,6 +18689,7 @@ function BaralhoDeContatos() {
                 setMsgs(d.msgs || []);
                 setMinhaCidade(d.minhaCidade || CIDADE_PADRAO);
                 setDesbloqueios(d.desbloqueios || []);
+                setTestes(d.testes || []);
                 setConhecimento(d.conhecimento || []);
                 setObjetivos(d.objetivos || []);
                 setAcoes(d.acoes || []);
@@ -18770,6 +18785,7 @@ function BaralhoDeContatos() {
             msgs,
             minhaCidade,
             desbloqueios,
+            testes,
             conhecimento,
             objetivos,
             acoes,
@@ -18785,6 +18801,7 @@ function BaralhoDeContatos() {
         msgs,
         minhaCidade,
         desbloqueios,
+        testes,
         conhecimento,
         objetivos,
         acoes,
@@ -18938,6 +18955,21 @@ function BaralhoDeContatos() {
     };
     const marcarDesbloqueio = (id) => setDesbloqueios((ds) => ds.map((d) => d.id === id ? { ...d, feito: !d.feito, feitoEm: !d.feito ? Date.now() : null } : d));
     const removerDesbloqueio = (id) => setDesbloqueios((ds) => ds.filter((d) => d.id !== id));
+    const addTeste = (texto) => {
+        const t = String(texto || "").trim();
+        if (!t)
+            return;
+        setTestes((ts) => [{ id: uid(), texto: t, criadoEm: Date.now(), registros: [] }, ...ts]);
+    };
+    const registrarNotaTeste = (id, nota) => {
+        const n = String(nota || "").trim();
+        if (!n)
+            return;
+        setTestes((ts) => ts.map((t) => t.id === id
+            ? { ...t, registros: [{ id: uid(), nota: n, data: Date.now() }, ...(t.registros || [])] }
+            : t));
+    };
+    const removerTeste = (id) => setTestes((ts) => ts.filter((t) => t.id !== id));
     const addConhecimento = (texto) => {
         const t = String(texto || "").trim();
         if (!t)
@@ -19038,7 +19070,7 @@ function BaralhoDeContatos() {
         nuvemAberta && (react_1.default.createElement(ModalNuvem, { status: nuvemStatus, onVerificar: () => sincronizarNuvem(true), onFechar: () => setNuvemAberta(false) })),
         configAberta && (react_1.default.createElement(ModalConfig, { minhaCidade: minhaCidade, onMudarCidade: setMinhaCidade, temCidade: temCidade, chaveMinha: chaveMinha, statusOrigem: statusOrigem, onR2Salvo: () => setR2Check((n) => n + 1), onFechar: () => setConfigAberta(false) })),
         loaded && tela === "baralho" && (react_1.default.createElement(PainelLembretesHoje, { lembretes: lembretes, onIrCalendario: () => setTela("calendario") })),
-        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onAddMsgFalar: addMsgFalar, onEditarMsgFalar: editarMsgFalar, onRemoverMsgFalar: removerMsgFalar, onConcluirMsgFalar: concluirMsgFalar, onRemoverMsgFalado: removerMsgFalado, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "calendario" ? (react_1.default.createElement(TelaCalendario, { lembretes: lembretes, onAdd: addLembrete, onRemover: removerLembrete })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
+        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onAddMsgFalar: addMsgFalar, onEditarMsgFalar: editarMsgFalar, onRemoverMsgFalar: removerMsgFalar, onConcluirMsgFalar: concluirMsgFalar, onRemoverMsgFalado: removerMsgFalado, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, testes: testes, onAddTeste: addTeste, onRegistrarNotaTeste: registrarNotaTeste, onRemoverTeste: removerTeste, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "calendario" ? (react_1.default.createElement(TelaCalendario, { lembretes: lembretes, onAdd: addLembrete, onRemover: removerLembrete })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
         react_1.default.createElement("footer", { className: "bc-footer" },
             react_1.default.createElement("span", { className: erro ? "bc-status bc-status-erro" : "bc-status" }, erro
                 ? "não foi possível salvar"
@@ -19959,14 +19991,43 @@ function PainelMsg({ carta, onFechar, onAddFalar, onEditarFalar, onRemoverFalar,
     useTravarRolagem(true);
     const [escrevendo, setEscrevendo] = (0, react_1.useState)(false);
     const [texto, setTexto] = (0, react_1.useState)("");
+    const [traducaoFalar, setTraducaoFalar] = (0, react_1.useState)("");
+    const [traduzindoFalar, setTraduzindoFalar] = (0, react_1.useState)(false);
+    const [erroFalar, setErroFalar] = (0, react_1.useState)("");
     const falar = carta.msgFalar || [];
     const falado = carta.msgFalado || [];
+    const idiomaAlvo = carta.idioma === "Espanhol" || carta.idioma === "Inglês" ? carta.idioma : null;
+    (0, react_1.useEffect)(() => {
+        if (!idiomaAlvo || !texto.trim()) {
+            setTraducaoFalar("");
+            setErroFalar("");
+            setTraduzindoFalar(false);
+            return;
+        }
+        setTraduzindoFalar(true);
+        setErroFalar("");
+        const espera = setTimeout(async () => {
+            try {
+                const traduzido = await traduzirTexto(texto, idiomaAlvo);
+                setTraducaoFalar(traduzido);
+            }
+            catch {
+                setErroFalar("não consegui traduzir agora");
+            }
+            finally {
+                setTraduzindoFalar(false);
+            }
+        }, 700);
+        return () => clearTimeout(espera);
+    }, [texto, idiomaAlvo]);
     const adicionar = () => {
         const t = texto.trim();
         if (!t)
             return;
-        onAddFalar(t);
+        const final = idiomaAlvo && traducaoFalar.trim() ? traducaoFalar.trim() : t;
+        onAddFalar(final);
         setTexto("");
+        setTraducaoFalar("");
     };
     return (react_1.default.createElement("div", { className: "bc-modal", role: "dialog", "aria-label": "Msg" },
         react_1.default.createElement("div", { className: "bc-modalbox" },
@@ -19982,6 +20043,11 @@ function PainelMsg({ carta, onFechar, onAddFalar, onEditarFalar, onRemoverFalar,
                         react_1.default.createElement("label", { className: "bc-group" },
                             react_1.default.createElement("span", { className: "bc-lbl" }, "Falar"),
                             react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: texto, onChange: (e) => setTexto(e.target.value), placeholder: "Escreva o que voc\u00EA quer falar", "aria-label": "Falar", autoFocus: true })),
+                        idiomaAlvo && (react_1.default.createElement("div", { className: "bc-group bc-traducaoauto" },
+                            react_1.default.createElement("span", { className: "bc-lbl" },
+                                "Tradu\u00E7\u00E3o autom\u00E1tica \u00B7 ",
+                                idiomaAlvo),
+                            traduzindoFalar ? (react_1.default.createElement("p", { className: "bc-mini" }, "traduzindo\u2026")) : erroFalar ? (react_1.default.createElement("p", { className: "bc-mini bc-ocrstatus-erro" }, erroFalar)) : traducaoFalar ? (react_1.default.createElement("p", { className: "bc-traducaotexto" }, traducaoFalar)) : (react_1.default.createElement("p", { className: "bc-mini" }, "Escreva o texto para ver a tradu\u00E7\u00E3o aqui.")))),
                         react_1.default.createElement("div", { className: "bc-bancoacoes" },
                             react_1.default.createElement("button", { className: "bc-feito", onClick: adicionar, disabled: !texto.trim() }, "Adicionar"))))),
                 react_1.default.createElement("section", { className: "bc-nextbloco" },
@@ -19999,6 +20065,14 @@ function ItemMsgFalar({ item, onEditar, onRemover, onConcluir }) {
     const [editando, setEditando] = (0, react_1.useState)(false);
     const [texto, setTexto] = (0, react_1.useState)(item.texto);
     const [confirma, setConfirma] = (0, react_1.useState)(false);
+    const [copiado, setCopiado] = (0, react_1.useState)(false);
+    const copiarTexto = async () => {
+        const ok = await copiar(item.texto || "");
+        if (ok) {
+            setCopiado(true);
+            setTimeout(() => setCopiado(false), 1500);
+        }
+    };
     const salvar = () => {
         const t = texto.trim();
         if (!t)
@@ -20022,6 +20096,7 @@ function ItemMsgFalar({ item, onEditar, onRemover, onConcluir }) {
     return (react_1.default.createElement("article", { className: "bc-fcreg" },
         react_1.default.createElement("div", { className: "bc-fcregtop" },
             react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(item.criadoEm)),
+            react_1.default.createElement("button", { className: "bc-linhax bc-fcedit-btn", onClick: copiarTexto, "aria-label": "Copiar" }, copiado ? "✓" : "⧉"),
             react_1.default.createElement("button", { className: "bc-linhax bc-fcedit-btn", onClick: () => setEditando(true), "aria-label": "Editar" }, "\u270E"),
             react_1.default.createElement("button", { className: "bc-linhax", onClick: () => (confirma ? onRemover() : setConfirma(true)), onBlur: () => setConfirma(false), "aria-label": "Excluir" }, confirma ? "excluir?" : "×")),
         react_1.default.createElement("p", { className: "bc-fccampo" }, item.texto),
@@ -20352,7 +20427,7 @@ function TelaCalendario({ lembretes, onAdd, onRemover }) {
                 react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemover(l.id), "aria-label": "Excluir lembrete" }, "\u00D7")))))))));
 }
 /* ── tela: FC Skill ────────────────────────────────────── */
-function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloqueios, conhecimento, onAddDesbloqueio, onMarcarDesbloqueio, onRemoverDesbloqueio, onAddConhecimento, onRemoverConhecimento, onRemoverFC, onEditarFC, }) {
+function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloqueios, conhecimento, onAddDesbloqueio, onMarcarDesbloqueio, onRemoverDesbloqueio, testes = [], onAddTeste, onRegistrarNotaTeste, onRemoverTeste, onAddConhecimento, onRemoverConhecimento, onRemoverFC, onEditarFC, }) {
     const [novoItem, setNovoItem] = (0, react_1.useState)("");
     const [texto, setTexto] = (0, react_1.useState)("");
     const [salvo, setSalvo] = (0, react_1.useState)(false);
@@ -20388,6 +20463,13 @@ function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloquei
             return;
         onAddDesbloqueio(novoItem);
         setNovoItem("");
+    };
+    const [novoTeste, setNovoTeste] = (0, react_1.useState)("");
+    const adicionarTeste = () => {
+        if (!novoTeste.trim())
+            return;
+        onAddTeste(novoTeste);
+        setNovoTeste("");
     };
     const registrarSaber = () => {
         if (!texto.trim())
@@ -20447,6 +20529,14 @@ function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloquei
                 react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemoverDesbloqueio(d.id), "aria-label": "Excluir item" }, "\u00D7"))))))),
         react_1.default.createElement("section", { className: "bc-col" },
             react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Testar"),
+                react_1.default.createElement("span", { className: "bc-status" }, testes.length)),
+            react_1.default.createElement("div", { className: "bc-catrow bc-desbrow" },
+                react_1.default.createElement("input", { className: "bc-desbinput", value: novoTeste, onChange: (e) => setNovoTeste(e.target.value), onKeyDown: (e) => e.key === "Enter" && adicionarTeste(), placeholder: "Novo item para testar", "aria-label": "Novo item para testar" }),
+                react_1.default.createElement("button", { className: "bc-catbtn", onClick: adicionarTeste }, "Adicionar")),
+            testes.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhum item ainda. Escreva o primeiro acima.")) : (react_1.default.createElement("div", { className: "bc-desblista" }, testes.map((t) => (react_1.default.createElement(ItemTeste, { key: t.id, item: t, onRegistrarNota: (nota) => onRegistrarNotaTeste(t.id, nota), onRemover: () => onRemoverTeste(t.id) })))))),
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
                 react_1.default.createElement("h2", { className: "bc-h2" }, "Conhecimento popular"),
                 react_1.default.createElement("span", { className: "bc-status" },
                     conhecimento.length,
@@ -20468,9 +20558,41 @@ function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloquei
                     react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemoverConhecimento(c.id), "aria-label": "Excluir registro" }, "\u00D7")),
                 react_1.default.createElement("p", { className: "bc-fccampo" }, c.texto)))))))));
 }
+function ItemTeste({ item, onRegistrarNota, onRemover }) {
+    const [escrevendo, setEscrevendo] = (0, react_1.useState)(false);
+    const [nota, setNota] = (0, react_1.useState)("");
+    const [verRegistro, setVerRegistro] = (0, react_1.useState)(false);
+    const [confirma, setConfirma] = (0, react_1.useState)(false);
+    const registros = item.registros || [];
+    const salvar = () => {
+        if (!nota.trim())
+            return;
+        onRegistrarNota(nota);
+        setNota("");
+        setEscrevendo(false);
+        setVerRegistro(true);
+    };
+    return (react_1.default.createElement("div", { className: "bc-desb bc-testeitem" },
+        react_1.default.createElement("div", { className: "bc-testetopo" },
+            react_1.default.createElement("span", { className: "bc-desbtexto" }, item.texto),
+            registros.length > 0 && (react_1.default.createElement("button", { className: verRegistro ? "bc-verregistro bc-verregistro-on" : "bc-verregistro", onClick: () => setVerRegistro((v) => !v) },
+                "ver registro ",
+                react_1.default.createElement("em", null, registros.length))),
+            react_1.default.createElement("button", { className: escrevendo ? "bc-realizado bc-realizado-on" : "bc-realizado", onClick: () => setEscrevendo((e) => !e) }, "testado"),
+            react_1.default.createElement("button", { className: "bc-linhax", onClick: () => (confirma ? onRemover() : setConfirma(true)), onBlur: () => setConfirma(false), "aria-label": "Excluir item" }, confirma ? "excluir?" : "×")),
+        escrevendo && (react_1.default.createElement("div", { className: "bc-testenota" },
+            react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: nota, onChange: (e) => setNota(e.target.value), placeholder: "Escreva a nota deste teste", "aria-label": "Nota de teste para " + item.texto, autoFocus: true }),
+            react_1.default.createElement("div", { className: "bc-bancoacoes" },
+                react_1.default.createElement("button", { className: "bc-feito", onClick: salvar, disabled: !nota.trim() }, "Salvar")))),
+        verRegistro && registros.length > 0 && (react_1.default.createElement("div", { className: "bc-fclista" }, registros.map((r) => (react_1.default.createElement("article", { className: "bc-fcreg", key: r.id },
+            react_1.default.createElement("div", { className: "bc-fcregtop" },
+                react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(r.data))),
+            react_1.default.createElement("p", { className: "bc-fccampo" }, r.nota))))))));
+}
 /* ── tela 3: livro razão ───────────────────────────────── */
 function TelaRazao({ cards, conhecimento = [], desbloqueios = [], onRemoverFC, onEditarFC }) {
     const [filtro, setFiltro] = (0, react_1.useState)("todos");
+    const [visao, setVisao] = (0, react_1.useState)("lista"); // "lista" ou "mes"
     const tudo = (0, react_1.useMemo)(() => {
         const out = [];
         cards.forEach((c) => {
@@ -20490,6 +20612,24 @@ function TelaRazao({ cards, conhecimento = [], desbloqueios = [], onRemoverFC, o
                 ? tudo.filter((r) => r.kind === "desb")
                 : tudo.filter((r) => r.cardId === filtro);
     const comRegistros = cards.filter((c) => (c.fcskill || []).length);
+    const agrupadoMes = (0, react_1.useMemo)(() => {
+        const grupos = {};
+        lista.forEach((r) => {
+            const d = new Date(r.data);
+            const chave = d.getFullYear() + "-" + String(d.getMonth()).padStart(2, "0");
+            if (!grupos[chave])
+                grupos[chave] = [];
+            grupos[chave].push(r);
+        });
+        return Object.entries(grupos)
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .map(([chave, regs]) => {
+            const [ano, mes] = chave.split("-");
+            const d = new Date(ano, parseInt(mes), 1);
+            const mesNome = d.toLocaleString("pt-BR", { month: "long", year: "numeric" });
+            return { chave, mesNome: mesNome.charAt(0).toUpperCase() + mesNome.slice(1), regs };
+        });
+    }, [lista]);
     return (react_1.default.createElement("div", { className: "bc-razao" },
         react_1.default.createElement("div", { className: "bc-colhead bc-razaohead" },
             react_1.default.createElement("h2", { className: "bc-h2" }, "Livro raz\u00E3o"),
@@ -20501,11 +20641,20 @@ function TelaRazao({ cards, conhecimento = [], desbloqueios = [], onRemoverFC, o
             comRegistros.map((c) => (react_1.default.createElement(Chip, { key: c.id, ativo: filtro === c.id, onClick: () => setFiltro(c.id) }, c.nome.trim() || "sem nome"))),
             conhecimento.length > 0 && (react_1.default.createElement(Chip, { ativo: filtro === "saber", onClick: () => setFiltro("saber") }, "Conhecimento")),
             desbloqueios.some((d) => d.feito) && (react_1.default.createElement(Chip, { ativo: filtro === "desb", onClick: () => setFiltro("desb") }, "Desbloqueios"))),
-        lista.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty" }, "Nada registrado ainda. Abra uma carta, toque em FC Skill e registre o primeiro encontro.")) : (react_1.default.createElement("div", { className: "bc-fclista bc-fclista-razao" }, lista.map((r) => r.kind === "fc" ? (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, nomeContato: r.nome, onRemover: () => onRemoverFC(r.cardId, r.id), onEditar: (patch) => onEditarFC(r.cardId, r.id, patch) })) : (react_1.default.createElement("article", { className: "bc-fcreg", key: r.id },
+        react_1.default.createElement("div", { className: "bc-visaocontrole" },
+            react_1.default.createElement("button", { className: visao === "lista" ? "bc-visaobtn bc-visaobtn-on" : "bc-visaobtn", onClick: () => setVisao("lista") }, "Lista"),
+            react_1.default.createElement("button", { className: visao === "mes" ? "bc-visaobtn bc-visaobtn-on" : "bc-visaobtn", onClick: () => setVisao("mes") }, "Por m\u00EAs")),
+        lista.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty" }, "Nada registrado ainda. Abra uma carta, toque em FC Skill e registre o primeiro encontro.")) : visao === "lista" ? (react_1.default.createElement("div", { className: "bc-fclista bc-fclista-razao" }, lista.map((r) => r.kind === "fc" ? (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, nomeContato: r.nome, onRemover: () => onRemoverFC(r.cardId, r.id), onEditar: (patch) => onEditarFC(r.cardId, r.id, patch) })) : (react_1.default.createElement("article", { className: "bc-fcreg", key: r.id },
             react_1.default.createElement("div", { className: "bc-fcregtop" },
                 react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(r.data)),
                 react_1.default.createElement("strong", { className: "bc-fcnome" }, r.kind === "saber" ? "Conhecimento popular" : "Desbloqueado")),
-            react_1.default.createElement("p", { className: "bc-fccampo" }, r.texto))))))));
+            react_1.default.createElement("p", { className: "bc-fccampo" }, r.texto)))))) : (react_1.default.createElement("div", { className: "bc-razaomes" }, agrupadoMes.map((grupo) => (react_1.default.createElement("div", { className: "bc-mesbloco", key: grupo.chave },
+            react_1.default.createElement("h3", { className: "bc-mestitulo" }, grupo.mesNome),
+            react_1.default.createElement("div", { className: "bc-fclista bc-fclista-razao" }, grupo.regs.map((r) => r.kind === "fc" ? (react_1.default.createElement(RegistroFC, { key: r.id, registro: r, nomeContato: r.nome, onRemover: () => onRemoverFC(r.cardId, r.id), onEditar: (patch) => onEditarFC(r.cardId, r.id, patch) })) : (react_1.default.createElement("article", { className: "bc-fcreg", key: r.id },
+                react_1.default.createElement("div", { className: "bc-fcregtop" },
+                    react_1.default.createElement("span", { className: "bc-fcdata" }, fmtData(r.data)),
+                    react_1.default.createElement("strong", { className: "bc-fcnome" }, r.kind === "saber" ? "Conhecimento popular" : "Desbloqueado")),
+                react_1.default.createElement("p", { className: "bc-fccampo" }, r.texto))))))))))));
 }
 /* ── tela 2: mensagens e envio ─────────────────────────── */
 function TelaMensagens({ cards, sources, sourceGlyphs, msgs, setMsgs, medir, onRegistrarEnvio }) {
@@ -20959,6 +21108,17 @@ const CSS = `
   border:1px solid var(--ink);flex-shrink:0;transition:filter .15s ease;}
 .bc-realizado:hover{filter:brightness(1.25);}
 .bc-realizado-on{background:transparent;color:var(--soft);border-color:var(--edge);}
+.bc-testeitem{flex-direction:column;align-items:stretch;gap:8px;}
+.bc-testetopo{display:flex;align-items:center;gap:10px;}
+.bc-testenota{display:flex;flex-direction:column;gap:0;}
+.bc-verregistro{font-family:inherit;font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  padding:6px 10px;cursor:pointer;border-radius:2px;color:var(--ink);background:transparent;
+  border:1px solid var(--edge);flex-shrink:0;transition:filter .15s ease,background .15s ease;}
+.bc-verregistro em{font-style:normal;opacity:.7;margin-left:2px;}
+.bc-verregistro:hover{filter:brightness(1.1);}
+.bc-verregistro-on{background:var(--ink);color:var(--card);border-color:var(--ink);}
+.bc-testeitem .bc-fclista{margin-top:2px;}
+.bc-testeitem .bc-fcreg{background:rgba(21,16,15,.05);}
 .bc-saber{margin-top:2px;}
 .bc-midia{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;}
 .bc-midiabtn{display:inline-flex;align-items:center;gap:7px;font-family:inherit;font-size:11px;
@@ -21061,6 +21221,17 @@ const CSS = `
 .bc-razao{max-width:820px;width:100%;margin:26px auto 0;padding:0 2px 40px;min-width:0;}
 .bc-razaofiltros{margin:12px 0 4px;}
 .bc-razaohead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+.bc-visaocontrole{display:flex;gap:8px;margin:12px 0;border-bottom:1px solid rgba(205,194,170,.3);padding-bottom:8px;}
+.bc-visaobtn{font-family:inherit;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:6px 12px;cursor:pointer;border-radius:2px;color:var(--ink);background:transparent;
+  border:1px solid var(--edge);flex-shrink:0;transition:background .15s ease,color .15s ease;}
+.bc-visaobtn:hover{filter:brightness(1.08);}
+.bc-visaobtn-on{background:var(--ink);color:var(--card);border-color:var(--ink);}
+.bc-razaomes{display:flex;flex-direction:column;gap:18px;margin-top:12px;}
+.bc-mesbloco{border-top:1px solid rgba(205,194,170,.4);padding-top:14px;}
+.bc-mesbloco:first-of-type{border-top:none;padding-top:0;}
+.bc-mestitulo{font-family:'Bodoni Moda',serif;font-size:16px;font-weight:600;color:var(--card);
+  margin:0 0 10px;text-transform:capitalize;}
 
 .bc-card{background:var(--card);border-radius:12px;padding:9px;
   box-shadow:0 18px 34px rgba(0,0,0,.42),0 2px 0 rgba(255,255,255,.06);
@@ -21323,6 +21494,8 @@ const CSS = `
 .bc-msgtext{width:100%;margin-top:4px;font-family:inherit;font-size:13px;line-height:1.55;color:var(--ink);resize:vertical;
   background:rgba(21,16,15,.03);border:1px solid var(--edge);border-radius:2px;padding:8px 10px;}
 .bc-msgtext:focus{outline:none;border-color:var(--red);}
+.bc-msgtext.bc-saber{color:var(--card);}
+.bc-msgtext.bc-saber::placeholder{color:rgba(251,247,238,.4);}
 .bc-mini{margin:6px 0 0;font-size:10.5px;color:var(--soft);}
 
 .bc-traducaoauto{background:rgba(21,16,15,.03);border:1px dashed var(--edge);border-radius:3px;
