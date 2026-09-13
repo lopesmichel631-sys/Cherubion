@@ -803,6 +803,9 @@ const css = `
 .sd-btn:hover { border-color: ${T.action}; color: ${T.action}; }
 .sd-btn-p { background: ${T.action}; border-color: ${T.action}; color: #FFFDF7; }
 .sd-btn-p:hover { background: #8E6417; border-color: #8E6417; color: #FFFDF7; }
+.sd-btn-feito { font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; border-radius: 4px; padding: 5px 13px; border: 1px solid ${T.action}; background: ${T.action}; color: #FFFDF7; white-space: nowrap; transition: background 150ms ease, border-color 150ms ease; }
+.sd-btn-feito:hover { background: #8E6417; border-color: #8E6417; }
+.sd-btn-feito[data-pressionado="1"] { background: #2E7D46; border-color: #2E7D46; }
 .sd-chip { font-size: 13px; padding: 6px 11px; border-radius: 3px; border: 1px solid ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
 .sd-chip[data-on="1"] { background: ${T.ink}; border-color: ${T.ink}; color: #F2F3EF; }
 .sd-seg { font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 999px; border: 1.5px solid ${T.ink}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.ink}; white-space: nowrap; }
@@ -816,6 +819,14 @@ const css = `
 .sd-tag-voto[data-on="1"] { background: #E1EBF3; border-color: #2F6FA8; border-style: solid; color: #21507A; font-weight: 700; }
 .sd-limpar { font-size: 12px; padding: 5px 4px; border: none; border-bottom: 1px solid #8A3A2C; background: transparent; cursor: pointer; font-family: inherit; color: #8A3A2C; white-space: nowrap; }
 .sd-limpar:hover { color: #6E2E23; border-color: #6E2E23; }
+.sd-tag-notas { font-size: 13px; padding: 6px 11px; border-radius: 3px; border: 1px solid #D9C7A3; background: #F1E6D2; cursor: pointer; font-family: inherit; color: #7A6A4C; white-space: nowrap; }
+.sd-tag-notas:hover { border-color: #C2A876; color: #5E5138; }
+.sd-tag-pastanota { font-size: 12px; padding: 4px 10px; border-radius: 4px 4px 0 4px; border: 1px solid #C9A227; background: #F6EAC5; color: #6B5410; font-family: inherit; cursor: pointer; white-space: nowrap; }
+.sd-tag-pastanota:hover { background: #F0DFA0; }
+.sd-tag-pastanota[data-on="1"] { background: #C9A227; border-color: #8A6D1A; color: #FFFDF7; font-weight: 600; }
+.sd-nota-arrastavel { cursor: grab; }
+.sd-nota-arrastavel:active { cursor: grabbing; }
+.sd-nota-alvo { outline: 2px dashed #A8791F !important; outline-offset: 2px; }
 .sd-row { display: flex; width: 100%; align-items: flex-start; gap: 10px; text-align: left; background: none; border: none; font-family: inherit; cursor: pointer; padding: 12px 0; color: ${T.ink}; }
 .sd-row:hover .sd-rowlabel { color: ${T.action}; }
 .sd-sep { border-top: 1px solid ${T.line}; }
@@ -864,6 +875,8 @@ function emptyIdea(title) {
     metas: {},
     anexos: [],
     notas: [],
+    pastasNotas: [],
+    feitoLog: [],
     quadro: quadroVazio(),
     status: "ideia",
     prioridade: "media",
@@ -5720,6 +5733,22 @@ const COMO_USAR = [
       {
         titulo: "Campo Tipo do projeto (App / Produto / Servi\xE7o)",
         texto: 'Cada projeto ganhou um terceiro seletor, ao lado de Status e Prioridade, chamado "Tipo" \u2014 com as op\xE7\xF5es "App", "Produto" e "Servi\xE7o" (ou "Sem tipo", se ainda n\xE3o escolheu nenhum). Na barra de cima de "Meus projetos" (modo "\u2630 Lista"), logo depois dos filtros de status, tem um chip pra cada tipo \u2014 toque pra mostrar s\xF3 os projetos daquele tipo; toque de novo no mesmo chip pra desligar o filtro. Combina com todos os outros filtros da mesma barra (status, App das notas, voto).'
+      },
+      {
+        titulo: "Reordenar notas arrastando",
+        texto: 'Com "Ver notas" aberto, cada nota tem uma alcinha "\u283F" no canto esquerdo do cabe\xE7alho. Segure e arraste uma nota at\xE9 a posi\xE7\xE3o de outra pra trocar a ordem entre elas \u2014 a nota arrastada assume o lugar da nota-alvo. Funciona mesmo com se\xE7\xE3o ou filtro de cor/voto ativos: a nota s\xF3 muda de posi\xE7\xE3o, sem sair da se\xE7\xE3o onde est\xE1. O bot\xE3o "Ver/Ocultar notas" tamb\xE9m ganhou uma cor areia, pra ficar mais f\xE1cil de achar entre os outros bot\xF5es do card.'
+      },
+      {
+        titulo: "Pastas de notas \u{1F5C2}\uFE0F",
+        texto: 'Diferente da "\u{1F4E6} Se\xE7\xE3o" (um campo de texto livre), a pasta \xE9 criada e gerenciada \xE0 parte: toque em "\u{1F5C2}\uFE0F Pastas" (ao lado de "Ver notas") pra abrir o painel, digitar um nome e tocar em "+ Criar pasta". Pra conectar uma nota j\xE1 salva a uma pasta, use o seletor "\u{1F5C2}\uFE0F Pasta:" que aparece no rodap\xE9 da nota assim que o projeto tem pelo menos uma pasta criada. Excluir uma pasta (\u2715 no chip dela) n\xE3o apaga as notas \u2014 elas s\xF3 voltam a ficar "sem pasta". Na faixa "Filtrar:" de "Ver notas", cada pasta vira um chip pra isolar s\xF3 as notas daquela pasta.'
+      },
+      {
+        titulo: 'Contador "Feito" \u2705',
+        texto: 'Cada nota tem um bot\xE3o dourado "Feito" no cabe\xE7alho. Cada toque soma 1 no contador do PROJETO (n\xE3o da nota) \u2014 o bot\xE3o vira verde por um instante como confirma\xE7\xE3o, e assim que "Feito" j\xE1 foi tocado ao menos uma vez, aparece ao lado de "Ver notas" um resumo "\u2705 X hoje \xB7 Y semana \xB7 Z m\xEAs", contando quantos toques ca\xEDram em cada per\xEDodo. N\xE3o guarda qual nota foi tocada nem o texto dela, s\xF3 a data e a hora \u2014 \xE9 s\xF3 um contador de frequ\xEAncia.'
+      },
+      {
+        titulo: "Ocultar todas as notas de dentro de qualquer nota",
+        texto: 'Com "Ver notas" aberto, cada nota tem um link "\u25B2 Ocultar" no canto esquerdo do cabe\xE7alho, ao lado da alcinha de arrastar. Ele faz exatamente o que o bot\xE3o "Ocultar notas" l\xE1 em cima faz: fecha a lista inteira de notas do projeto de uma vez, n\xE3o s\xF3 aquela nota \u2014 \xFAtil pra n\xE3o precisar rolar a tela at\xE9 o topo depois de ler uma nota mais abaixo na lista.'
       }
     ]
   },
@@ -5774,14 +5803,21 @@ function Sondagem() {
   const [anexoErro, setAnexoErro] = useState({});
   const [enviandoAnexo, setEnviandoAnexo] = useState({});
   const [notasAbertas, setNotasAbertas] = useState({});
+  const [pastasNotasAbertas, setPastasNotasAbertas] = useState({});
+  const [pastaNotaDraft, setPastaNotaDraft] = useState({});
+  const [filtroPastaNota, setFiltroPastaNota] = useState({});
   const [notaDraft, setNotaDraft] = useState({});
   const [notaEditando, setNotaEditando] = useState({});
   const [notaCopiada, setNotaCopiada] = useState({});
+  const [notaFeitoPressionado, setNotaFeitoPressionado] = useState({});
+  const notaFeitoTimers = useRef({});
   const [notaFiltroApp, setNotaFiltroApp] = useState({});
   const [notaFiltroVoto, setNotaFiltroVoto] = useState({});
   const [notaEditDraft, setNotaEditDraft] = useState({});
   const [notaAutoSalvando, setNotaAutoSalvando] = useState({});
   const notaAutoSaveTimers = useRef({});
+  const [notaArrastando, setNotaArrastando] = useState(null);
+  const [notaSobreAlvo, setNotaSobreAlvo] = useState(null);
   const [notaAnexoDraft, setNotaAnexoDraft] = useState({});
   const [notaAnexoEnviando, setNotaAnexoEnviando] = useState({});
   const [notaAnexoErro, setNotaAnexoErro] = useState({});
@@ -5810,7 +5846,7 @@ function Sondagem() {
         const res = await window.storage.get(STORE_KEY);
         const parsed = res ? JSON.parse(res.value) : null;
         if (parsed && Array.isArray(parsed.ideas) && parsed.ideas.length) {
-          setIdeas(parsed.ideas.map((i) => ({ ...i, hoshin: i.hoshin || blankHoshin(), toc: i.toc || {}, v2mom: i.v2mom || blankV2(), pmi: i.pmi || blankPmi(), gold: i.gold || blankGold(), okr: i.okr || blankOkr(), cabala: i.cabala || {}, metas: i.metas || {}, anexos: i.anexos || [], notas: (i.notas || []).map((n) => ({ ...n, anexos: n.anexos || [], lembrete: n.lembrete || "", secao: n.secao || "", votos: n.votos || 0, checklist: n.checklist || [], app: n.app === true ? "on" : n.app === false || n.app === void 0 ? "off" : n.app })), quadro: i.quadro || quadroVazio(), status: i.status || "ideia", prioridade: i.prioridade || "media", tipo: i.tipo || "", metodosSugeridos: i.metodosSugeridos || [], pasta: i.pasta || "" })));
+          setIdeas(parsed.ideas.map((i) => ({ ...i, hoshin: i.hoshin || blankHoshin(), toc: i.toc || {}, v2mom: i.v2mom || blankV2(), pmi: i.pmi || blankPmi(), gold: i.gold || blankGold(), okr: i.okr || blankOkr(), cabala: i.cabala || {}, metas: i.metas || {}, anexos: i.anexos || [], pastasNotas: i.pastasNotas || [], feitoLog: i.feitoLog || [], notas: (i.notas || []).map((n) => ({ ...n, anexos: n.anexos || [], lembrete: n.lembrete || "", secao: n.secao || "", pastaId: n.pastaId || "", votos: n.votos || 0, checklist: n.checklist || [], app: n.app === true ? "on" : n.app === false || n.app === void 0 ? "off" : n.app })), quadro: i.quadro || quadroVazio(), status: i.status || "ideia", prioridade: i.prioridade || "media", tipo: i.tipo || "", metodosSugeridos: i.metodosSugeridos || [], pasta: i.pasta || "" })));
           setActiveId(parsed.activeId || parsed.ideas[0].id);
         } else {
           const idea = emptyIdea();
@@ -6017,6 +6053,65 @@ function Sondagem() {
         (i) => i.id === ideaId ? { ...i, notas: (i.notas || []).map((n) => n.id === notaId ? { ...n, secao: valor } : n) } : i
       )
     );
+  }
+  function criarPastaNota(ideaId, nome) {
+    const nomeLimpo = (nome || "").trim();
+    if (!nomeLimpo) return;
+    const novaPasta = { id: "pn" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nome: nomeLimpo };
+    setIdeas(
+      (p) => p.map((i) => i.id === ideaId ? { ...i, pastasNotas: [...i.pastasNotas || [], novaPasta] } : i)
+    );
+  }
+  function excluirPastaNota(ideaId, pastaId) {
+    setIdeas(
+      (p) => p.map(
+        (i) => i.id === ideaId ? {
+          ...i,
+          pastasNotas: (i.pastasNotas || []).filter((pn) => pn.id !== pastaId),
+          notas: (i.notas || []).map((n) => n.pastaId === pastaId ? { ...n, pastaId: "" } : n)
+        } : i
+      )
+    );
+  }
+  function mudarPastaNota(ideaId, notaId, pastaId) {
+    setIdeas(
+      (p) => p.map(
+        (i) => i.id === ideaId ? { ...i, notas: (i.notas || []).map((n) => n.id === notaId ? { ...n, pastaId } : n) } : i
+      )
+    );
+  }
+  function togglePastasNotas(ideaId) {
+    setPastasNotasAbertas((p) => ({ ...p, [ideaId]: !p[ideaId] }));
+  }
+  function alternarFiltroPastaNota(ideaId, pastaId) {
+    setFiltroPastaNota((p) => ({ ...p, [ideaId]: p[ideaId] === pastaId ? "todas" : pastaId }));
+  }
+  function registrarFeito(ideaId, notaId) {
+    setIdeas(
+      (p) => p.map((i) => i.id === ideaId ? { ...i, feitoLog: [...i.feitoLog || [], Date.now()] } : i)
+    );
+    setNotaFeitoPressionado((p) => ({ ...p, [notaId]: true }));
+    if (notaFeitoTimers.current[notaId]) clearTimeout(notaFeitoTimers.current[notaId]);
+    notaFeitoTimers.current[notaId] = setTimeout(() => {
+      setNotaFeitoPressionado((p) => ({ ...p, [notaId]: false }));
+    }, 1200);
+  }
+  function contarFeitoPorPeriodo(feitoLog) {
+    const lista = feitoLog || [];
+    const agora = /* @__PURE__ */ new Date();
+    const hojeStr = agora.toDateString();
+    const inicioSemana = new Date(agora);
+    inicioSemana.setHours(0, 0, 0, 0);
+    inicioSemana.setDate(agora.getDate() - agora.getDay());
+    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    let hoje = 0, semana = 0, mes = 0;
+    lista.forEach((ts) => {
+      const d = new Date(ts);
+      if (d.toDateString() === hojeStr) hoje++;
+      if (d >= inicioSemana) semana++;
+      if (d >= inicioMes) mes++;
+    });
+    return { hoje, semana, mes, total: lista.length };
   }
   function votarNota(ideaId, notaId) {
     setIdeas(
@@ -6303,7 +6398,7 @@ function Sondagem() {
     const checklist = checklistDraft[ideaId] || [];
     if (!texto && checklist.length === 0) return;
     const anexos = notaAnexoDraft[ideaId] || [];
-    const nota = { id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, ts: Date.now(), anexos, lembrete: "", secao: "", votos: 0, checklist, app: "off" };
+    const nota = { id: "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), texto, ts: Date.now(), anexos, lembrete: "", secao: "", pastaId: "", votos: 0, checklist, app: "off" };
     setIdeas((p) => p.map((i) => i.id === ideaId ? { ...i, notas: [nota, ...i.notas || []] } : i));
     setNotaDraft((p) => ({ ...p, [ideaId]: "" }));
     setNotaAnexoDraft((p) => ({ ...p, [ideaId]: [] }));
@@ -6415,6 +6510,22 @@ function Sondagem() {
   function toggleNotas(ideaId) {
     setNotasAbertas((p) => ({ ...p, [ideaId]: !p[ideaId] }));
   }
+  function moverNota(ideaId, notaOrigemId, notaDestinoId) {
+    if (!notaOrigemId || !notaDestinoId || notaOrigemId === notaDestinoId) return;
+    setIdeas(
+      (p) => p.map((i) => {
+        if (i.id !== ideaId) return i;
+        const lista = [...i.notas || []];
+        const origemIdx = lista.findIndex((n) => n.id === notaOrigemId);
+        const destinoIdx = lista.findIndex((n) => n.id === notaDestinoId);
+        if (origemIdx === -1 || destinoIdx === -1) return i;
+        const [movida] = lista.splice(origemIdx, 1);
+        const novoDestinoIdx = lista.findIndex((n) => n.id === notaDestinoId);
+        lista.splice(novoDestinoIdx, 0, movida);
+        return { ...i, notas: lista };
+      })
+    );
+  }
   function alternarFiltroApp(ideaId, valor) {
     setNotaFiltroApp((p) => ({ ...p, [ideaId]: p[ideaId] === valor ? "todas" : valor }));
   }
@@ -6424,6 +6535,7 @@ function Sondagem() {
   function limparFiltrosNotas(ideaId) {
     setNotaFiltroApp((p) => ({ ...p, [ideaId]: "todas" }));
     setNotaFiltroVoto((p) => ({ ...p, [ideaId]: false }));
+    setFiltroPastaNota((p) => ({ ...p, [ideaId]: "todas" }));
   }
   function alternarFiltroProjetoApp(valor) {
     setFiltroProjetoApp((p) => p === valor ? "todos" : valor);
@@ -7151,12 +7263,16 @@ function Sondagem() {
     const notasDoProjeto = i.notas || [];
     const filtroAppAtivo = notaFiltroApp[i.id] || "todas";
     const filtroVotoAtivo = !!notaFiltroVoto[i.id];
+    const pastasNotasDoProjeto = i.pastasNotas || [];
+    const feitoContagem = contarFeitoPorPeriodo(i.feitoLog);
+    const filtroPastaNotaAtiva = filtroPastaNota[i.id] || "todas";
     const notasFiltradas = notasDoProjeto.filter((n) => {
       if (filtroAppAtivo !== "todas" && (n.app || "off") !== filtroAppAtivo) return false;
       if (filtroVotoAtivo && !((n.votos || 0) > 0)) return false;
+      if (filtroPastaNotaAtiva !== "todas" && (n.pastaId || "") !== filtroPastaNotaAtiva) return false;
       return true;
     });
-    const filtroNotasAtivo = filtroAppAtivo !== "todas" || filtroVotoAtivo;
+    const filtroNotasAtivo = filtroAppAtivo !== "todas" || filtroVotoAtivo || filtroPastaNotaAtiva !== "todas";
     const gruposSecao = {};
     notasFiltradas.forEach((n) => {
       const s = (n.secao || "").trim() || "Sem se\xE7\xE3o";
@@ -7456,7 +7572,104 @@ function Sondagem() {
           onClick: () => salvarNota(i.id)
         },
         "\u{1F4BE} Salvar nota"
-      )), (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra ou esconde as notas j\xE1 salvas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => toggleNotas(i.id) }, (notasAbertas[i.id] ? "Ocultar " : "Ver ") + i.notas.length + " " + (i.notas.length === 1 ? "nota" : "notas")))), linkPickerAberto && linkPickerAberto.ideaId === i.id && linkPickerAberto.alvo === "draft" && (linkPickerAberto.tipo === "metodo" ? /* @__PURE__ */ React.createElement(
+      )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Cria e gerencia pastas para agrupar as notas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-tag-pastanota", onClick: () => togglePastasNotas(i.id) }, "\u{1F5C2}\uFE0F Pastas", pastasNotasDoProjeto.length > 0 ? " (" + pastasNotasDoProjeto.length + ")" : "")), (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra ou esconde as notas j\xE1 salvas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-tag-notas", onClick: () => toggleNotas(i.id) }, (notasAbertas[i.id] ? "Ocultar " : "Ver ") + i.notas.length + " " + (i.notas.length === 1 ? "nota" : "notas"))), feitoContagem.total > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Total desde o in\xEDcio: " + feitoContagem.total + " toques em 'Feito'." }, /* @__PURE__ */ React.createElement(
+        "span",
+        {
+          style: {
+            fontSize: 11,
+            color: T.muted,
+            padding: "5px 2px",
+            whiteSpace: "nowrap"
+          }
+        },
+        "\u2705 ",
+        feitoContagem.hoje,
+        " hoje \xB7 ",
+        feitoContagem.semana,
+        " semana \xB7 ",
+        feitoContagem.mes,
+        " m\xEAs"
+      ))), pastasNotasAbertas[i.id] && /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          style: {
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            alignItems: "center",
+            padding: "6px 8px",
+            marginTop: 6,
+            border: "1px dashed " + T.line,
+            borderRadius: 6
+          }
+        },
+        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: T.muted, marginRight: 2 } }, "\u{1F5C2}\uFE0F Pastas deste projeto:"),
+        pastasNotasDoProjeto.length === 0 && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11.5, color: T.muted, fontStyle: "italic" } }, "nenhuma ainda"),
+        pastasNotasDoProjeto.map((pn) => /* @__PURE__ */ React.createElement(
+          "span",
+          {
+            key: pn.id,
+            className: "sd-tag-pastanota",
+            style: { display: "inline-flex", alignItems: "center", gap: 6 }
+          },
+          pn.nome,
+          /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              onClick: () => excluirPastaNota(i.id, pn.id),
+              "aria-label": "Excluir pasta " + pn.nome,
+              title: "Excluir pasta (as notas voltam pra 'sem pasta')",
+              style: {
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "#8A3A2C",
+                fontSize: 12,
+                lineHeight: 1,
+                padding: 0
+              }
+            },
+            "\u2715"
+          )
+        )),
+        /* @__PURE__ */ React.createElement(
+          "input",
+          {
+            value: pastaNotaDraft[i.id] || "",
+            onChange: (e) => setPastaNotaDraft((p) => ({ ...p, [i.id]: e.target.value })),
+            onKeyDown: (e) => {
+              if (e.key === "Enter") {
+                criarPastaNota(i.id, pastaNotaDraft[i.id]);
+                setPastaNotaDraft((p) => ({ ...p, [i.id]: "" }));
+              }
+            },
+            placeholder: "nome da nova pasta",
+            "aria-label": "Nome da nova pasta de notas",
+            style: {
+              fontSize: 11.5,
+              padding: "3px 6px",
+              width: 130,
+              border: "1px solid " + T.line,
+              borderRadius: 4,
+              background: T.surface,
+              color: T.ink
+            }
+          }
+        ),
+        /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "sd-chip",
+            style: { fontSize: 11 },
+            disabled: !(pastaNotaDraft[i.id] || "").trim(),
+            onClick: () => {
+              criarPastaNota(i.id, pastaNotaDraft[i.id]);
+              setPastaNotaDraft((p) => ({ ...p, [i.id]: "" }));
+            }
+          },
+          "+ Criar pasta"
+        )
+      ), linkPickerAberto && linkPickerAberto.ideaId === i.id && linkPickerAberto.alvo === "draft" && (linkPickerAberto.tipo === "metodo" ? /* @__PURE__ */ React.createElement(
         LinkPickerMetodo,
         {
           itens: metodosParaLink(),
@@ -7587,6 +7800,17 @@ function Sondagem() {
           },
           "\u{1F535} Com voto"
         )),
+        pastasNotasDoProjeto.map((pn) => /* @__PURE__ */ React.createElement(Tooltip, { key: pn.id, texto: 'S\xF3 notas dentro da pasta "' + pn.nome + '".' }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            className: "sd-tag-pastanota",
+            "data-on": filtroPastaNotaAtiva === pn.id ? "1" : "0",
+            style: { fontSize: 11 },
+            onClick: () => alternarFiltroPastaNota(i.id, pn.id)
+          },
+          "\u{1F5C2}\uFE0F ",
+          pn.nome
+        ))),
         filtroNotasAtivo && /* @__PURE__ */ React.createElement("button", { className: "sd-limpar", style: { fontSize: 11 }, onClick: () => limparFiltrosNotas(i.id) }, "\u2715 Limpar filtro")
       ), filtroNotasAtivo && notasFiltradas.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12.5, color: T.muted, padding: "4px 2px" } }, "Nenhuma nota com esse filtro.") : nomesSecoes.map((nomeSecao) => /* @__PURE__ */ React.createElement("div", { key: nomeSecao }, usaSecoes && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: T.muted, margin: "8px 0 4px" } }, "\u{1F4E6} ", nomeSecao, " (", gruposSecao[nomeSecao].length, ")"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, gruposSecao[nomeSecao].map((n) => {
         const editando = notaEditando[i.id] === n.id;
@@ -7596,6 +7820,32 @@ function Sondagem() {
           {
             key: n.id,
             id: "nota-" + n.id,
+            draggable: !editando,
+            onDragStart: (e) => {
+              setNotaArrastando({ ideaId: i.id, notaId: n.id });
+              e.dataTransfer.effectAllowed = "move";
+            },
+            onDragOver: (e) => {
+              if (!notaArrastando || notaArrastando.ideaId !== i.id) return;
+              e.preventDefault();
+              if (notaSobreAlvo !== n.id) setNotaSobreAlvo(n.id);
+            },
+            onDragLeave: () => {
+              if (notaSobreAlvo === n.id) setNotaSobreAlvo(null);
+            },
+            onDrop: (e) => {
+              e.preventDefault();
+              if (notaArrastando && notaArrastando.ideaId === i.id) {
+                moverNota(i.id, notaArrastando.notaId, n.id);
+              }
+              setNotaArrastando(null);
+              setNotaSobreAlvo(null);
+            },
+            onDragEnd: () => {
+              setNotaArrastando(null);
+              setNotaSobreAlvo(null);
+            },
+            className: notaSobreAlvo === n.id ? "sd-nota-alvo" : "",
             style: {
               border: notaDestaque === n.id ? "1px solid " + T.action : "1px solid " + T.line,
               outline: notaDestaque === n.id ? "2px solid " + T.action : "none",
@@ -7603,10 +7853,34 @@ function Sondagem() {
               borderRadius: 8,
               padding: "8px 10px",
               background: T.surface,
+              opacity: notaArrastando && notaArrastando.notaId === n.id ? 0.5 : 1,
               transition: "outline-color 200ms ease"
             }
           },
-          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, marginBottom: 6 } }, n.app === "on" && /* @__PURE__ */ React.createElement(
+          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, !editando && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Arraste para reordenar as notas." }, /* @__PURE__ */ React.createElement(
+            "span",
+            {
+              style: { cursor: "grab", color: T.muted, fontSize: 14, lineHeight: 1, userSelect: "none" },
+              "aria-hidden": "true"
+            },
+            "\u283F"
+          )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Oculta TODAS as notas deste projeto de uma vez (igual ao bot\xE3o 'Ver/Ocultar notas' l\xE1 em cima)." }, /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              className: "sd-limpar",
+              style: { fontSize: 10.5 },
+              onClick: () => toggleNotas(i.id)
+            },
+            "\u25B2 Ocultar"
+          ))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Registra 1 toque no contador do projeto (por dia/semana/m\xEAs) com a data de agora." }, /* @__PURE__ */ React.createElement(
+            "button",
+            {
+              className: "sd-btn-feito",
+              "data-pressionado": notaFeitoPressionado[n.id] ? "1" : "0",
+              onClick: () => registrarFeito(i.id, n.id)
+            },
+            notaFeitoPressionado[n.id] ? "\u2713 Feito" : "Feito"
+          )), n.app === "on" && /* @__PURE__ */ React.createElement(
             "button",
             {
               className: "sd-chip",
@@ -7614,7 +7888,7 @@ function Sondagem() {
               onClick: () => copiarTextoNota(n)
             },
             notaCopiada[n.id] === "ok" ? "\u2713 Copiado" : notaCopiada[n.id] === "erro" ? "N\xE3o deu pra copiar" : "\u{1F4CB} Copiar"
-          ), /* @__PURE__ */ React.createElement(InterruptorApp, { estado: n.app || "off", onToggle: () => toggleAppNota(i.id, n.id) })),
+          ), /* @__PURE__ */ React.createElement(InterruptorApp, { estado: n.app || "off", onToggle: () => toggleAppNota(i.id, n.id) }))),
           editando ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
             "textarea",
             {
@@ -7840,7 +8114,24 @@ function Sondagem() {
                 color: T.ink
               }
             }
-          ), /* @__PURE__ */ React.createElement("datalist", { id: "sd-secoes-" + i.id }, secoesExistentesProjeto.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }))), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Some 1 voto nesta nota (dot voting). N\xE3o d\xE1 pra tirar um por um, s\xF3 zerar tudo." }, /* @__PURE__ */ React.createElement(
+          ), /* @__PURE__ */ React.createElement("datalist", { id: "sd-secoes-" + i.id }, secoesExistentesProjeto.map((s) => /* @__PURE__ */ React.createElement("option", { key: s, value: s }))), pastasNotasDoProjeto.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10.5, color: T.muted } }, "\u{1F5C2}\uFE0F Pasta:"), /* @__PURE__ */ React.createElement(
+            "select",
+            {
+              value: n.pastaId || "",
+              onChange: (e) => mudarPastaNota(i.id, n.id, e.target.value),
+              "aria-label": "Conectar esta nota a uma pasta",
+              style: {
+                fontSize: 11,
+                padding: "2px 4px",
+                border: "1px solid " + T.line,
+                borderRadius: 4,
+                background: "#FDFDFC",
+                color: T.ink
+              }
+            },
+            /* @__PURE__ */ React.createElement("option", { value: "" }, "sem pasta"),
+            pastasNotasDoProjeto.map((pn) => /* @__PURE__ */ React.createElement("option", { key: pn.id, value: pn.id }, pn.nome))
+          )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Some 1 voto nesta nota (dot voting). N\xE3o d\xE1 pra tirar um por um, s\xF3 zerar tudo." }, /* @__PURE__ */ React.createElement(
             "button",
             {
               className: "sd-chip",
@@ -8562,7 +8853,7 @@ function Sondagem() {
   )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: copySummary }, copied ? "Copiado" : "Copiar resumo"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: T.muted } }, status)))) : /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, padding: "24px 4px" } }, 'Nenhum projeto aberto. Abra ou crie um em "Meus projetos".')))));
 }
 
-window.__SONDAGEM_VERSAO__ = "1.18.0";
+window.__SONDAGEM_VERSAO__ = "1.21.0";
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Sondagem, null));
 
   var __carr = document.getElementById('carregando');
