@@ -1,4 +1,5 @@
 "use strict";
+window.__CHERUBION_VERSAO__ = "2026-09-13 13:50";
 var __rest = (this && this.__rest) || function (s, e) {
     var t = {};
     for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
@@ -10,8 +11,6 @@ var __rest = (this && this.__rest) || function (s, e) {
         }
     return t;
 };
-// ===== Cherubion — miolo autônomo (gerado automaticamente, não editar à mão) =====
-window.__CHERUBION_VERSAO__ = new Date().toISOString();
 const { useState, useEffect, useRef, useMemo } = React;
 // ===== constantes =====
 // ======================================================================
@@ -71,8 +70,7 @@ const GOALS_SESSAO = '__goals';
 // id reservado da sessão fixa "Programa" — disponível nas abas Snat, PE, Skill e B.E.S.T.
 // (e, com o nome "Receitas", também na aba Nutrição).
 // É uma sessão de tarefas normal (checklist de verdade), só que os itens dela mostram o
-// mesmo botão "Programa" (janela de texto livre por tarefa) que já existe na aba Realidade,
-// em vez do botão "Priority" padrão
+// botão "Programa" (janela de texto livre por tarefa) em vez do botão "Priority" padrão
 const PROGRAMA_SESSAO = '__programa';
 // id reservado da sessão fixa "Já Tenho" — disponível na aba Skill. É uma sessão de
 // tarefas normal (checklist de verdade, botão "Priority" padrão), só que fixa: sempre
@@ -99,7 +97,6 @@ const CHECKLISTS = [
     { id: 'sonhomeu', nome: 'Sonho Meu', emoji: '💭', cor: '#6C7BC4' },
     { id: 'nutricao', nome: 'Nutrição', emoji: '🥗', cor: '#8CA24E' },
     { id: 'compras', nome: 'Compras', emoji: '🛒', cor: '#D98E4A' },
-    { id: 'objetivas', nome: 'Realidade', emoji: '🎯', cor: '#4A7FD9' },
     { id: 'protocolosgerais', nome: 'Protocolos Gerais', emoji: '📐', cor: '#5A8E7A' },
     { id: 'atividades', nome: 'Atividades', emoji: '📋', cor: '#B0546E' },
 ];
@@ -115,33 +112,35 @@ const ABAS_RAZAO_FIXAS = [
     { id: 'categorias', nome: 'Categorias', emoji: '🗂️', cor: '#57A773' },
     { id: 'pump', nome: 'Pump', emoji: '💪', cor: '#6E8C82' },
     { id: 'pso', nome: 'Pso', emoji: '🧭', cor: '#8E6BAE' },
-    { id: 'premiacao', nome: 'Premiação', emoji: '🏆', cor: '#BFA23A' },
     { id: 'historia', nome: 'História', emoji: '📜', cor: '#8A6D3B' },
 ];
 // tipos de evento padrão da aba História — protegidos (não podem ser apagados),
-// os demais que o Michel criar pelo ⚙️ entram soltos, sem essa marca
+// os demais que o Michel criar pelo ⚙️ entram soltos, sem essa marca. "Geral" não tem cor
+// própria: é só um filtro que reúne os eventos de todos os tipos, não registra evento nenhum.
 const HIST_TIPOS_PADRAO = [
     { id: 'geral', nome: 'Geral', fixo: true },
-    { id: 'civilizacoes', nome: 'Civilizações e Culturas', fixo: true },
+    { id: 'civilizacoes', nome: 'Civilizações e Culturas', fixo: true, cor: '#8A6D3B' },
 ];
 // regiões/continentes selecionáveis ao registrar um evento do tipo "Civilizações e Culturas".
 // continentes sem `subs` (Oceania, Eurásia) são selecionáveis diretamente; os demais só revelam
 // suas subdivisões ao serem tocados — a seleção em si acontece na subdivisão.
+// Cada continente principal tem sua própria cor (usada no botão dele e na linha do tempo);
+// as subdivisões não têm cor própria — só os 6 botões principais.
 const REGIOES_CIVILIZACOES = [
-    { id: 'americas', nome: 'Américas', subs: [
+    { id: 'americas', nome: 'Américas', cor: '#5B7C99', subs: [
             { id: 'america_norte', nome: 'América do Norte' },
             { id: 'america_central', nome: 'América Central' },
             { id: 'caribe', nome: 'Caribe (Antilhas)' },
             { id: 'america_sul', nome: 'América do Sul' },
         ] },
-    { id: 'europa', nome: 'Europa', subs: [
+    { id: 'europa', nome: 'Europa', cor: '#D96C4F', subs: [
             { id: 'europa_ocidental', nome: 'Europa Ocidental' },
             { id: 'leste_europeu', nome: 'Leste Europeu' },
             { id: 'europa_central', nome: 'Europa Central' },
             { id: 'norte_europa', nome: 'Norte da Europa' },
             { id: 'sul_europa', nome: 'Sul da Europa' },
         ] },
-    { id: 'asia', nome: 'Ásia', subs: [
+    { id: 'asia', nome: 'Ásia', cor: '#6E8C82', subs: [
             { id: 'oriente_medio', nome: 'Oriente Médio' },
             { id: 'leste_asiatico', nome: 'Leste Asiático' },
             { id: 'sudeste_asiatico', nome: 'Sudeste Asiático' },
@@ -150,12 +149,12 @@ const REGIOES_CIVILIZACOES = [
             { id: 'norte_asia', nome: 'Norte da Ásia / Sibéria' },
             { id: 'caucaso', nome: 'Cáucaso' },
         ] },
-    { id: 'africa', nome: 'África', subs: [
+    { id: 'africa', nome: 'África', cor: '#A85C4D', subs: [
             { id: 'norte_africa', nome: 'Norte da África' },
             { id: 'africa_subsaariana', nome: 'África Subsaariana' },
         ] },
-    { id: 'oceania', nome: 'Oceania', subs: [] },
-    { id: 'eurasia', nome: 'Eurásia', subs: [] },
+    { id: 'oceania', nome: 'Oceania', cor: '#8E6BAE', subs: [] },
+    { id: 'eurasia', nome: 'Eurásia', cor: '#C9A227', subs: [] },
 ];
 // devolve o rótulo legível de uma região/subdivisão a partir do id salvo no evento
 const nomeRegiaoCivilizacao = (id) => {
@@ -167,6 +166,19 @@ const nomeRegiaoCivilizacao = (id) => {
             return c.nome + ' – ' + s.nome;
     }
     return id;
+};
+// cor do continente principal de uma lista de regiões salvas num evento — usa a primeira região
+// marcada; se for uma subdivisão (ex: "América do Norte"), sobe até o continente pai (Américas)
+// pra pegar a cor. Sem nenhuma região marcada, cai no marrom neutro da aba.
+const corRegiaoPrincipal = (regioes) => {
+    if (!Array.isArray(regioes) || regioes.length === 0)
+        return '#8A6D3B';
+    const id = regioes[0];
+    const direto = REGIOES_CIVILIZACOES.find((c) => c.id === id);
+    if (direto)
+        return direto.cor;
+    const pai = REGIOES_CIVILIZACOES.find((c) => c.subs.some((s) => s.id === id));
+    return pai ? pai.cor : '#8A6D3B';
 };
 const ABAS_RAZAO = [...ABAS_RAZAO_FIXAS, ...CHECKLISTS];
 const ORDEM_ABAS_RAZAO_PADRAO = ABAS_RAZAO.map((a) => a.id);
@@ -274,6 +286,13 @@ const formatDataBRDeISO = (iso) => {
         return '';
     const [ano, mes, dia] = iso.split('-');
     return `${dia}/${mes}/${ano}`;
+};
+// como formatDataBRDeISO, mas com a hora atual do relógio junto — usado nos registros que sempre
+// carimbam hora (Pso, Pump, Face). Ao registrar com data retroativa, só o DIA muda pro escolhido;
+// não dá pra escolher a hora retroativamente, então a hora que aparece é sempre a de agora.
+const formatDataHoraBRDeISO = (iso) => {
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return `${formatDataBRDeISO(iso)} ${hora}`;
 };
 // domingo da semana atual — a semana começa no domingo (mesma convenção do array DIAS_SEMANA,
 // onde índice 0 = Domingo, e de getDay(), onde 0 = Domingo). É essa chave que decide quando as
@@ -416,6 +435,11 @@ const tarefaFeitaHoje = (t) => {
         return t.feitoEm === primeiroDiaDoanual();
     return !!t.feitoEm; // listas adicionais criadas pelo usuário: marcação manual, sem expiração
 };
+// Sequência (streak) exibida ao vivo: soma o que já está consolidado em rollovers anteriores
+// (t.sequenciaAtual) com +1 se a tarefa já está feita no período em andamento. Sobe e desce
+// junto com o check, sem gravar nada em estado — só t.sequenciaAtual é persistido, e só no
+// fechamento do período (rolloverFreq), igual ao t.atrasos.
+const streakExibido = (t) => (t.sequenciaAtual || 0) + (tarefaFeitaHoje(t) ? 1 : 0);
 const formatTempo = (segundos) => {
     const m = Math.floor(segundos / 60);
     const s = segundos % 60;
@@ -1217,7 +1241,6 @@ function App() {
     const [msgPremiacao, setMsgPremiacao] = useState('');
     const [valorHora, setValorHora] = useState(VALOR_HORA_PADRAO);
     const [regrasEstrelas, setRegrasEstrelas] = useState(REGRAS_ESTRELAS_PADRAO);
-    const [mostrarConfigPremiacao, setMostrarConfigPremiacao] = useState(false);
     // ---- livro razão: saldo + lançamentos de gastos (extrato) ----
     const [razaoTabSelecionada, setRazaoTabSelecionada] = useState('best'); // aba ativa no card unificado do Livro Razão
     const [ordemAbasRazao, setOrdemAbasRazao] = useState(ORDEM_ABAS_RAZAO_PADRAO); // ordem dos botões das abas
@@ -1289,7 +1312,9 @@ function App() {
     const [corteEditData, setCorteEditData] = useState('');
     const [pesoInput, setPesoInput] = useState('');
     const [cinturaInput, setCinturaInput] = useState('');
-    const [medidasRegistro, setMedidasRegistro] = useState([]); // [{id, peso, cintura, data, dataISO}]
+    const [medidaNovoComentario, setMedidaNovoComentario] = useState(''); // texto livre, opcional, salvo junto no registro
+    const [medidaDataRetroativa, setMedidaDataRetroativa] = useState(''); // vazio = registra com a data de hoje
+    const [medidasRegistro, setMedidasRegistro] = useState([]); // [{id, peso, cintura, comentario, data, dataISO}]
     const [medidasExpandido, setMedidasExpandido] = useState(false);
     const [confirmApagarMedidas, setConfirmApagarMedidas] = useState(false);
     const [msgMedidas, setMsgMedidas] = useState('');
@@ -1297,6 +1322,7 @@ function App() {
     const [medidaEditandoId, setMedidaEditandoId] = useState(null);
     const [medidaEditPeso, setMedidaEditPeso] = useState('');
     const [medidaEditCintura, setMedidaEditCintura] = useState('');
+    const [medidaEditComentario, setMedidaEditComentario] = useState('');
     const [medidaEditData, setMedidaEditData] = useState('');
     // ---- 🧴 Face (aba Development): foto/vídeo (câmera) + comentário — mesmo pipeline do R2
     // usado no Pso (foto comprimida e sobe pro servidor quando o R2 está configurado; sem R2,
@@ -1306,6 +1332,7 @@ function App() {
     const [faceComentario, setFaceComentario] = useState('');
     const [faceNovaFoto, setFaceNovaFoto] = useState(null);
     const [faceNovoVideo, setFaceNovoVideo] = useState(null);
+    const [faceDataRetroativa, setFaceDataRetroativa] = useState(''); // vazio = registra com a data/hora de agora
     const [uploadMidiaFaceEmAndamento, setUploadMidiaFaceEmAndamento] = useState(false);
     const [msgUploadMidiaFace, setMsgUploadMidiaFace] = useState('');
     const faceFotoInputRef = useRef(null);
@@ -1322,6 +1349,7 @@ function App() {
     const [bankRegistro, setBankRegistro] = useState([]); // [{id, valor, nota, percentual, saldoAnterior, saldoNovo, data, dataISO}]
     const [bankValor, setBankValor] = useState('');
     const [bankNota, setBankNota] = useState('');
+    const [bankDataRetroativa, setBankDataRetroativa] = useState(''); // vazio = lança com a data de hoje
     const [bankExpandido, setBankExpandido] = useState(false);
     const [confirmApagarBank, setConfirmApagarBank] = useState(false);
     const [msgBank, setMsgBank] = useState('');
@@ -1333,11 +1361,18 @@ function App() {
     const [pumpTarefas, setPumpTarefas] = useState([]); // [{id, nome}] botões nomeáveis criados pelo usuário
     const [pumpNovoNome, setPumpNovoNome] = useState('');
     const [pumpConfigAberto, setPumpConfigAberto] = useState(false);
-    const [pumpRegistro, setPumpRegistro] = useState([]); // [{id, nome, data, dataISO}]
+    const [pumpRegistro, setPumpRegistro] = useState([]); // [{id, nome, comentario, pele, foto, data, dataISO}]
     const [pumpSelecionados, setPumpSelecionados] = useState([]); // ids marcados, ainda não registrados
     const [pumpNumero, setPumpNumero] = useState(''); // até 2 dígitos; a aspa (") é acrescentada automaticamente
     const [pumpPele, setPumpPele] = useState(0); // cursor de sensibilidade da pele: -10 .. 0 .. +10
     const [pumpComentario, setPumpComentario] = useState(''); // texto livre, salvo junto no registro ao tocar em Feito
+    // ---- Pump: foto (câmera) — mesmo pipeline do R2 usado no Pso/Face; sem vídeo aqui, só foto ----
+    const [pumpNovaFoto, setPumpNovaFoto] = useState(null);
+    const [pumpDataRetroativa, setPumpDataRetroativa] = useState(''); // vazio = registra com a data/hora de agora
+    const [uploadMidiaPumpEmAndamento, setUploadMidiaPumpEmAndamento] = useState(false);
+    const [msgUploadMidiaPump, setMsgUploadMidiaPump] = useState('');
+    const pumpFotoInputRef = useRef(null);
+    const pumpFotoGaleriaInputRef = useRef(null); // 🖼 escolher foto do rolo da câmera (Pump)
     const [pumpExpandido, setPumpExpandido] = useState(false);
     const [confirmApagarPump, setConfirmApagarPump] = useState(false);
     const [msgPump, setMsgPump] = useState('');
@@ -1364,6 +1399,7 @@ function App() {
     const [psoNovaFoto, setPsoNovaFoto] = useState(null);
     const [psoNovoVideo, setPsoNovoVideo] = useState(null);
     const [psoComentarioMidia, setPsoComentarioMidia] = useState('');
+    const [psoDataRetroativa, setPsoDataRetroativa] = useState(''); // vazio = registra com a data/hora de agora
     const [uploadMidiaPsoEmAndamento, setUploadMidiaPsoEmAndamento] = useState(false);
     const [msgUploadMidiaPso, setMsgUploadMidiaPso] = useState('');
     const psoFotoInputRef = useRef(null);
@@ -1411,7 +1447,7 @@ function App() {
     const [desbloqueioSubAba, setDesbloqueioSubAba] = useState('geral');
     const [nivelDesbloqueioConfigAberto, setNivelDesbloqueioConfigAberto] = useState(false);
     // ---- sessão "Antes de ir" (Atividades): checklist de última hora, com um botão "Programa"
-    // por item (mesmo padrão do Contador/Realidade) e um "Feito" que move o item pra Concluídos ----
+    // por item (mesmo padrão do Contador) e um "Feito" que move o item pra Concluídos ----
     const [antesDeIrPendentes, setAntesDeIrPendentes] = useState([]); // [{id, texto, programa}]
     const [antesDeIrConcluidos, setAntesDeIrConcluidos] = useState([]); // [{id, texto, programa}]
     const [antesDeIrNovoTexto, setAntesDeIrNovoTexto] = useState('');
@@ -1460,7 +1496,7 @@ function App() {
     const [chkConfirmApagar, setChkConfirmApagar] = useState({});
     const [chkConfirmRemoverSessao, setChkConfirmRemoverSessao] = useState({});
     const [chkMsg, setChkMsg] = useState({});
-    // ---- Botão "Programa" da aba Realidade: abre uma janela para escrever um texto livre
+    // ---- Botão "Programa": abre uma janela para escrever um texto livre
     // ligado à tarefa. O texto fica guardado no próprio item (campo `programa`), então já
     // viaja de graça pelos 4 pontos de persistência (checklistItens já está neles). O mesmo
     // botão/função também vale pros itens do ⏳ Contador (aba Atividades) — o campo `fonte`
@@ -1537,6 +1573,7 @@ function App() {
     const [catTabSelecionada, setCatTabSelecionada] = useState(null); // id da aba ativa no card unificado
     const [mostrarConfigCategorias, setMostrarConfigCategorias] = useState(false);
     const [categoriasEdicaoAtiva, setCategoriasEdicaoAtiva] = useState(false); // trava: só permite apagar categoria quando ativa
+    const [mostrarConfigPremiacao, setMostrarConfigPremiacao] = useState(false); // painel de config (valor/hora, regras) da aba Premiação
     const [listaMistaAberta, setListaMistaAberta] = useState(false); // painel do 🎲 Aleatório
     const [listaMista, setListaMista] = useState([]); // [{catId, tarefaId}] embaralhados
     const [novaFixaTextos, setNovaFixaTextos] = useState(['']);
@@ -2414,6 +2451,10 @@ function App() {
     const rolloverFreq = (freq, fixasAtuais, chaveAnterior, saltos = 1) => {
         const idx = idxDeChave(freq, chaveAnterior);
         const pulados = Math.max(1, saltos || 1); // quantos períodos passaram desde a última vez
+        // Domingo é dia de descanso — fica fora da sequência (streak) e do recorde, igual já
+        // fica fora das medalhas e da média semanal. A sequência e o recorde simplesmente não
+        // mudam no fechamento de um domingo, seja a tarefa feita ou não.
+        const ehDomingoFechando = freq === 'diaria' && idx === 0;
         return fixasAtuais.map((t) => {
             if (t.freq !== freq)
                 return t;
@@ -2425,7 +2466,18 @@ function App() {
             // 1 = amarela, 2 ou mais = vermelha. Concluir a tarefa zera o contador.
             // Se o app ficou dias/semanas fechado, todos os períodos que passaram são contados.
             const atrasos = feita ? (pulados - 1) : (t.atrasos || 0) + pulados;
-            return Object.assign(Object.assign({}, t), { feitoEm: null, feitoDia: null, historico, atrasos });
+            // Sequência (streak) + recorde: cada período concluído soma +1 à sequência anterior;
+            // o recorde acompanha o pico mesmo que a sequência quebre logo em seguida (ex: app ficou
+            // fechado por vários períodos — o último concluído ainda soma, mas os períodos perdidos
+            // que vieram depois, dentro do mesmo salto, já zeram a sequência corrente).
+            let sequenciaAtual = t.sequenciaAtual || 0;
+            let recorde = t.recorde || 0;
+            if (!ehDomingoFechando) {
+                const sequenciaGanha = feita ? sequenciaAtual + 1 : 0;
+                recorde = Math.max(recorde, sequenciaGanha);
+                sequenciaAtual = (feita && pulados === 1) ? sequenciaGanha : 0;
+            }
+            return Object.assign(Object.assign({}, t), { feitoEm: null, feitoDia: null, historico, atrasos, sequenciaAtual, recorde });
         });
     };
     // Dado o período "pai" (ex: 'semanal') e a chave ISO do período anterior dele (a que acabou de virar),
@@ -3323,20 +3375,25 @@ function App() {
     const registrarMedidas = () => {
         const peso = pesoInput.trim() ? parseFloat(pesoInput.replace(',', '.')) : null;
         const cintura = cinturaInput.trim() ? parseFloat(cinturaInput.replace(',', '.')) : null;
-        if ((peso === null || isNaN(peso)) && (cintura === null || isNaN(cintura))) {
-            setMsgMedidas('Digite ao menos o peso ou a cintura.');
+        const comentario = medidaNovoComentario.trim();
+        if ((peso === null || isNaN(peso)) && (cintura === null || isNaN(cintura)) && !comentario) {
+            setMsgMedidas('Digite ao menos o peso, a cintura ou um comentário.');
             return;
         }
-        const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const dataISO = medidaDataRetroativa || hoje();
+        const dataBR = formatDataBRDeISO(dataISO);
         setMedidasRegistro((l) => [{
                 id: genId(),
                 peso: (peso !== null && !isNaN(peso)) ? peso : null,
                 cintura: (cintura !== null && !isNaN(cintura)) ? cintura : null,
-                data: dataHoje,
-                dataISO: hoje(),
+                comentario,
+                data: dataBR,
+                dataISO,
             }, ...l]);
         setPesoInput('');
         setCinturaInput('');
+        setMedidaNovoComentario('');
+        setMedidaDataRetroativa('');
         setMsgMedidas('');
         marcarSujo();
     };
@@ -3352,19 +3409,21 @@ function App() {
         setMedidaEditandoId(m.id);
         setMedidaEditPeso(m.peso !== null && m.peso !== undefined ? String(m.peso).replace('.', ',') : '');
         setMedidaEditCintura(m.cintura !== null && m.cintura !== undefined ? String(m.cintura).replace('.', ',') : '');
+        setMedidaEditComentario(m.comentario || '');
         setMedidaEditData(m.dataISO || hoje());
     };
     const cancelarEdicaoMedida = () => setMedidaEditandoId(null);
     const salvarEdicaoMedida = () => {
         const peso = medidaEditPeso.trim() ? parseFloat(medidaEditPeso.replace(',', '.')) : null;
         const cintura = medidaEditCintura.trim() ? parseFloat(medidaEditCintura.replace(',', '.')) : null;
-        if ((peso === null || isNaN(peso)) && (cintura === null || isNaN(cintura))) {
-            setMsgMedidas('Digite ao menos o peso ou a cintura.');
+        const comentario = medidaEditComentario.trim();
+        if ((peso === null || isNaN(peso)) && (cintura === null || isNaN(cintura)) && !comentario) {
+            setMsgMedidas('Digite ao menos o peso, a cintura ou um comentário.');
             return;
         }
         const dataISO = medidaEditData || hoje();
         const dataBR = formatDataBRDeISO(dataISO);
-        setMedidasRegistro((l) => l.map((x) => (x.id === medidaEditandoId ? Object.assign(Object.assign({}, x), { peso: (peso !== null && !isNaN(peso)) ? peso : null, cintura: (cintura !== null && !isNaN(cintura)) ? cintura : null, data: dataBR, dataISO }) : x)));
+        setMedidasRegistro((l) => l.map((x) => (x.id === medidaEditandoId ? Object.assign(Object.assign({}, x), { peso: (peso !== null && !isNaN(peso)) ? peso : null, cintura: (cintura !== null && !isNaN(cintura)) ? cintura : null, comentario, data: dataBR, dataISO }) : x)));
         setMedidaEditandoId(null);
         setMsgMedidas('');
         marcarSujo();
@@ -3440,15 +3499,17 @@ function App() {
         const novo = anterior + valor;
         const valorAnterior = bankRegistro.length ? bankRegistro[0].valor : null; // último valor lançado
         const percentual = percentualBank(valorAnterior, valor);
-        const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const dataISO = bankDataRetroativa || hoje();
+        const dataHoje = formatDataBRDeISO(dataISO);
         setBankRegistro((l) => [{
                 id: genId(), valor, nota: bankNota.trim(), percentual,
                 frase: fraseBank(percentual), // a frase inteira fica gravada no livro de registro
-                valorAnterior, saldoAnterior: anterior, saldoNovo: novo, data: dataHoje, dataISO: hoje(),
+                valorAnterior, saldoAnterior: anterior, saldoNovo: novo, data: dataHoje, dataISO,
             }, ...l]);
         setBankSaldo(novo);
         setBankValor('');
         setBankNota('');
+        setBankDataRetroativa('');
         setMsgBank('');
         marcarSujo();
     };
@@ -3571,20 +3632,24 @@ function App() {
         // usa a ordem em que os botões aparecem na tela, não a ordem dos toques
         const nomes = pumpTarefas.filter((t) => pumpSelecionados.includes(t.id)).map((t) => t.nome);
         const comentario = pumpComentario.trim();
-        if (!nomes.length && !comentario && !pumpNumero && pumpPele === 0) {
-            setMsgPump('Selecione um botão, escreva um comentário ou informe o tempo.');
+        if (!nomes.length && !comentario && !pumpNumero && pumpPele === 0 && !pumpNovaFoto) {
+            setMsgPump('Selecione um botão, escreva um comentário, informe o tempo ou anexe uma foto.');
             return;
         }
-        const dataHoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const dataISO = pumpDataRetroativa || hoje();
+        const dataHoje = formatDataBRDeISO(dataISO);
         // se houver número digitado, ele entra no registro já com a aspa no final (ex: 45")
         const sufixo = pumpNumero ? ` ${pumpNumero}"` : '';
         // sem botão marcado o registro fica só com o tempo (ou vazio, quando é só comentário)
         const nome = (nomes.join(' + ') + sufixo).trim();
-        setPumpRegistro((l) => [{ id: genId(), nome, comentario, pele: pumpPele, data: dataHoje, dataISO: hoje() }, ...l]);
+        setPumpRegistro((l) => [{ id: genId(), nome, comentario, pele: pumpPele, foto: pumpNovaFoto, data: dataHoje, dataISO }, ...l]);
         setPumpSelecionados([]);
         setPumpNumero('');
         setPumpPele(0);
         setPumpComentario('');
+        setPumpNovaFoto(null);
+        setMsgUploadMidiaPump('');
+        setPumpDataRetroativa('');
         setMsgPump('Registrado!');
         marcarSujo();
     };
@@ -3747,13 +3812,11 @@ function App() {
         const comentario = psoComentarioMidia.trim();
         // usa a ordem em que os botões aparecem na tela, não a ordem dos toques
         const botoes = psoTarefas.filter((t) => psoSelecionados.includes(t.id)).map((t) => t.nome).join(' + ');
-        const agora = new Date();
-        const dataHoje = agora.toLocaleString('pt-BR', {
-            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-        });
+        const dataISO = psoDataRetroativa || hoje();
+        const dataHoje = formatDataHoraBRDeISO(dataISO);
         setPsoRegistro((l) => [{
                 id: genId(), valor: psoValor, sensacao, causa, botoes, comentario,
-                foto: psoNovaFoto, video: psoNovoVideo, data: dataHoje, dataISO: hoje(),
+                foto: psoNovaFoto, video: psoNovoVideo, data: dataHoje, dataISO,
             }, ...l]);
         setPsoValor(0);
         setPsoSensacao('');
@@ -3763,6 +3826,7 @@ function App() {
         setPsoNovoVideo(null);
         setMsgUploadMidiaPso('');
         setPsoSelecionados([]);
+        setPsoDataRetroativa('');
         setMsgPso('Registrado!');
         marcarSujo();
     };
@@ -3851,12 +3915,25 @@ function App() {
     const editarTextoEventoHistoria = (id, novoTexto) => {
         setHistEventos((prev) => prev.map((x) => (x.id === id ? Object.assign(Object.assign({}, x), { texto: novoTexto }) : x)));
     };
+    // cor de identidade de um tipo de evento: tipos criados por mim (⚙️ → + Tipo) ganham uma cor
+    // da paleta CORES, cíclica — cada novo tipo pega a próxima da lista. Civilizações e Culturas
+    // usa o marrom fixo aqui, mas a cor REAL de cada evento dela vem da região (corDoEventoHistoria).
+    // "Geral" nunca aparece aqui porque não é mais um tipo que se registra evento — é só um filtro.
+    const corDoTipoHistoria = (tipoId) => {
+        const t = histTipos.find((x) => x.id === tipoId);
+        return (t && t.cor) || '#8A6D3B';
+    };
+    // cor final de um evento na linha do tempo e nas listagens: eventos de Civilizações e Culturas
+    // usam a cor da região marcada; os demais usam a cor do próprio tipo.
+    const corDoEventoHistoria = (e) => (e.tipo === 'civilizacoes' ? corRegiaoPrincipal(e.regioes) : corDoTipoHistoria(e.tipo));
     const adicionarTipoHistoria = () => {
         const nome = histNovoTipoNome.trim();
         if (!nome)
             return;
         const id = 'custom_' + genIdHistoria();
-        setHistTipos((prev) => [...prev, { id, nome, fixo: false }]);
+        const usados = histTipos.filter((t) => !t.fixo).length; // quantos tipos "meus" já existem — decide a próxima cor da paleta
+        const cor = CORES[usados % CORES.length];
+        setHistTipos((prev) => [...prev, { id, nome, fixo: false, cor }]);
         setHistNovoTipoNome('');
         setHistTipoSelecionado(id);
     };
@@ -4040,7 +4117,7 @@ function App() {
         React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
             React.createElement("button", { className: "mt-btn-sm primary", onClick: () => enviarParaPrioritarios('Lavar carro') }, "\uD83D\uDE97 Lavar carro"),
             React.createElement("button", { className: "mt-btn-sm primary", onClick: () => enviarParaPrioritarios('Oil change') }, "\uD83D\uDEE2\uFE0F Oil change"))));
-    // Botão "Programa" (aba Realidade): abre a janela de texto livre ligada à tarefa.
+    // Botão "Programa": abre a janela de texto livre ligada à tarefa.
     const abrirPrograma = (chkId, id) => {
         const item = chkItensDe(chkId).find((i) => i.id === id);
         setProgramaTextoEdit((item === null || item === void 0 ? void 0 : item.programa) || '');
@@ -4714,7 +4791,7 @@ function App() {
                 React.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: info.cor } }, formatMoeda(soma)))));
     };
     // Painel "Antes de ir": checklist de última hora — caixa de texto + Adicionar; cada item
-    // pendente ganha um botão "Programa" (igual ao do Contador/Realidade, texto livre por item)
+    // pendente ganha um botão "Programa" (igual ao do Contador, texto livre por item)
     // e um "Feito", que tira o item daqui e manda pra lista de Concluídos logo abaixo.
     const renderAntesDeIr = () => (React.createElement(React.Fragment, null,
         React.createElement("div", { className: "mt-premio-secao" },
@@ -5056,8 +5133,15 @@ function App() {
                 React.createElement("input", { type: "number", step: "0.1", className: "mt-nota-input", placeholder: "Peso (kg)", value: pesoInput, onChange: (e) => setPesoInput(e.target.value) }),
                 React.createElement("span", { style: { fontSize: 12.5, color: '#999', flexShrink: 0 } }, "kg")),
             React.createElement("div", { className: "mt-premio-saque-row", style: { marginTop: 6 } },
-                React.createElement("input", { type: "number", step: "0.1", className: "mt-nota-input", placeholder: "Cintura (cm)", value: cinturaInput, onChange: (e) => setCinturaInput(e.target.value), onKeyDown: (e) => e.key === 'Enter' && registrarMedidas() }),
+                React.createElement("input", { type: "number", step: "0.1", className: "mt-nota-input", placeholder: "Cintura (cm)", value: cinturaInput, onChange: (e) => setCinturaInput(e.target.value) }),
                 React.createElement("span", { style: { fontSize: 12.5, color: '#999', flexShrink: 0 } }, "cm")),
+            React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Coment\u00E1rio\u2026 (opcional)", value: medidaNovoComentario, onChange: (e) => setMedidaNovoComentario(e.target.value), style: { minHeight: 44, marginTop: 6 } }),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 } },
+                React.createElement("span", { style: { fontSize: 12, color: '#999', flexShrink: 0 } },
+                    "\uD83D\uDCC5 Data",
+                    medidaDataRetroativa ? '' : ' (hoje)'),
+                React.createElement("input", { className: "mt-nota-input", type: "date", value: medidaDataRetroativa, onChange: (e) => setMedidaDataRetroativa(e.target.value), onKeyDown: (e) => e.key === 'Enter' && registrarMedidas(), style: { flex: '0 0 150px' } }),
+                medidaDataRetroativa && React.createElement("button", { className: "mt-btn-sm", onClick: () => setMedidaDataRetroativa('') }, "Hoje")),
             React.createElement("button", { className: "mt-btn-sm primary", style: { marginTop: 6 }, onClick: registrarMedidas }, "Registrar"),
             msgMedidas && React.createElement("p", { className: "mt-premio-msg" }, msgMedidas)),
         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
@@ -5070,11 +5154,13 @@ function App() {
                     React.createElement("div", { style: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6, minWidth: 0 } },
                         React.createElement("input", { className: "mt-nota-input", type: "number", step: "0.1", placeholder: "Peso (kg)", value: medidaEditPeso, onChange: (e) => setMedidaEditPeso(e.target.value), style: { flex: '0 0 90px' } }),
                         React.createElement("input", { className: "mt-nota-input", type: "number", step: "0.1", placeholder: "Cintura (cm)", value: medidaEditCintura, onChange: (e) => setMedidaEditCintura(e.target.value), style: { flex: '0 0 90px' } }),
-                        React.createElement("input", { className: "mt-nota-input", type: "date", value: medidaEditData, onChange: (e) => setMedidaEditData(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoMedida(), style: { flex: '0 0 140px' } })),
+                        React.createElement("input", { className: "mt-nota-input", type: "date", value: medidaEditData, onChange: (e) => setMedidaEditData(e.target.value), style: { flex: '0 0 140px' } }),
+                        React.createElement("input", { className: "mt-nota-input", placeholder: "Coment\u00E1rio\u2026", value: medidaEditComentario, onChange: (e) => setMedidaEditComentario(e.target.value), onKeyDown: (e) => e.key === 'Enter' && salvarEdicaoMedida(), style: { flex: '1 1 100%' } })),
                     React.createElement("button", { className: "mt-btn-sm primary", onClick: salvarEdicaoMedida }, "Salvar"),
                     React.createElement("button", { className: "mt-btn-sm", onClick: cancelarEdicaoMedida }, "Cancelar"))) : (React.createElement(React.Fragment, null,
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, [m.peso !== null ? `Peso: ${m.peso} kg` : null, m.cintura !== null ? `Cintura: ${m.cintura} cm` : null].filter(Boolean).join(' · ')),
+                        m.comentario && React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, m.comentario),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, m.data)),
                     mostrarConfigLivroRazao && React.createElement("button", { className: "mt-discreto-btn", onClick: () => iniciarEdicaoMedida(m), title: "Editar" }, "\u270E"),
                     mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerMedida(m.id) }, "\u00D7")))))))))));
@@ -5102,6 +5188,12 @@ function App() {
                 React.createElement("input", { ref: faceFotoInputRef, type: "file", accept: "image/*", capture: "environment", style: { display: 'none' }, onChange: handleFotoInputFace }),
                 React.createElement("input", { ref: faceFotoGaleriaInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleFotoInputFace }),
                 React.createElement("input", { ref: faceVideoInputRef, type: "file", accept: "video/*", capture: "environment", style: { display: 'none' }, onChange: handleVideoInputFace })),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 } },
+                React.createElement("span", { style: { fontSize: 12, color: '#999', flexShrink: 0 } },
+                    "\uD83D\uDCC5 Data",
+                    faceDataRetroativa ? '' : ' (hoje)'),
+                React.createElement("input", { className: "mt-nota-input", type: "date", value: faceDataRetroativa, onChange: (e) => setFaceDataRetroativa(e.target.value), style: { flex: '0 0 150px' } }),
+                faceDataRetroativa && React.createElement("button", { className: "mt-btn-sm", onClick: () => setFaceDataRetroativa('') }, "Hoje")),
             React.createElement("button", { className: "mt-btn-sm primary", style: { marginTop: 8 }, onClick: registrarFace }, "Registrar"),
             msgFace && React.createElement("p", { className: "mt-premio-msg" }, msgFace)),
         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
@@ -5121,10 +5213,14 @@ function App() {
     // Linha do tempo gráfica da aba História: reta horizontal com um ponto por evento,
     // posicionado conforme o ano (negativo = a.C., positivo = d.C., 0 = ano zero).
     // Escala 'anos' aproxima (10 em 10 anos nas marcações); 'seculo' afasta (100 em 100).
+    // "Geral" é o único que mistura eventos de todos os tipos numa linha só; os demais mostram
+    // só os eventos do tipo selecionado. Cada ponto usa a cor do tipo (ou da região, em
+    // Civilizações e Culturas) — a mesma cor do botão que ele pertence.
     const renderLinhaDoTempoHistoria = () => {
-        const eventos = histEventos.filter((e) => e.tipo === histTipoSelecionado).slice().sort((a, b) => a.ano - b.ano);
+        const todosOsTipos = histTipoSelecionado === 'geral';
+        const eventos = (todosOsTipos ? histEventos : histEventos.filter((e) => e.tipo === histTipoSelecionado)).slice().sort((a, b) => a.ano - b.ano);
         if (eventos.length === 0) {
-            return React.createElement("p", { className: "mt-empty", style: { marginTop: 10 } }, "Nenhum evento neste tipo ainda \u2014 a linha do tempo aparece aqui assim que voc\u00EA registrar o primeiro.");
+            return React.createElement("p", { className: "mt-empty", style: { marginTop: 10 } }, todosOsTipos ? 'Nenhum evento registrado ainda em nenhum tipo.' : 'Nenhum evento neste tipo ainda — a linha do tempo aparece aqui assim que você registrar o primeiro.');
         }
         const pxPorAno = 4;
         const anos = eventos.map((e) => e.ano);
@@ -5148,10 +5244,13 @@ function App() {
                         React.createElement("text", { x: anoParaX(a), y: y + 18, fontSize: "9", textAnchor: "middle", fill: a === 0 ? '#C0492E' : '#999' }, formatAnoHistoria(a)),
                         marcaDeSeculo && (React.createElement("text", { x: anoParaX(a), y: y + 30, fontSize: "8", fontWeight: "700", textAnchor: "middle", fill: "#8A6D3B" }, formatSeculoHistoria(a === 0 ? 1 : a)))));
                 }),
-                eventos.map((e) => (React.createElement("g", { key: e.id },
-                    React.createElement("circle", { cx: anoParaX(e.ano), cy: y, r: 5, fill: "#8A6D3B", stroke: "#fff", strokeWidth: 1.5 }),
-                    React.createElement("text", { x: anoParaX(e.ano), y: y - 12, fontSize: "9", textAnchor: "middle", fill: "#232323" }, formatAnoHistoria(e.ano)),
-                    React.createElement("text", { x: anoParaX(e.ano), y: y - 22, fontSize: "7.5", textAnchor: "middle", fill: "#8A6D3B" }, formatSeculoHistoria(e.ano))))))));
+                eventos.map((e) => {
+                    const cor = corDoEventoHistoria(e);
+                    return (React.createElement("g", { key: e.id },
+                        React.createElement("circle", { cx: anoParaX(e.ano), cy: y, r: 5, fill: cor, stroke: "#fff", strokeWidth: 1.5 }),
+                        React.createElement("text", { x: anoParaX(e.ano), y: y - 12, fontSize: "9", textAnchor: "middle", fill: "#232323" }, formatAnoHistoria(e.ano)),
+                        React.createElement("text", { x: anoParaX(e.ano), y: y - 22, fontSize: "7.5", textAnchor: "middle", fill: cor }, formatSeculoHistoria(e.ano))));
+                }))));
     };
     // Painel "💰 Bank": mora dentro da aba Finanças, no botão "Bank" ao lado das sessões.
     const renderBank = () => {
@@ -5170,6 +5269,12 @@ function App() {
                     React.createElement("input", { type: "text", inputMode: "decimal", className: "mt-nota-input", placeholder: "Valor (ex: 250.00 ou -80.00)", value: bankValor, onChange: (e) => setBankValor(e.target.value) })),
                 React.createElement("div", { className: "mt-premio-saque-row", style: { marginTop: 6 } },
                     React.createElement("input", { className: "mt-nota-input", placeholder: "Notas\u2026", value: bankNota, onChange: (e) => setBankNota(e.target.value), onKeyDown: (e) => e.key === 'Enter' && lancarBank() })),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 } },
+                    React.createElement("span", { style: { fontSize: 12, color: '#999', flexShrink: 0 } },
+                        "\uD83D\uDCC5 Data",
+                        bankDataRetroativa ? '' : ' (hoje)'),
+                    React.createElement("input", { className: "mt-nota-input", type: "date", value: bankDataRetroativa, onChange: (e) => setBankDataRetroativa(e.target.value), style: { flex: '0 0 150px' } }),
+                    bankDataRetroativa && React.createElement("button", { className: "mt-btn-sm", onClick: () => setBankDataRetroativa('') }, "Hoje")),
                 React.createElement("button", { className: "mt-btn-sm primary", style: { marginTop: 6 }, onClick: lancarBank }, "Done"),
                 msgBank && React.createElement("p", { className: "mt-premio-msg" }, msgBank)),
             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
@@ -6293,6 +6398,46 @@ function App() {
         }
     };
     // ---- Face (Development): foto (câmera) + vídeo (câmera) — mesmo pipeline do Pso acima ----
+    // ---- Pump: foto (câmera) — mesmo pipeline do Pso/Face acima, mas sem vídeo aqui ----
+    const handleFotoInputPump = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file)
+            return;
+        const { url, token } = lerConfigR2();
+        if (!url || !token) {
+            setMsgUploadMidiaPump('');
+            setUploadMidiaPumpEmAndamento(true);
+            try {
+                const comprimida = await comprimirImagemParaUpload(file);
+                const reader = new FileReader();
+                reader.onload = (ev) => setPumpNovaFoto(ev.target.result);
+                reader.onerror = () => setMsgUploadMidiaPump('Não consegui processar a foto. Tente de novo.');
+                reader.readAsDataURL(comprimida);
+                setMsgUploadMidiaPump('⚠️ Cloudflare R2 não configurado — a foto foi comprimida e guardada localmente (base64). Configure em ⚙️ Configurações gerais para subir pro servidor.');
+            }
+            catch (err) {
+                setMsgUploadMidiaPump('Não consegui processar a foto. Tente de novo.');
+            }
+            finally {
+                setUploadMidiaPumpEmAndamento(false);
+            }
+            return;
+        }
+        setMsgUploadMidiaPump('');
+        setUploadMidiaPumpEmAndamento(true);
+        try {
+            const comprimida = await comprimirImagemParaUpload(file);
+            const urlFinal = await subirArquivoParaR2(comprimida, file.name || 'pump-foto.jpg');
+            setPumpNovaFoto(urlFinal);
+        }
+        catch (err) {
+            setMsgUploadMidiaPump('Não consegui subir a foto. Confira a configuração do Cloudflare em ⚙️ Configurações gerais.');
+        }
+        finally {
+            setUploadMidiaPumpEmAndamento(false);
+        }
+    };
     const handleFotoInputFace = async (e) => {
         const file = e.target.files && e.target.files[0];
         e.target.value = '';
@@ -6356,20 +6501,21 @@ function App() {
         }
     };
     // grava um registro de Face: comentário + foto/vídeo (se anexados), carimbando dia e horário
+    // (ou o dia escolhido em "data retroativa", com a hora de agora)
     const registrarFace = () => {
         const comentario = faceComentario.trim();
         if (!comentario && !faceNovaFoto && !faceNovoVideo) {
             setMsgFace('Escreva um comentário, tire uma foto ou grave um vídeo.');
             return;
         }
-        const dataHoje = new Date().toLocaleString('pt-BR', {
-            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-        });
-        setFaceRegistro((l) => [{ id: genId(), comentario, foto: faceNovaFoto, video: faceNovoVideo, data: dataHoje, dataISO: hoje() }, ...l]);
+        const dataISO = faceDataRetroativa || hoje();
+        const dataHoje = formatDataHoraBRDeISO(dataISO);
+        setFaceRegistro((l) => [{ id: genId(), comentario, foto: faceNovaFoto, video: faceNovoVideo, data: dataHoje, dataISO }, ...l]);
         setFaceComentario('');
         setFaceNovaFoto(null);
         setFaceNovoVideo(null);
         setMsgUploadMidiaFace('');
+        setFaceDataRetroativa('');
         setMsgFace('Registrado!');
         marcarSujo();
     };
@@ -7954,10 +8100,14 @@ function App() {
                             const atrasos = t.atrasos || 0;
                             const corAtraso = atrasos >= 2 ? '#C0492E' : atrasos === 1 ? '#C9A227' : null;
                             const corTexto = corAtraso || corPrazo;
+                            const streak = streakExibido(t);
                             return (React.createElement("div", { key: t.id, "data-fixa-id": t.id, className: `mt-fixa-item ${draggingId === t.id ? 'dragging' : ''} ${dragOverId === t.id && draggingId !== t.id ? 'drag-over' : ''}` },
                                 fixasEdicaoAtiva && (React.createElement("span", { className: "mt-drag-handle", onTouchStart: (e) => onHandleTouchStart(e, freq, t.id), onTouchMove: onHandleTouchMove, onTouchEnd: onHandleTouchEnd }, "\u2261")),
                                 React.createElement("button", { className: `mt-check ${feita ? 'feita' : ''}`, onClick: () => alternarFixa(t.id) }, feita ? '✓' : ''),
                                 React.createElement("span", { className: `mt-fixa-texto ${feita ? 'feita' : ''}`, title: !feita && atrasos > 0 ? `${atrasos} ${atrasos === 1 ? 'período' : 'períodos'} sem concluir` : undefined, style: !feita && corTexto ? { color: corTexto, fontWeight: 600 } : undefined }, t.texto),
+                                streak > 0 && (React.createElement("span", { style: { flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#C9622F', whiteSpace: 'nowrap' }, title: t.recorde ? `recorde: ${t.recorde} ${t.recorde === 1 ? 'seguido' : 'seguidos'}` : undefined },
+                                    "\uD83D\uDD25",
+                                    streak)),
                                 fixasEdicaoAtiva && (React.createElement("span", { style: { flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4 } },
                                     dias !== null && (React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: corPrazo || '#a8a293' } }, dias < 0 ? `${Math.abs(dias)}d atrasado` : dias === 0 ? 'hoje' : `${dias}d`)),
                                     React.createElement("input", { type: "text", inputMode: "numeric", placeholder: "dias", defaultValue: dias !== null && dias > 0 ? String(dias) : '', onBlur: (e) => definirPrazoFixa(t.id, e.target.value), style: {
@@ -8394,7 +8544,23 @@ function App() {
                                             React.createElement("span", null, "0"),
                                             React.createElement("span", null, "+10")),
                                         React.createElement("input", { type: "range", min: "-10", max: "10", step: "1", value: pumpPele, onChange: (e) => setPumpPele(parseInt(e.target.value, 10)), style: { width: '100%', accentColor: '#6E8C82', margin: '2px 0 0' } })),
-                                    React.createElement("textarea", { className: "mt-nota-input", placeholder: "Coment\u00E1rio (opcional)\u2026", value: pumpComentario, onChange: (e) => setPumpComentario(e.target.value), rows: 2, style: { width: '100%', marginTop: 10, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' } })),
+                                    React.createElement("textarea", { className: "mt-nota-input", placeholder: "Coment\u00E1rio (opcional)\u2026", value: pumpComentario, onChange: (e) => setPumpComentario(e.target.value), rows: 2, style: { width: '100%', marginTop: 10, resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' } }),
+                                    pumpNovaFoto && (React.createElement("div", { style: { position: 'relative', marginTop: 8 } },
+                                        React.createElement("img", { src: pumpNovaFoto, style: { maxWidth: '100%', maxHeight: 120, borderRadius: 8, objectFit: 'cover', display: 'block' }, alt: "" }),
+                                        React.createElement("button", { className: "mt-del", style: { position: 'absolute', top: 4, right: 4 }, onClick: () => setPumpNovaFoto(null) }, "\u00D7"))),
+                                    uploadMidiaPumpEmAndamento && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12, margin: '6px 0 0' } }, "Enviando\u2026"),
+                                    msgUploadMidiaPump && React.createElement("p", { className: "mt-alerta-vazio", style: { fontSize: 12, margin: '6px 0 0', color: msgUploadMidiaPump.startsWith('⚠️') ? '#C9A227' : '#C0492E' } }, msgUploadMidiaPump),
+                                    React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' } },
+                                        React.createElement("button", { className: "mt-btn-sm", disabled: uploadMidiaPumpEmAndamento, onClick: () => pumpFotoInputRef.current && pumpFotoInputRef.current.click() }, "\uD83D\uDCF7 Tirar foto"),
+                                        React.createElement("button", { className: "mt-btn-sm", disabled: uploadMidiaPumpEmAndamento, onClick: () => pumpFotoGaleriaInputRef.current && pumpFotoGaleriaInputRef.current.click() }, "\uD83D\uDDBC Escolher da galeria"),
+                                        React.createElement("input", { ref: pumpFotoInputRef, type: "file", accept: "image/*", capture: "environment", style: { display: 'none' }, onChange: handleFotoInputPump }),
+                                        React.createElement("input", { ref: pumpFotoGaleriaInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleFotoInputPump })),
+                                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 } },
+                                        React.createElement("span", { style: { fontSize: 12, color: '#999', flexShrink: 0 } },
+                                            "\uD83D\uDCC5 Data",
+                                            pumpDataRetroativa ? '' : ' (hoje)'),
+                                        React.createElement("input", { className: "mt-nota-input", type: "date", value: pumpDataRetroativa, onChange: (e) => setPumpDataRetroativa(e.target.value), style: { flex: '0 0 150px' } }),
+                                        pumpDataRetroativa && React.createElement("button", { className: "mt-btn-sm", onClick: () => setPumpDataRetroativa('') }, "Hoje"))),
                                 msgPump && React.createElement("p", { className: "mt-premio-msg" }, msgPump)),
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
                                 React.createElement("button", { className: "mt-discreto-btn", onClick: () => setPumpExpandido((v) => !v), title: pumpExpandido ? 'Ocultar registro' : 'Ver registro do Pump' }, pumpExpandido ? '▲' : '▼'),
@@ -8403,6 +8569,7 @@ function App() {
                                 React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 10 } },
                                     pumpRegistro.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum registro ainda."),
                                     pumpRegistro.map((r, i) => (React.createElement("div", { key: r.id, className: "mt-fixa-item", style: mesmoDiaRegistro(r, pumpRegistro[i + 1]) ? { borderBottom: 'none' } : undefined },
+                                        r.foto && React.createElement("img", { src: r.foto, className: "mt-alerta-img-preview", alt: "", onClick: () => setMidiaAmpliada({ tipo: 'foto', url: r.foto }) }),
                                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                             r.nome && React.createElement("span", { style: { display: 'block', fontSize: 13.5, fontWeight: 600, color: '#232323' } }, r.nome),
                                             mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setPumpRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { comentario: e.target.value }) : x))), placeholder: "Coment\u00E1rio\u2026", style: { width: '100%', marginTop: 2, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: r.nome ? '#666' : '#232323', fontWeight: r.nome ? 400 : 600, whiteSpace: 'pre-wrap' } }, r.comentario)),
@@ -8487,6 +8654,12 @@ function App() {
                                     React.createElement("input", { ref: psoFotoInputRef, type: "file", accept: "image/*", capture: "environment", style: { display: 'none' }, onChange: handleFotoInputPso }),
                                     React.createElement("input", { ref: psoFotoGaleriaInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleFotoInputPso }),
                                     React.createElement("input", { ref: psoVideoInputRef, type: "file", accept: "video/*", capture: "environment", style: { display: 'none' }, onChange: handleVideoInputPso })),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 } },
+                                    React.createElement("span", { style: { fontSize: 12, color: '#999', flexShrink: 0 } },
+                                        "\uD83D\uDCC5 Data",
+                                        psoDataRetroativa ? '' : ' (hoje)'),
+                                    React.createElement("input", { className: "mt-nota-input", type: "date", value: psoDataRetroativa, onChange: (e) => setPsoDataRetroativa(e.target.value), style: { flex: '0 0 150px' } }),
+                                    psoDataRetroativa && React.createElement("button", { className: "mt-btn-sm", onClick: () => setPsoDataRetroativa('') }, "Hoje")),
                                 msgPso && React.createElement("p", { className: "mt-premio-msg" }, msgPso)),
                             React.createElement("div", { className: "mt-premio-secao", style: { marginTop: 10 } },
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
@@ -8586,42 +8759,10 @@ function App() {
                                             mostrarConfigLivroRazao ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setPsoRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { comentario: e.target.value }) : x))), placeholder: "Coment\u00E1rio\u2026", style: { width: '100%', marginTop: 2, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 12.5, color: '#232323' } }, r.comentario)),
                                             React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
                                         mostrarConfigLivroRazao && React.createElement("button", { className: "mt-del", onClick: () => removerRegistroPso(r.id) }, "\u00D7"))))))))),
-                        razaoTabSelecionada === 'premiacao' && (React.createElement(React.Fragment, null,
-                            React.createElement("div", { className: "mt-premio-secao" },
-                                React.createElement("p", { className: "mt-premio-secao-titulo" }, "\uD83C\uDFE6 Banco de Horas"),
-                                React.createElement("p", { className: "mt-premio-valor" }, formatBH(bancoDeHoras)),
-                                React.createElement("div", { className: "mt-premio-saque-row" },
-                                    React.createElement("input", { className: "mt-nota-input", placeholder: "HH:MM ou horas (ex: 1:30)", value: sacoBH, onChange: (e) => setSacoBH(e.target.value), onKeyDown: (e) => e.key === 'Enter' && sacarBH() }),
-                                    React.createElement("button", { className: "mt-btn-sm primary", onClick: sacarBH }, "Sacar"))),
-                            React.createElement("div", { className: "mt-premio-divisor" }),
-                            React.createElement("div", { className: "mt-premio-secao" },
-                                React.createElement("p", { className: "mt-premio-secao-titulo" }, "\uD83D\uDD12 Caixa Forte"),
-                                React.createElement("p", { className: "mt-premio-valor" }, formatCF(bancoDeHoras, valorHora)),
-                                React.createElement("p", { className: "mt-premio-sub" },
-                                    "$ ",
-                                    valorHora.toFixed(2),
-                                    " / hora"),
-                                React.createElement("div", { className: "mt-premio-saque-row" },
-                                    React.createElement("input", { className: "mt-nota-input", placeholder: "Valor em $ (ex: 23.00)", value: sacoCF, onChange: (e) => setSacoCF(e.target.value), onKeyDown: (e) => e.key === 'Enter' && sacarCF() }),
-                                    React.createElement("button", { className: "mt-btn-sm primary", onClick: sacarCF }, "Sacar"))),
-                            msgPremiacao && React.createElement("p", { className: "mt-premio-msg" }, msgPremiacao),
-                            React.createElement("button", { className: "mt-add-tarefa-toggle-btn", onClick: () => setMostrarConfigPremiacao((v) => !v), title: mostrarConfigPremiacao ? 'Fechar' : 'Ajustar parâmetros', style: { marginTop: 10 } }, mostrarConfigPremiacao ? '×' : '+'),
-                            mostrarConfigPremiacao && (React.createElement("div", { className: "mt-config-panel" },
-                                React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '0 0 6px' } }, "AJUSTAR PAR\u00C2METROS"),
-                                React.createElement("div", { className: "mt-config-item" },
-                                    React.createElement("div", null,
-                                        React.createElement("p", { className: "mt-config-item-label" }, "Valor da hora ($)"),
-                                        React.createElement("p", { className: "mt-config-item-desc" }, "Usado para converter o Banco de Horas em d\u00F3lares na Caixa Forte.")),
-                                    React.createElement("input", { type: "number", step: "0.01", className: "mt-premio-config-input", value: valorHora, onChange: (e) => { setValorHora(parseFloat(e.target.value) || 0); marcarSujo(); } })),
-                                [0, 1, 2, 3].map((n) => (React.createElement("div", { className: "mt-config-item", key: n },
-                                    React.createElement("div", null,
-                                        React.createElement("p", { className: "mt-config-item-label" }, n === 0 ? 'Sem estrelas' : `${n} estrela${n > 1 ? 's' : ''}`),
-                                        React.createElement("p", { className: "mt-config-item-desc" }, "Multiplicador aplicado ao tempo gasto ao premiar.")),
-                                    React.createElement("input", { type: "number", step: "0.1", className: "mt-premio-config-input", value: regrasEstrelas[n], onChange: (e) => { const v = parseFloat(e.target.value) || 0; setRegrasEstrelas((r) => (Object.assign(Object.assign({}, r), { [n]: v }))); marcarSujo(); } })))))))),
                         razaoTabSelecionada === 'historia' && (() => {
                             var _a;
-                            const eventosFiltrados = histEventos
-                                .filter((e) => e.tipo === histTipoSelecionado)
+                            const todosOsTipos = histTipoSelecionado === 'geral';
+                            const eventosFiltrados = (todosOsTipos ? histEventos : histEventos.filter((e) => e.tipo === histTipoSelecionado))
                                 .slice()
                                 .sort((a, b) => a.ano - b.ano);
                             const tipoAtual = histTipos.find((t) => t.id === histTipoSelecionado);
@@ -8629,7 +8770,13 @@ function App() {
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
                                     React.createElement("p", { className: "mt-premio-secao-titulo", style: { flex: 1, margin: 0 } }, "\uD83D\uDCDC Hist\u00F3ria"),
                                     React.createElement("button", { className: "mt-discreto-btn", onClick: () => setHistConfigAberto((v) => !v), title: histConfigAberto ? 'Fechar configurações' : 'Configurações — editar textos, apagar e criar tipos' }, histConfigAberto ? '×' : '⚙️')),
-                                React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 } }, histTipos.map((t) => (React.createElement("button", { key: t.id, className: "mt-btn-sm", style: histTipoSelecionado === t.id ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B' } : undefined, onClick: () => setHistTipoSelecionado(t.id) }, t.nome)))),
+                                React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 } }, histTipos.map((t) => {
+                                    const ativo = histTipoSelecionado === t.id;
+                                    const cor = t.id === 'geral' ? '#6b6b6b' : corDoTipoHistoria(t.id);
+                                    return (React.createElement("button", { key: t.id, className: "mt-btn-sm", style: ativo ? { background: cor, color: '#fff', borderColor: cor } : { color: cor, borderColor: cor }, onClick: () => setHistTipoSelecionado(t.id) },
+                                        t.id === 'geral' ? '📚 ' : '',
+                                        t.nome));
+                                })),
                                 histTipoSelecionado === 'civilizacoes' && (React.createElement("div", { style: { marginTop: 10 } },
                                     React.createElement("button", { className: "mt-btn-sm", style: histRegioesPainelAberto ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B' } : undefined, onClick: () => setHistRegioesPainelAberto((v) => !v) },
                                         "\uD83C\uDF0D Regi\u00F5es",
@@ -8638,7 +8785,7 @@ function App() {
                                         React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } }, REGIOES_CIVILIZACOES.map((c) => {
                                             const marcado = histRegioesSelecionadas.includes(c.id);
                                             const expandido = histContinenteExpandido === c.id;
-                                            return (React.createElement("button", { key: c.id, className: "mt-btn-sm", style: marcado ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B' } : (expandido ? { borderColor: '#8A6D3B' } : undefined), onClick: () => toggleHistContinente(c) },
+                                            return (React.createElement("button", { key: c.id, className: "mt-btn-sm", style: marcado ? { background: c.cor, color: '#fff', borderColor: c.cor } : { color: c.cor, borderColor: c.cor }, onClick: () => toggleHistContinente(c) },
                                                 c.nome,
                                                 c.subs.length > 0 ? (expandido ? ' ▾' : ' ▸') : ''));
                                         })),
@@ -8655,7 +8802,7 @@ function App() {
                                         tipoAtual.nome,
                                         "\" (e os eventos dele)")))),
                                 renderLinhaDoTempoHistoria(),
-                                React.createElement("div", { style: { marginTop: 14 } },
+                                todosOsTipos ? (React.createElement("p", { className: "mt-empty", style: { marginTop: 14 } }, "\"Geral\" re\u00FAne os eventos de todos os tipos aqui embaixo \u2014 escolha um tipo espec\u00EDfico ali em cima pra registrar um novo evento.")) : (React.createElement("div", { style: { marginTop: 14 } },
                                     React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Texto do evento\u2026", value: histNovoTexto, onChange: (e) => setHistNovoTexto(e.target.value), style: { minHeight: 50 } }),
                                     React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
                                         React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "numeric", placeholder: "Ano (ex: 476)", value: histNovoAno, onChange: (e) => setHistNovoAno(e.target.value.replace(/\D/g, '')), onKeyDown: (e) => e.key === 'Enter' && adicionarEventoHistoria(), style: { flex: 1 } }),
@@ -8665,15 +8812,19 @@ function App() {
                                     React.createElement("button", { className: "mt-btn-sm primary", style: { marginTop: 8 }, onClick: adicionarEventoHistoria },
                                         "Registrar evento \u2014 ", tipoAtual === null || tipoAtual === void 0 ? void 0 :
                                         tipoAtual.nome),
-                                    msgHistoria && React.createElement("p", { className: "mt-premio-msg" }, msgHistoria)),
+                                    msgHistoria && React.createElement("p", { className: "mt-premio-msg" }, msgHistoria))),
                                 React.createElement("div", { className: "mt-fixas-scroll", style: { marginTop: 14 } },
                                     eventosFiltrados.length === 0 && React.createElement("p", { className: "mt-empty" }, "Nenhum evento neste tipo ainda."),
-                                    eventosFiltrados.map((e) => (React.createElement("div", { key: e.id, className: "mt-fixa-item" },
-                                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                            React.createElement("span", { style: { fontSize: 11.5, color: '#8A6D3B', fontWeight: 700 } }, formatAnoHistoria(e.ano)),
-                                            histConfigAberto ? (React.createElement("textarea", { className: "mt-bloco-textarea", style: { minHeight: 36, marginTop: 4 }, value: e.texto, onChange: (ev) => editarTextoEventoHistoria(e.id, ev.target.value) })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, e.texto)),
-                                            Array.isArray(e.regioes) && e.regioes.length > 0 && (React.createElement("div", { style: { display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 } }, e.regioes.map((rid) => (React.createElement("span", { key: rid, style: { fontSize: 10.5, color: '#8A6D3B', background: '#F5EFE0', border: '1px solid #8A6D3B', borderRadius: 10, padding: '1px 7px' } }, nomeRegiaoCivilizacao(rid))))))),
-                                        histConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerEventoHistoria(e.id) }, "\u00D7"))))))));
+                                    eventosFiltrados.map((e) => {
+                                        const corEvento = corDoEventoHistoria(e);
+                                        return (React.createElement("div", { key: e.id, className: "mt-fixa-item" },
+                                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                                React.createElement("span", { style: { fontSize: 11.5, color: corEvento, fontWeight: 700 } }, formatAnoHistoria(e.ano)),
+                                                todosOsTipos && (React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: corEvento, background: '#fff', border: `1px solid ${corEvento}`, borderRadius: 8, padding: '1px 6px', marginLeft: 6 } }, (histTipos.find((t) => t.id === e.tipo) || {}).nome || e.tipo)),
+                                                histConfigAberto ? (React.createElement("textarea", { className: "mt-bloco-textarea", style: { minHeight: 36, marginTop: 4 }, value: e.texto, onChange: (ev) => editarTextoEventoHistoria(e.id, ev.target.value) })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, e.texto)),
+                                                Array.isArray(e.regioes) && e.regioes.length > 0 && (React.createElement("div", { style: { display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 } }, e.regioes.map((rid) => (React.createElement("span", { key: rid, style: { fontSize: 10.5, color: '#8A6D3B', background: '#F5EFE0', border: '1px solid #8A6D3B', borderRadius: 10, padding: '1px 7px' } }, nomeRegiaoCivilizacao(rid))))))),
+                                            histConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerEventoHistoria(e.id) }, "\u00D7"))));
+                                    }))));
                         })(),
                         CHECKLISTS.map((c) => {
                             const abas = chkAbasDe(c.id);
@@ -8777,7 +8928,7 @@ function App() {
                                                     border: '1.5px solid ' + (it.cor ? CORES_CIRCULO[it.cor] : '#ddd8c9'),
                                                     background: it.cor ? CORES_CIRCULO[it.cor] : '#fff',
                                                 } })),
-                                            (c.id === 'objetivas' || sid === PROGRAMA_SESSAO || ehSessaoAntifrust) ? (React.createElement("button", { onClick: () => abrirPrograma(c.id, it.id), title: it.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
+                                            (sid === PROGRAMA_SESSAO || ehSessaoAntifrust) ? (React.createElement("button", { onClick: () => abrirPrograma(c.id, it.id), title: it.programa ? 'Ver/editar programa' : 'Escrever programa', style: {
                                                     flexShrink: 0, fontSize: 10.5, fontWeight: 700, padding: '4px 9px',
                                                     borderRadius: 20, border: '1.5px solid', cursor: 'pointer',
                                                     background: it.programa ? '#4A7FD9' : '#fff',
@@ -8857,6 +9008,7 @@ function App() {
                                             React.createElement("button", { className: `mt-cat-tab-btn ${minhaListaModoAtivo ? 'ativo' : ''}`, style: { '--cor': '#5B7C99' }, onClick: () => { setMinhaListaModoAtivo(true); setListaMistaAberta(false); }, title: "Tarefas sorteadas, aguardando ou j\u00E1 feitas" },
                                                 "\uD83D\uDCDD Minha lista",
                                                 lista.length > 0 ? ` (${lista.length})` : ''),
+                                            React.createElement("button", { className: `mt-cat-tab-btn ${catTabSelecionada === 'premiacao' ? 'ativo' : ''}`, style: { '--cor': '#BFA23A' }, onClick: () => { setCatTabSelecionada('premiacao'); setListaMistaAberta(false); setMinhaListaModoAtivo(false); }, title: "Banco de Horas e Caixa Forte" }, "\uD83C\uDFC6 Premia\u00E7\u00E3o"),
                                             cats.map((c) => (React.createElement("button", { key: c.id, className: `mt-cat-tab-btn ${tabId === c.id ? 'ativo' : ''}`, style: { '--cor': c.cor }, onClick: () => { setCatTabSelecionada(c.id); setListaMistaAberta(false); setMinhaListaModoAtivo(false); } }, c.nome)))),
                                         minhaListaModoAtivo ? (React.createElement("div", { style: { marginTop: 12 } },
                                             React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end' } },
@@ -8919,7 +9071,38 @@ function App() {
                                             React.createElement("button", { className: "mt-sortear-btn", style: { '--cor': '#8E6BAE' }, disabled: poolDaMistura().length === 0, onClick: sortearDaMistura },
                                                 "\uD83C\uDFB2 Sortear",
                                                 filtroSortear[MISTURA_ID] != null ? ` · ${filtroSortear[MISTURA_ID] < 60 ? filtroSortear[MISTURA_ID] + ' min' : '1 hora'}` : '',
-                                                premiacaoDraft[MISTURA_ID] > 0 ? ` · ${'⭐️'.repeat(premiacaoDraft[MISTURA_ID])}` : ''))) : (catAtiva && renderCatConteudo(catAtiva)))) : (React.createElement("p", { className: "mt-empty" }, "Nenhuma categoria ainda. Toque em \u2699\uFE0F para criar uma.")),
+                                                premiacaoDraft[MISTURA_ID] > 0 ? ` · ${'⭐️'.repeat(premiacaoDraft[MISTURA_ID])}` : ''))) : catTabSelecionada === 'premiacao' ? (React.createElement("div", { style: { marginTop: 12 } },
+                                            React.createElement("div", { className: "mt-premio-secao" },
+                                                React.createElement("p", { className: "mt-premio-secao-titulo" }, "\uD83C\uDFE6 Banco de Horas"),
+                                                React.createElement("p", { className: "mt-premio-valor" }, formatBH(bancoDeHoras)),
+                                                React.createElement("div", { className: "mt-premio-saque-row" },
+                                                    React.createElement("input", { className: "mt-nota-input", placeholder: "HH:MM ou horas (ex: 1:30)", value: sacoBH, onChange: (e) => setSacoBH(e.target.value), onKeyDown: (e) => e.key === 'Enter' && sacarBH() }),
+                                                    React.createElement("button", { className: "mt-btn-sm primary", onClick: sacarBH }, "Sacar"))),
+                                            React.createElement("div", { className: "mt-premio-divisor" }),
+                                            React.createElement("div", { className: "mt-premio-secao" },
+                                                React.createElement("p", { className: "mt-premio-secao-titulo" }, "\uD83D\uDD12 Caixa Forte"),
+                                                React.createElement("p", { className: "mt-premio-valor" }, formatCF(bancoDeHoras, valorHora)),
+                                                React.createElement("p", { className: "mt-premio-sub" },
+                                                    "$ ",
+                                                    valorHora.toFixed(2),
+                                                    " / hora"),
+                                                React.createElement("div", { className: "mt-premio-saque-row" },
+                                                    React.createElement("input", { className: "mt-nota-input", placeholder: "Valor em $ (ex: 23.00)", value: sacoCF, onChange: (e) => setSacoCF(e.target.value), onKeyDown: (e) => e.key === 'Enter' && sacarCF() }),
+                                                    React.createElement("button", { className: "mt-btn-sm primary", onClick: sacarCF }, "Sacar"))),
+                                            msgPremiacao && React.createElement("p", { className: "mt-premio-msg" }, msgPremiacao),
+                                            React.createElement("button", { className: "mt-add-tarefa-toggle-btn", onClick: () => setMostrarConfigPremiacao((v) => !v), title: mostrarConfigPremiacao ? 'Fechar' : 'Ajustar parâmetros', style: { marginTop: 10 } }, mostrarConfigPremiacao ? '×' : '+'),
+                                            mostrarConfigPremiacao && (React.createElement("div", { className: "mt-config-panel" },
+                                                React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '0 0 6px' } }, "AJUSTAR PAR\u00C2METROS"),
+                                                React.createElement("div", { className: "mt-config-item" },
+                                                    React.createElement("div", null,
+                                                        React.createElement("p", { className: "mt-config-item-label" }, "Valor da hora ($)"),
+                                                        React.createElement("p", { className: "mt-config-item-desc" }, "Usado para converter o Banco de Horas em d\u00F3lares na Caixa Forte.")),
+                                                    React.createElement("input", { type: "number", step: "0.01", className: "mt-premio-config-input", value: valorHora, onChange: (e) => { setValorHora(parseFloat(e.target.value) || 0); marcarSujo(); } })),
+                                                [0, 1, 2, 3].map((n) => (React.createElement("div", { className: "mt-config-item", key: n },
+                                                    React.createElement("div", null,
+                                                        React.createElement("p", { className: "mt-config-item-label" }, n === 0 ? 'Sem estrelas' : `${n} estrela${n > 1 ? 's' : ''}`),
+                                                        React.createElement("p", { className: "mt-config-item-desc" }, "Multiplicador aplicado ao tempo gasto ao premiar.")),
+                                                    React.createElement("input", { type: "number", step: "0.1", className: "mt-premio-config-input", value: regrasEstrelas[n], onChange: (e) => { const v = parseFloat(e.target.value) || 0; setRegrasEstrelas((r) => (Object.assign(Object.assign({}, r), { [n]: v }))); marcarSujo(); } })))))))) : (catAtiva && renderCatConteudo(catAtiva)))) : (React.createElement("p", { className: "mt-empty" }, "Nenhuma categoria ainda. Toque em \u2699\uFE0F para criar uma.")),
                                     React.createElement("button", { className: "mt-config-fixas-btn", onClick: () => setMostrarConfigCategorias((v) => !v), title: mostrarConfigCategorias ? 'Fechar configurações' : 'Configurações das categorias', style: { marginTop: 12 } }, mostrarConfigCategorias ? '×' : '⚙️'),
                                     mostrarConfigCategorias && (React.createElement("div", { style: { marginTop: 14, paddingTop: 14, borderTop: '1px solid #f0efe9' } },
                                         React.createElement("p", { className: "mt-fixa-grupo-label", style: { marginBottom: 10 } }, "Configura\u00E7\u00F5es das categorias"),
