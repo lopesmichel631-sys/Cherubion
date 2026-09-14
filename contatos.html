@@ -17501,6 +17501,10 @@ const blankCard = () => ({
     fcskill: [],
     historico: [],
     lancamentos: [],
+    cadenciaDias: 0,
+    atividades: [],
+    datasImportantes: [],
+    estagio: "nova",
 });
 const blankFC = () => ({
     id: uid(),
@@ -18446,6 +18450,232 @@ const fmtDataISO = (iso) => {
         return iso || "";
     return p[2] + "/" + p[1] + "/" + p[0];
 };
+/* ── cadência de contato, atividades rápidas e datas importantes ── */
+const TIPOS_ATIVIDADE = [
+    ["ligacao", "📞", "Ligação"],
+    ["encontro", "☕", "Encontro"],
+    ["refeicao", "🍽️", "Refeição"],
+    ["mensagem", "💬", "Mensagem"],
+    ["nota", "📝", "Nota"],
+];
+const CADENCIAS = [
+    [0, "sem cadência"],
+    [3, "a cada 3 dias"],
+    [7, "a cada semana"],
+    [15, "a cada 15 dias"],
+    [30, "a cada mês"],
+    [60, "a cada 2 meses"],
+    [90, "a cada 3 meses"],
+];
+/* último contato registrado: maior data entre atividades rápidas,
+   envios de mensagem (historico) e registros de FC Skill */
+const ultimoContatoTs = (carta) => {
+    let max = 0;
+    (carta.atividades || []).forEach((a) => { if (a.data > max)
+        max = a.data; });
+    (carta.historico || []).forEach((h) => { if (h.data > max)
+        max = h.data; });
+    (carta.fcskill || []).forEach((f) => { if (f.data > max)
+        max = f.data; });
+    return max || null;
+};
+const diasSemFalar = (carta) => {
+    const base = ultimoContatoTs(carta) || carta.criadoEm;
+    if (!base)
+        return null;
+    return Math.floor((Date.now() - base) / 86400000);
+};
+const estaAtrasado = (carta) => {
+    const cad = carta.cadenciaDias || 0;
+    if (!cad)
+        return false;
+    const dias = diasSemFalar(carta);
+    return dias === null || dias >= cad;
+};
+/* datas importantes: "mesDia" fica em "MM-DD" — recorrente, sem ano */
+const fmtMesDia = (mesDia) => {
+    const p = String(mesDia || "").split("-");
+    if (p.length !== 2)
+        return "";
+    const mes = Number(p[0]) - 1;
+    const dia = Number(p[1]);
+    if (!Number.isFinite(mes) || !Number.isFinite(dia))
+        return "";
+    return dia + " de " + (MESES_PT[mes] || "");
+};
+const proximaOcorrencia = (mesDia) => {
+    const p = String(mesDia || "").split("-");
+    if (p.length !== 2)
+        return null;
+    const mes = Number(p[0]) - 1;
+    const dia = Number(p[1]);
+    if (!Number.isFinite(mes) || !Number.isFinite(dia))
+        return null;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    let alvo = new Date(hoje.getFullYear(), mes, dia);
+    if (alvo < hoje)
+        alvo = new Date(hoje.getFullYear() + 1, mes, dia);
+    return alvo;
+};
+const proximasDatasImportantes = (cards, janelaDias = 30) => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const limite = new Date(hoje.getTime() + janelaDias * 86400000);
+    const lista = [];
+    (cards || []).forEach((c) => {
+        (c.datasImportantes || []).forEach((d) => {
+            if (d.lembrete === false)
+                return;
+            const ocorrencia = proximaOcorrencia(d.mesDia);
+            if (!ocorrencia || ocorrencia > limite)
+                return;
+            lista.push({
+                cardId: c.id,
+                nome: c.nome,
+                titulo: d.titulo,
+                data: ocorrencia,
+                diasFaltam: Math.round((ocorrencia - hoje) / 86400000),
+            });
+        });
+    });
+    return lista.sort((a, b) => a.data - b.data);
+};
+const registrosNaSemana = (cards) => {
+    const limite = Date.now() - 7 * 86400000;
+    let n = 0;
+    (cards || []).forEach((c) => {
+        n += (c.atividades || []).filter((a) => a.data >= limite).length;
+        n += (c.historico || []).filter((h) => h.data >= limite).length;
+        n += (c.fcskill || []).filter((f) => f.data >= limite).length;
+    });
+    return n;
+};
+/* início da semana atual (segunda-feira, 00:00, horário local) */
+const inicioSemana = () => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const diaSemana = hoje.getDay(); // 0=domingo .. 6=sábado
+    const diffSegunda = diaSemana === 0 ? 6 : diaSemana - 1;
+    hoje.setDate(hoje.getDate() - diffSegunda);
+    return hoje.getTime();
+};
+/* quantas atividades rápidas (os 5 botões de registro) foram feitas desde segunda-feira —
+   só isso, sem contar mensagens enviadas nem registros de FC Skill */
+const atividadesNaSemanaAtual = (cards) => {
+    const inicio = inicioSemana();
+    let n = 0;
+    (cards || []).forEach((c) => {
+        n += (c.atividades || []).filter((a) => a.data >= inicio).length;
+    });
+    return n;
+};
+/* "naquele dia": registros de anos anteriores que caem na mesma data (mês/dia) de hoje */
+const memoriasDeHoje = (cards, maxAnos = 6) => {
+    const hoje = new Date();
+    const mesDiaHoje = pad2(hoje.getMonth() + 1) + "-" + pad2(hoje.getDate());
+    const anoAtual = hoje.getFullYear();
+    const lista = [];
+    const add = (cardId, nome, tipo, texto, ts) => {
+        if (!ts)
+            return;
+        const d = new Date(ts);
+        const mesDia = pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+        if (mesDia !== mesDiaHoje)
+            return;
+        const anos = anoAtual - d.getFullYear();
+        if (anos <= 0 || anos > maxAnos)
+            return;
+        lista.push({ id: cardId + "-" + tipo + "-" + ts, cardId, nome, tipo, texto, anos, data: ts });
+    };
+    (cards || []).forEach((c) => {
+        (c.fcskill || []).forEach((f) => {
+            const texto = f.experience || f.novidades || f.reactions || f.pros || "registro de FC Skill";
+            add(c.id, c.nome, "fc", texto, f.data);
+        });
+        (c.atividades || []).forEach((a) => {
+            const info = TIPOS_ATIVIDADE.find((t) => t[0] === a.tipo);
+            add(c.id, c.nome, "atividade", (info ? info[2] : "Atividade") + (a.nota ? ": " + a.nota : ""), a.data);
+        });
+        (c.historico || []).forEach((h) => {
+            add(c.id, c.nome, "mensagem", h.titulo ? "mensagem: " + h.titulo : "mensagem enviada", h.data);
+        });
+    });
+    return lista.sort((a, b) => a.anos - b.anos || b.data - a.data);
+};
+/* ── estágio (pipeline): onde cada carta está no funil ── */
+const ESTAGIOS = [
+    ["nova", "Nova"],
+    ["conversando", "Conversando"],
+    ["encontro", "Encontro marcado"],
+    ["saiu", "Já saiu"],
+    ["recorrente", "Recorrente"],
+    ["encerrada", "Encerrada"],
+];
+const estagioLabel = (k) => {
+    const item = ESTAGIOS.find((e) => e[0] === k);
+    return item ? item[1] : "Nova";
+};
+const contarPorEstagio = (cards) => {
+    const contagem = {};
+    ESTAGIOS.forEach(([k]) => { contagem[k] = 0; });
+    (cards || []).forEach((c) => {
+        const k = contagem.hasOwnProperty(c.estagio) ? c.estagio : "nova";
+        contagem[k]++;
+    });
+    return contagem;
+};
+/* estágio com mais cartas acumuladas (fora "encerrada") — indica onde o funil trava */
+const estagioGargalo = (cards) => {
+    const contagem = contarPorEstagio(cards);
+    let melhorK = null;
+    let melhorN = 0;
+    ESTAGIOS.forEach(([k]) => {
+        if (k === "encerrada")
+            return;
+        if (contagem[k] > melhorN) {
+            melhorN = contagem[k];
+            melhorK = k;
+        }
+    });
+    return melhorN >= 2 ? melhorK : null;
+};
+/* ── estatísticas: funil de conversão e volume por mês ──
+   usa só o estágio atual de cada carta e a data em que ela foi criada
+   (criadoEm) — nada disso é gravado no FC Skill. */
+const ORDEM_FUNIL = ["nova", "conversando", "encontro", "saiu", "recorrente"];
+const indiceFunil = (estagio) => {
+    const i = ORDEM_FUNIL.indexOf(estagio);
+    return i === -1 ? 0 : i;
+};
+/* quantas cartas alcançaram cada estágio do funil (pelo menos aquele estágio).
+   cartas "encerrada" ficam de fora, porque não guardamos até onde elas
+   chegaram antes de fechar */
+const funilConversao = (cards) => {
+    const ativas = (cards || []).filter((c) => (c.estagio || "nova") !== "encerrada");
+    return ORDEM_FUNIL.map((k, i) => ({
+        estagio: k,
+        label: estagioLabel(k),
+        alcancaram: ativas.filter((c) => indiceFunil(c.estagio) >= i).length,
+    }));
+};
+/* cartas criadas por mês, a partir de criadoEm, e quantas já saíram de "Nova" */
+const cartasPorMes = (cards) => {
+    const mapa = {};
+    (cards || []).forEach((c) => {
+        if (!c.criadoEm)
+            return;
+        const d = new Date(c.criadoEm);
+        const chave = d.getFullYear() + "-" + pad2(d.getMonth() + 1);
+        if (!mapa[chave]) {
+            mapa[chave] = { chave, ano: d.getFullYear(), mes: d.getMonth(), total: 0, avancaram: 0 };
+        }
+        mapa[chave].total++;
+        if ((c.estagio || "nova") !== "nova")
+            mapa[chave].avancaram++;
+    });
+    return Object.values(mapa).sort((a, b) => (a.chave < b.chave ? 1 : -1));
+};
 /* ── comemoração: som curto e confete ──────────────────── */
 function tocarSucesso() {
     try {
@@ -18594,11 +18824,13 @@ function BaralhoDeContatos() {
     const [acoes, setAcoes] = (0, react_1.useState)([]);
     const [valorHoraPadrao, setValorHoraPadrao] = (0, react_1.useState)("");
     const [botoesInvest, setBotoesInvest] = (0, react_1.useState)([]);
+    const [metaAtividadesSemana, setMetaAtividadesSemana] = (0, react_1.useState)(5);
     const [loaded, setLoaded] = (0, react_1.useState)(false);
     const [saved, setSaved] = (0, react_1.useState)(true);
     const [salvoEm, setSalvoEm] = (0, react_1.useState)(null);
     const [erro, setErro] = (0, react_1.useState)(false);
     const [novaId, setNovaId] = (0, react_1.useState)(null);
+    const [focoId, setFocoId] = (0, react_1.useState)(null);
     const [exportadoEm, setExportadoEm] = (0, react_1.useState)(null);
     const [r2Check, setR2Check] = (0, react_1.useState)(0);
     const [lembretes, setLembretes] = (0, react_1.useState)([]);
@@ -18619,6 +18851,7 @@ function BaralhoDeContatos() {
         valorHoraPadrao,
         botoesInvest,
         lembretes,
+        metaAtividadesSemana,
     };
     const gravar = async (dados) => {
         try {
@@ -18666,6 +18899,7 @@ function BaralhoDeContatos() {
                 setValorHoraPadrao(d.valorHoraPadrao || "");
                 setBotoesInvest(d.botoesInvest || []);
                 setLembretes(d.lembretes || []);
+                setMetaAtividadesSemana(Number.isFinite(d.metaAtividadesSemana) ? d.metaAtividadesSemana : 5);
                 setErro(false);
             }
             catch {
@@ -18696,6 +18930,7 @@ function BaralhoDeContatos() {
                 setValorHoraPadrao(d.valorHoraPadrao || "");
                 setBotoesInvest(d.botoesInvest || []);
                 setLembretes(d.lembretes || []);
+                setMetaAtividadesSemana(Number.isFinite(d.metaAtividadesSemana) ? d.metaAtividadesSemana : 5);
             }
             catch {
                 setCards([blankCard()]);
@@ -18792,6 +19027,7 @@ function BaralhoDeContatos() {
             valorHoraPadrao,
             botoesInvest,
             lembretes,
+            metaAtividadesSemana,
         }), 700);
         return () => clearTimeout(timer.current);
     }, [
@@ -18808,6 +19044,7 @@ function BaralhoDeContatos() {
         valorHoraPadrao,
         botoesInvest,
         lembretes,
+        metaAtividadesSemana,
         loaded,
     ]);
     /* ── salvar também ao fechar ou trocar de aba ── */
@@ -18861,6 +19098,10 @@ function BaralhoDeContatos() {
         const c = blankCard();
         setNovaId(c.id);
         setCards((cs) => [c, ...cs]);
+    };
+    const abrirCarta = (id) => {
+        setFocoId(id);
+        setTela("baralho");
     };
     const criarDePerfil = (dados) => {
         const c = blankCard();
@@ -19040,6 +19281,9 @@ function BaralhoDeContatos() {
         : chaveMinha
             ? CIDADES[chaveMinha] + " · ponto de partida"
             : "fora da lista do sul da Califórnia";
+    const atrasadosCount = (0, react_1.useMemo)(() => cards.filter(estaAtrasado).length, [cards]);
+    const gargalo = (0, react_1.useMemo)(() => estagioGargalo(cards), [cards]);
+    const gargaloCount = (0, react_1.useMemo)(() => (gargalo ? cards.filter((c) => (c.estagio || "nova") === gargalo).length : 0), [cards, gargalo]);
     return (react_1.default.createElement("div", { className: "bc-root" },
         react_1.default.createElement("style", null, CSS),
         react_1.default.createElement("datalist", { id: "bc-cidades" }, listaCidades.map((nome) => (react_1.default.createElement("option", { key: nome, value: nome })))),
@@ -19052,6 +19296,13 @@ function BaralhoDeContatos() {
                     react_1.default.createElement("button", { className: tela === "baralho" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("baralho") },
                         "Cartas ",
                         react_1.default.createElement("em", null, cards.length)),
+                    react_1.default.createElement("button", { className: tela === "hoje" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("hoje") },
+                        "Hoje ",
+                        atrasadosCount > 0 && react_1.default.createElement("em", null, atrasadosCount)),
+                    react_1.default.createElement("button", { className: tela === "estagios" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("estagios") },
+                        "Est\u00E1gios ",
+                        gargalo && react_1.default.createElement("em", null, gargaloCount)),
+                    react_1.default.createElement("button", { className: tela === "estatisticas" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("estatisticas") }, "Estat\u00EDsticas"),
                     react_1.default.createElement("button", { className: tela === "mensagens" ? "bc-tab bc-tab-on" : "bc-tab", onClick: () => setTela("mensagens") },
                         "Mensagens ",
                         react_1.default.createElement("em", null, msgs.length)),
@@ -19070,7 +19321,7 @@ function BaralhoDeContatos() {
         nuvemAberta && (react_1.default.createElement(ModalNuvem, { status: nuvemStatus, onVerificar: () => sincronizarNuvem(true), onFechar: () => setNuvemAberta(false) })),
         configAberta && (react_1.default.createElement(ModalConfig, { minhaCidade: minhaCidade, onMudarCidade: setMinhaCidade, temCidade: temCidade, chaveMinha: chaveMinha, statusOrigem: statusOrigem, onR2Salvo: () => setR2Check((n) => n + 1), onFechar: () => setConfigAberta(false) })),
         loaded && tela === "baralho" && (react_1.default.createElement(PainelLembretesHoje, { lembretes: lembretes, onIrCalendario: () => setTela("calendario") })),
-        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onAddMsgFalar: addMsgFalar, onEditarMsgFalar: editarMsgFalar, onRemoverMsgFalar: removerMsgFalar, onConcluirMsgFalar: concluirMsgFalar, onRemoverMsgFalado: removerMsgFalado, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, testes: testes, onAddTeste: addTeste, onRegistrarNotaTeste: registrarNotaTeste, onRemoverTeste: removerTeste, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "calendario" ? (react_1.default.createElement(TelaCalendario, { lembretes: lembretes, onAdd: addLembrete, onRemover: removerLembrete })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
+        !loaded ? (react_1.default.createElement("p", { className: "bc-empty" }, "Abrindo o baralho\u2026")) : tela === "hoje" ? (react_1.default.createElement(TelaHoje, { cards: cards, lembretes: lembretes, onAbrirCarta: abrirCarta, onIrCalendario: () => setTela("calendario"), metaAtividadesSemana: metaAtividadesSemana, onMudarMeta: setMetaAtividadesSemana })) : tela === "estagios" ? (react_1.default.createElement(TelaEstagios, { cards: cards, onAbrirCarta: abrirCarta })) : tela === "estatisticas" ? (react_1.default.createElement(TelaEstatisticas, { cards: cards })) : tela === "baralho" ? (react_1.default.createElement(TelaBaralho, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, onCiclarGlyph: ciclarGlyph, onEscolherGlyph: escolherGlyph, novaId: novaId, focoId: focoId, medir: medir, onNova: novaCarta, onImportarPerfil: criarDePerfil, onPatch: patch, onPatchDating: patchDating, onAddMsgFalar: addMsgFalar, onEditarMsgFalar: editarMsgFalar, onRemoverMsgFalar: removerMsgFalar, onConcluirMsgFalar: concluirMsgFalar, onRemoverMsgFalado: removerMsgFalado, onRemove: removerCarta, onLancar: lancar, onRemoverLancamento: removerLancamento, onRegistrarDating: registrarDating, onRegistrarFC: registrarFC, onRemoverFC: removerFC, onEditarFC: editarFC, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, valorHoraPadrao: valorHoraPadrao, onValorHoraPadrao: setValorHoraPadrao, botoesInvest: botoesInvest, onCriarBotaoInvest: criarBotaoInvest, onRemoverBotaoInvest: removerBotaoInvest, onCriarCategoria: criarCategoria, onRemoverCategoria: removerCategoria })) : tela === "objetivos" ? (react_1.default.createElement(TelaObjetivos, { objetivos: objetivos, onAdd: addObjetivo, onMarcar: marcarObjetivo, onRemover: removerObjetivo })) : tela === "fcskill" ? (react_1.default.createElement(TelaFCSkill, { cards: cards, acoes: acoes, onCriarAcao: criarAcao, onRemoverAcao: removerAcao, desbloqueios: desbloqueios, conhecimento: conhecimento, onAddDesbloqueio: addDesbloqueio, onMarcarDesbloqueio: marcarDesbloqueio, onRemoverDesbloqueio: removerDesbloqueio, testes: testes, onAddTeste: addTeste, onRegistrarNotaTeste: registrarNotaTeste, onRemoverTeste: removerTeste, onAddConhecimento: addConhecimento, onRemoverConhecimento: removerConhecimento, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "razao" ? (react_1.default.createElement(TelaRazao, { cards: cards, conhecimento: conhecimento, desbloqueios: desbloqueios, onRemoverFC: removerFC, onEditarFC: editarFC })) : tela === "calendario" ? (react_1.default.createElement(TelaCalendario, { lembretes: lembretes, onAdd: addLembrete, onRemover: removerLembrete })) : (react_1.default.createElement(TelaMensagens, { cards: cards, sources: sources, sourceGlyphs: sourceGlyphs, msgs: msgs, setMsgs: setMsgs, medir: medir, onRegistrarEnvio: registrarEnvio })),
         react_1.default.createElement("footer", { className: "bc-footer" },
             react_1.default.createElement("span", { className: erro ? "bc-status bc-status-erro" : "bc-status" }, erro
                 ? "não foi possível salvar"
@@ -19099,7 +19350,7 @@ function BaralhoDeContatos() {
 }
 /* ── tela 1: baralho ───────────────────────────────────── */
 const valorOrdem = (m) => (m.estado === "mesma" ? 0 : m.estado === "ok" ? m.mi : Infinity);
-function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, novaId, medir, onNova, onImportarPerfil, onPatch, onPatchDating, onAddMsgFalar, onEditarMsgFalar, onRemoverMsgFalar, onConcluirMsgFalar, onRemoverMsgFalado, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, onEditarFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
+function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, novaId, focoId, medir, onNova, onImportarPerfil, onPatch, onPatchDating, onAddMsgFalar, onEditarMsgFalar, onRemoverMsgFalar, onConcluirMsgFalar, onRemoverMsgFalado, onRemove, onLancar, onRemoverLancamento, onRegistrarDating, onRegistrarFC, onRemoverFC, onEditarFC, acoes, onCriarAcao, onRemoverAcao, valorHoraPadrao, onValorHoraPadrao, botoesInvest, onCriarBotaoInvest, onRemoverBotaoInvest, onCriarCategoria, onRemoverCategoria, }) {
     const [busca, setBusca] = (0, react_1.useState)("");
     const [aberta, setAberta] = (0, react_1.useState)(novaId || null);
     const [lendo, setLendo] = (0, react_1.useState)(false);
@@ -19108,6 +19359,10 @@ function TelaBaralho({ cards, sources, sourceGlyphs, onCiclarGlyph, onEscolherGl
         if (novaId)
             setAberta(novaId);
     }, [novaId]);
+    (0, react_1.useEffect)(() => {
+        if (focoId)
+            setAberta(focoId);
+    }, [focoId]);
     const [filtro, setFiltro] = (0, react_1.useState)("todas");
     const [filtroRaca, setFiltroRaca] = (0, react_1.useState)("todas");
     const [filtroFarol, setFiltroFarol] = (0, react_1.useState)("todos");
@@ -19635,6 +19890,9 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
     const [subindoAlbum, setSubindoAlbum] = (0, react_1.useState)(false);
     const [visIndex, setVisIndex] = (0, react_1.useState)(null);
     const [midiaConfig, setMidiaConfig] = (0, react_1.useState)(false);
+    const [ativAberto, setAtivAberto] = (0, react_1.useState)(false);
+    const [novaDataTitulo, setNovaDataTitulo] = (0, react_1.useState)("");
+    const [novaDataValor, setNovaDataValor] = (0, react_1.useState)("");
     const fotoRef = (0, react_1.useRef)(null);
     const albumRef = (0, react_1.useRef)(null);
     const toqueX = (0, react_1.useRef)(null);
@@ -19770,6 +20028,36 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
             onPatch("tags", [...atuais, t]);
         setNovaTag("");
     };
+    const diasSF = diasSemFalar(carta);
+    const contatoTexto = diasSF === null
+        ? "sem registro de contato"
+        : diasSF <= 0
+            ? "falou hoje"
+            : diasSF === 1
+                ? "1 dia sem falar"
+                : diasSF + " dias sem falar";
+    const registrarAtividadeRapida = (tipo) => {
+        const novaAtiv = { id: uid(), tipo, nota: "", data: Date.now() };
+        onPatch("atividades", [novaAtiv, ...(carta.atividades || [])].slice(0, 50));
+    };
+    const removerAtividade = (id) => onPatch("atividades", (carta.atividades || []).filter((a) => a.id !== id));
+    const addDataImportante = () => {
+        const titulo = novaDataTitulo.trim();
+        if (!titulo || !novaDataValor)
+            return;
+        const partes = novaDataValor.split("-");
+        if (partes.length !== 3)
+            return;
+        const mesDia = partes[1] + "-" + partes[2];
+        onPatch("datasImportantes", [
+            ...(carta.datasImportantes || []),
+            { id: uid(), titulo, mesDia, lembrete: true },
+        ]);
+        setNovaDataTitulo("");
+        setNovaDataValor("");
+    };
+    const removerDataImportante = (id) => onPatch("datasImportantes", (carta.datasImportantes || []).filter((d) => d.id !== id));
+    const alternarLembreteData = (id) => onPatch("datasImportantes", (carta.datasImportantes || []).map((d) => (d.id === id ? { ...d, lembrete: !d.lembrete } : d)));
     const algumPainelAberto = visIndex !== null || fcAberto || nextAberto || msgAberto;
     return (react_1.default.createElement("article", { className: (nova ? "bc-card bc-deal" : "bc-card") + (algumPainelAberto ? " bc-card-planar" : "") },
         react_1.default.createElement("div", { className: "bc-card-inner" },
@@ -19801,6 +20089,26 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                 react_1.default.createElement("label", { className: "bc-nome-wrap" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Nome"),
                     react_1.default.createElement("input", { className: "bc-nome", value: carta.nome, onChange: (e) => onPatch("nome", e.target.value) })),
+                react_1.default.createElement("div", { className: "bc-estagio-row" },
+                    react_1.default.createElement("select", { className: (carta.estagio || "nova") === "encerrada"
+                            ? "bc-estagio-select bc-estagio-select-encerrada"
+                            : "bc-estagio-select", value: carta.estagio || "nova", onChange: (e) => onPatch("estagio", e.target.value), "aria-label": "Est\u00E1gio" }, ESTAGIOS.map(([k, label]) => (react_1.default.createElement("option", { key: k, value: k }, label))))),
+                react_1.default.createElement("div", { className: "bc-contato-row" },
+                    react_1.default.createElement("span", { className: estaAtrasado(carta) ? "bc-contato-badge bc-contato-atrasado" : "bc-contato-badge" }, contatoTexto),
+                    react_1.default.createElement("select", { className: "bc-contato-select", value: carta.cadenciaDias || 0, onChange: (e) => onPatch("cadenciaDias", Number(e.target.value)), "aria-label": "Cad\u00EAncia de contato" }, CADENCIAS.map(([v, rotulo]) => (react_1.default.createElement("option", { key: v, value: v }, rotulo))))),
+                react_1.default.createElement("div", { className: "bc-ativ-row" },
+                    TIPOS_ATIVIDADE.map(([tipo, icone, rotulo]) => (react_1.default.createElement("button", { key: tipo, type: "button", className: "bc-ativ-btn", onClick: () => registrarAtividadeRapida(tipo), "aria-label": "Registrar " + rotulo, title: rotulo }, icone))),
+                    (carta.atividades || []).length > 0 && (react_1.default.createElement("button", { type: "button", className: "bc-link bc-ativ-verlink", onClick: () => setAtivAberto((v) => !v) }, ativAberto ? "ocultar" : "histórico (" + (carta.atividades || []).length + ")"))),
+                ativAberto && (react_1.default.createElement("ul", { className: "bc-ativ-lista" }, (carta.atividades || []).slice(0, 12).map((a) => {
+                    const tipoInfo = TIPOS_ATIVIDADE.find((t) => t[0] === a.tipo);
+                    return (react_1.default.createElement("li", { key: a.id, className: "bc-ativ-item" },
+                        react_1.default.createElement("span", { className: "bc-ativ-icone", "aria-hidden": "true" }, tipoInfo ? tipoInfo[1] : "•"),
+                        react_1.default.createElement("span", { className: "bc-ativ-txt" },
+                            tipoInfo ? tipoInfo[2] : "Atividade",
+                            " \u00B7 ",
+                            fmtData(a.data)),
+                        react_1.default.createElement("button", { type: "button", className: "bc-linhax", onClick: () => removerAtividade(a.id), "aria-label": "Remover registro" }, "\u00D7")));
+                }))),
                 react_1.default.createElement("button", { type: "button", className: "bc-acaoadd bc-verfc bc-detalhesbtn", onClick: () => setDetalhesAberto((v) => !v), "aria-expanded": detalhesAberto }, detalhesAberto ? "ocultar Detalhes" : "Detalhes"),
                 detalhesAberto && (react_1.default.createElement(react_1.default.Fragment, null,
                     react_1.default.createElement("div", { className: "bc-row" },
@@ -19877,7 +20185,22 @@ function Carta({ carta, sources, sourceGlyphs, onCiclarGlyph, onEscolherGlyph, n
                                     " no hist\u00F3rico"))))),
                     react_1.default.createElement("label", { className: "bc-group" },
                         react_1.default.createElement("span", { className: "bc-lbl" }, "Personalidade"),
-                        react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: carta.personalidade || "", onChange: (e) => onPatch("personalidade", e.target.value) })))),
+                        react_1.default.createElement("textarea", { className: "bc-msgtext", rows: 3, value: carta.personalidade || "", onChange: (e) => onPatch("personalidade", e.target.value) })),
+                    react_1.default.createElement("div", { className: "bc-group" },
+                        react_1.default.createElement("span", { className: "bc-lbl" }, "Datas importantes"),
+                        react_1.default.createElement("div", { className: "bc-datas-lista" },
+                            (carta.datasImportantes || []).map((d) => (react_1.default.createElement("div", { className: "bc-datas-item", key: d.id },
+                                react_1.default.createElement("span", { className: "bc-datas-titulo" }, d.titulo || "sem título"),
+                                react_1.default.createElement("span", { className: "bc-datas-data" }, fmtMesDia(d.mesDia)),
+                                react_1.default.createElement("label", { className: "bc-datas-lembrete" },
+                                    react_1.default.createElement("input", { type: "checkbox", checked: d.lembrete !== false, onChange: () => alternarLembreteData(d.id) }),
+                                    " lembrar"),
+                                react_1.default.createElement("button", { type: "button", className: "bc-linhax", onClick: () => removerDataImportante(d.id), "aria-label": "Remover data" }, "\u00D7")))),
+                            !(carta.datasImportantes || []).length && react_1.default.createElement("span", { className: "bc-mini" }, "nenhuma")),
+                        react_1.default.createElement("div", { className: "bc-catrow" },
+                            react_1.default.createElement("input", { className: "bc-catinput", value: novaDataTitulo, onChange: (e) => setNovaDataTitulo(e.target.value), onKeyDown: (e) => e.key === "Enter" && addDataImportante(), placeholder: "T\u00EDtulo (ex.: anivers\u00E1rio)", "aria-label": "T\u00EDtulo da data importante" }),
+                            react_1.default.createElement("input", { type: "date", className: "bc-catinput bc-catinput-data", value: novaDataValor, onChange: (e) => setNovaDataValor(e.target.value), "aria-label": "Data" }),
+                            react_1.default.createElement("button", { className: "bc-catbtn", onClick: addDataImportante }, "Adicionar"))))),
                 react_1.default.createElement("label", { className: "bc-group" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Notas"),
                     react_1.default.createElement("textarea", { className: "bc-notas", rows: 3, value: carta.notas, onChange: (e) => onPatch("notas", e.target.value), placeholder: "Anota\u00E7\u00F5es sobre o contato" })),
@@ -20425,6 +20748,175 @@ function TelaCalendario({ lembretes, onAdd, onRemover }) {
                     l.data === hoje ? " · hoje" : ""),
                 react_1.default.createElement("span", { className: "bc-desbtexto" }, l.texto),
                 react_1.default.createElement("button", { className: "bc-linhax", onClick: () => onRemover(l.id), "aria-label": "Excluir lembrete" }, "\u00D7")))))))));
+}
+/* ── tela: Hoje (painel do dia — atrasados, lembretes, datas, resumo) ── */
+function TelaHoje({ cards, lembretes, onAbrirCarta, onIrCalendario, metaAtividadesSemana, onMudarMeta }) {
+    const hoje = hojeISO();
+    const hojeLabel = new Date().toLocaleDateString("pt-BR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+    });
+    const atrasados = (0, react_1.useMemo)(() => {
+        return cards
+            .filter((c) => (c.cadenciaDias || 0) > 0)
+            .map((c) => ({ carta: c, dias: diasSemFalar(c) }))
+            .filter(({ carta, dias }) => dias === null || dias >= carta.cadenciaDias)
+            .sort((a, b) => (b.dias ?? 999999) - (a.dias ?? 999999));
+    }, [cards]);
+    const lembretesHoje = (0, react_1.useMemo)(() => (lembretes || []).filter((l) => l.data === hoje).sort((a, b) => a.criadoEm - b.criadoEm), [lembretes, hoje]);
+    const datasProximas = (0, react_1.useMemo)(() => proximasDatasImportantes(cards, 30), [cards]);
+    const registrosSemana = (0, react_1.useMemo)(() => registrosNaSemana(cards), [cards]);
+    const atividadesSemana = (0, react_1.useMemo)(() => atividadesNaSemanaAtual(cards), [cards]);
+    const memorias = (0, react_1.useMemo)(() => memoriasDeHoje(cards), [cards]);
+    const meta = metaAtividadesSemana || 0;
+    const metaBatida = meta > 0 && atividadesSemana >= meta;
+    const metaLargura = meta > 0 ? Math.min(100, Math.round((atividadesSemana / meta) * 100)) : 0;
+    return (react_1.default.createElement("div", { className: "bc-fctela" },
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Hoje"),
+                react_1.default.createElement("span", { className: "bc-status" }, hojeLabel)),
+            react_1.default.createElement("p", { className: "bc-mini" },
+                registrosSemana,
+                " registro",
+                registrosSemana === 1 ? "" : "s",
+                " nos \u00FAltimos 7 dias")),
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Meta da semana"),
+                react_1.default.createElement("span", { className: "bc-status" }, "desde segunda")),
+            react_1.default.createElement("div", { className: "bc-meta-linha" },
+                react_1.default.createElement("span", { className: "bc-meta-num" }, atividadesSemana),
+                react_1.default.createElement("span", { className: "bc-meta-de" }, "de"),
+                react_1.default.createElement("input", { type: "number", min: "0", className: "bc-meta-input", value: meta, onChange: (e) => onMudarMeta(Math.max(0, Number(e.target.value) || 0)), "aria-label": "Meta de atividades por semana" }),
+                react_1.default.createElement("span", { className: "bc-meta-txt" }, "atividades registradas")),
+            react_1.default.createElement("div", { className: "bc-funil-barrafundo" },
+                react_1.default.createElement("div", { className: metaBatida ? "bc-funil-barra bc-meta-completa" : "bc-funil-barra", style: { width: metaLargura + "%" } })),
+            metaBatida && react_1.default.createElement("p", { className: "bc-mini" }, "meta da semana batida")),
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Naquele dia"),
+                react_1.default.createElement("span", { className: "bc-status" }, memorias.length)),
+            memorias.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nada registrado nesta data em anos anteriores.")) : (react_1.default.createElement("div", { className: "bc-desblista" }, memorias.map((m) => (react_1.default.createElement("button", { key: m.id, type: "button", className: "bc-desb bc-hoje-linha bc-memoria-item", onClick: () => onAbrirCarta(m.cardId) },
+                react_1.default.createElement("span", { className: "bc-memoria-topo" },
+                    react_1.default.createElement("span", { className: "bc-desbtexto" }, m.nome || "sem nome"),
+                    react_1.default.createElement("span", { className: "bc-desbdata" },
+                        "h\u00E1 ",
+                        m.anos,
+                        " ano",
+                        m.anos === 1 ? "" : "s")),
+                react_1.default.createElement("span", { className: "bc-memoria-texto" }, m.texto))))))),
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Atrasados"),
+                react_1.default.createElement("span", { className: "bc-status" }, atrasados.length)),
+            atrasados.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhum contato atrasado na cad\u00EAncia.")) : (react_1.default.createElement("div", { className: "bc-desblista" }, atrasados.map(({ carta, dias }) => (react_1.default.createElement("button", { key: carta.id, type: "button", className: "bc-desb bc-hoje-linha", onClick: () => onAbrirCarta(carta.id) },
+                react_1.default.createElement("span", { className: "bc-desbtexto" }, carta.nome || "sem nome"),
+                react_1.default.createElement("span", { className: "bc-desbdata" }, dias === null ? "sem registro" : dias + " dia" + (dias === 1 ? "" : "s") + " sem falar"))))))),
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Lembretes de hoje"),
+                react_1.default.createElement("button", { className: "bc-link", onClick: onIrCalendario }, "abrir calend\u00E1rio")),
+            lembretesHoje.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhum lembrete para hoje.")) : (react_1.default.createElement("ul", { className: "bc-hojelista" }, lembretesHoje.map((l) => (react_1.default.createElement("li", { key: l.id, className: "bc-hojeitem" }, l.texto)))))),
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Datas pr\u00F3ximas"),
+                react_1.default.createElement("span", { className: "bc-status" }, "pr\u00F3x. 30 dias")),
+            datasProximas.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhuma data importante nos pr\u00F3ximos 30 dias.")) : (react_1.default.createElement("div", { className: "bc-desblista" }, datasProximas.map((d, i) => (react_1.default.createElement("button", { key: d.cardId + "-" + i, type: "button", className: "bc-desb bc-hoje-linha", onClick: () => onAbrirCarta(d.cardId) },
+                react_1.default.createElement("span", { className: "bc-desbtexto" },
+                    d.nome || "sem nome",
+                    " \u00B7 ",
+                    d.titulo || "data"),
+                react_1.default.createElement("span", { className: "bc-desbdata" }, d.diasFaltam === 0 ? "hoje" : "em " + d.diasFaltam + "d")))))))));
+}
+/* ── tela: Estágios (pipeline — cartas agrupadas por etapa do funil) ── */
+function TelaEstagios({ cards, onAbrirCarta }) {
+    const porEstagio = (0, react_1.useMemo)(() => {
+        const mapa = {};
+        ESTAGIOS.forEach(([k]) => { mapa[k] = []; });
+        (cards || []).forEach((c) => {
+            const k = mapa.hasOwnProperty(c.estagio) ? c.estagio : "nova";
+            mapa[k].push(c);
+        });
+        return mapa;
+    }, [cards]);
+    const gargalo = (0, react_1.useMemo)(() => estagioGargalo(cards), [cards]);
+    return (react_1.default.createElement("div", { className: "bc-fctela" }, ESTAGIOS.map(([k, label], i) => {
+        const lista = porEstagio[k] || [];
+        const encerrada = k === "encerrada";
+        const naGargalo = gargalo === k;
+        return (react_1.default.createElement(react_1.default.Fragment, { key: k },
+            react_1.default.createElement("section", { className: encerrada ? "bc-col bc-col-encerrada" : "bc-col" },
+                react_1.default.createElement("div", { className: "bc-colhead" },
+                    react_1.default.createElement("span", { className: "bc-estagio-titulo" },
+                        react_1.default.createElement("h2", { className: "bc-h2" }, label),
+                        naGargalo && react_1.default.createElement("span", { className: "bc-gargalo-badge" }, "trava aqui")),
+                    react_1.default.createElement("span", { className: naGargalo ? "bc-status bc-status-gargalo" : "bc-status" }, lista.length)),
+                lista.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhuma carta neste est\u00E1gio.")) : (react_1.default.createElement("div", { className: "bc-desblista" }, lista.map((c) => {
+                    const dias = diasSemFalar(c);
+                    return (react_1.default.createElement("button", { key: c.id, type: "button", className: encerrada ? "bc-desb bc-hoje-linha bc-desb-encerrada" : "bc-desb bc-hoje-linha", onClick: () => onAbrirCarta(c.id) },
+                        react_1.default.createElement("span", { className: "bc-desbtexto" }, c.nome || "sem nome"),
+                        react_1.default.createElement("span", { className: "bc-desbdata" }, dias === null ? "" : dias + "d")));
+                })))),
+            i < ESTAGIOS.length - 1 && (react_1.default.createElement("div", { className: "bc-estagio-seta", "aria-hidden": "true" }, "\u2193"))));
+    })));
+}
+/* ── tela: Estatísticas (funil de conversão e volume por mês) ── */
+function TelaEstatisticas({ cards }) {
+    const funil = (0, react_1.useMemo)(() => funilConversao(cards), [cards]);
+    const porMes = (0, react_1.useMemo)(() => cartasPorMes(cards), [cards]);
+    const encerradas = (0, react_1.useMemo)(() => (cards || []).filter((c) => (c.estagio || "nova") === "encerrada").length, [cards]);
+    const total = (cards || []).length;
+    const maxAlcancaram = funil.length ? funil[0].alcancaram : 0;
+    return (react_1.default.createElement("div", { className: "bc-fctela" },
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Funil de convers\u00E3o"),
+                react_1.default.createElement("span", { className: "bc-status" },
+                    total,
+                    " carta",
+                    total === 1 ? "" : "s")),
+            maxAlcancaram === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhuma carta ativa para calcular o funil ainda.")) : (react_1.default.createElement("div", { className: "bc-funil-lista" }, funil.map((f, i) => {
+                const anterior = i > 0 ? funil[i - 1] : null;
+                const taxa = anterior && anterior.alcancaram
+                    ? Math.round((f.alcancaram / anterior.alcancaram) * 100)
+                    : null;
+                const largura = maxAlcancaram ? Math.round((f.alcancaram / maxAlcancaram) * 100) : 0;
+                return (react_1.default.createElement("div", { className: "bc-funil-linha", key: f.estagio },
+                    react_1.default.createElement("div", { className: "bc-funil-topo" },
+                        react_1.default.createElement("span", { className: "bc-funil-label" }, f.label),
+                        react_1.default.createElement("span", { className: "bc-funil-num" },
+                            f.alcancaram,
+                            taxa !== null && react_1.default.createElement("span", { className: "bc-funil-taxa" },
+                                " \u00B7 ",
+                                taxa,
+                                "%"))),
+                    react_1.default.createElement("div", { className: "bc-funil-barrafundo" },
+                        react_1.default.createElement("div", { className: "bc-funil-barra", style: { width: largura + "%" } }))));
+            }))),
+            encerradas > 0 && (react_1.default.createElement("p", { className: "bc-mini" },
+                encerradas,
+                " encerrada",
+                encerradas === 1 ? "" : "s",
+                " \u2014 fora do funil acima, sem registro de at\u00E9 onde chegaram antes de fechar"))),
+        react_1.default.createElement("section", { className: "bc-col" },
+            react_1.default.createElement("div", { className: "bc-colhead" },
+                react_1.default.createElement("h2", { className: "bc-h2" }, "Cartas por m\u00EAs"),
+                react_1.default.createElement("span", { className: "bc-status" }, "por criadoEm")),
+            porMes.length === 0 ? (react_1.default.createElement("p", { className: "bc-empty bc-empty-sm" }, "Nenhuma carta registrada ainda.")) : (react_1.default.createElement("div", { className: "bc-mesestat-lista" }, porMes.map((m) => (react_1.default.createElement("div", { className: "bc-mesestat-linha", key: m.chave },
+                react_1.default.createElement("span", { className: "bc-mesestat-label" },
+                    MESES_PT[m.mes],
+                    " ",
+                    m.ano),
+                react_1.default.createElement("span", { className: "bc-mesestat-num" },
+                    m.total,
+                    " criada",
+                    m.total === 1 ? "" : "s",
+                    " \u00B7 ",
+                    m.avancaram,
+                    " ",
+                    m.avancaram === 1 ? "avançou" : "avançaram")))))))));
 }
 /* ── tela: FC Skill ────────────────────────────────────── */
 function TelaFCSkill({ cards, acoes = [], onCriarAcao, onRemoverAcao, desbloqueios, conhecimento, onAddDesbloqueio, onMarcarDesbloqueio, onRemoverDesbloqueio, testes = [], onAddTeste, onRegistrarNotaTeste, onRemoverTeste, onAddConhecimento, onRemoverConhecimento, onRemoverFC, onEditarFC, }) {
@@ -21103,6 +21595,47 @@ const CSS = `
 .bc-desb-ok .bc-desbtexto{text-decoration:line-through;text-decoration-color:var(--red);
   text-decoration-thickness:2px;color:var(--soft);}
 .bc-desbdata{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);flex-shrink:0;}
+.bc-hoje-linha{width:100%;text-align:left;border:none;cursor:pointer;font-family:inherit;justify-content:space-between;}
+.bc-hoje-linha:hover{filter:brightness(1.04);}
+.bc-memoria-item{flex-direction:column;align-items:stretch;gap:4px;}
+.bc-memoria-topo{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.bc-memoria-texto{font-size:12px;line-height:1.45;color:var(--soft);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+/* tela de estágios (pipeline) */
+.bc-estagio-titulo{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+.bc-gargalo-badge{font-family:'Archivo',sans-serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:${C.card};background:var(--red);padding:3px 8px;border-radius:2px;}
+.bc-status-gargalo{color:var(--red);}
+.bc-estagio-seta{text-align:center;font-size:15px;color:rgba(251,247,238,.3);margin:-8px 0;}
+.bc-col-encerrada{opacity:.7;}
+.bc-desb-encerrada{opacity:.6;}
+
+/* estatísticas: funil de conversão e volume por mês */
+.bc-funil-lista{display:flex;flex-direction:column;gap:14px;}
+.bc-funil-linha{display:flex;flex-direction:column;gap:5px;}
+.bc-funil-topo{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.bc-funil-label{font-family:'Archivo',sans-serif;font-size:12.5px;font-weight:600;letter-spacing:.03em;color:${C.card};}
+.bc-funil-num{font-family:'Archivo',sans-serif;font-size:11.5px;color:rgba(251,247,238,.5);flex-shrink:0;}
+.bc-funil-taxa{color:${C.card};font-weight:600;}
+.bc-funil-barrafundo{height:8px;border-radius:4px;background:rgba(251,247,238,.08);overflow:hidden;}
+.bc-funil-barra{height:100%;background:var(--red);border-radius:4px;}
+.bc-mesestat-lista{display:flex;flex-direction:column;}
+.bc-mesestat-linha{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 0;border-bottom:1px solid rgba(251,247,238,.08);}
+.bc-mesestat-linha:last-child{border-bottom:none;}
+.bc-mesestat-label{font-family:'Archivo',sans-serif;font-size:12px;color:${C.card};text-transform:capitalize;}
+.bc-mesestat-num{font-family:'Archivo',sans-serif;font-size:11px;color:rgba(251,247,238,.5);}
+
+/* meta de atividades da semana (aba Hoje) */
+.bc-meta-linha{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-bottom:9px;}
+.bc-meta-num{font-family:'Bodoni Moda',serif;font-size:26px;font-weight:700;color:${C.card};}
+.bc-meta-de{font-family:'Archivo',sans-serif;font-size:12px;color:rgba(251,247,238,.5);}
+.bc-meta-input{font-family:'Archivo',sans-serif;font-size:16px;font-weight:600;width:48px;
+  padding:3px 6px;color:${C.card};background:rgba(251,247,238,.08);border:1px solid rgba(251,247,238,.18);
+  border-radius:3px;text-align:center;}
+.bc-meta-txt{font-family:'Archivo',sans-serif;font-size:12px;color:rgba(251,247,238,.5);}
+.bc-meta-completa{background:${C.card};}
 .bc-realizado{font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
   padding:7px 12px;cursor:pointer;border-radius:2px;color:var(--card);background:var(--ink);
   border:1px solid var(--ink);flex-shrink:0;transition:filter .15s ease;}
@@ -21403,6 +21936,40 @@ const CSS = `
   background:rgba(21,16,15,.03);border:1px solid var(--edge);border-radius:2px;}
 .bc-catbtn{font-family:inherit;font-size:11px;letter-spacing:.06em;padding:7px 13px;cursor:pointer;border-radius:2px;
   color:var(--card);background:var(--ink);border:1px solid var(--ink);}
+
+/* status de contato, cadência e atividades rápidas */
+.bc-contato-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.bc-contato-badge{font-size:10.5px;letter-spacing:.04em;padding:4px 9px;border-radius:2px;
+  background:rgba(21,16,15,.06);color:var(--soft);}
+.bc-contato-atrasado{background:var(--red);color:${C.card};}
+.bc-contato-select{font-family:inherit;font-size:11px;padding:5px 7px;color:var(--ink);
+  background:rgba(21,16,15,.03);border:1px solid var(--edge);border-radius:2px;}
+
+/* estágio (pipeline) */
+.bc-estagio-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;}
+.bc-estagio-select{font-family:inherit;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:6px 9px;color:var(--card);background:var(--ink);border:1px solid var(--ink);border-radius:2px;}
+.bc-estagio-select-encerrada{background:transparent;color:var(--soft);border-color:var(--edge);}
+.bc-ativ-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.bc-ativ-btn{font-size:15px;line-height:1;cursor:pointer;border-radius:2px;padding:6px 9px;
+  color:var(--ink);background:var(--card);border:1px solid var(--edge);transition:border-color .14s ease,transform .1s ease;}
+.bc-ativ-btn:hover{border-color:var(--soft);}
+.bc-ativ-btn:active{transform:scale(.92);}
+.bc-ativ-verlink{margin-left:auto;}
+.bc-ativ-lista{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;}
+.bc-ativ-item{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink);}
+.bc-ativ-icone{font-size:13px;flex-shrink:0;}
+.bc-ativ-txt{flex:1;color:var(--soft);}
+
+/* datas importantes */
+.bc-datas-lista{display:flex;flex-direction:column;gap:5px;margin-top:5px;}
+.bc-datas-item{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--ink);
+  background:rgba(21,16,15,.03);border:1px solid var(--edge);border-radius:2px;padding:6px 9px;}
+.bc-datas-titulo{flex:1;min-width:80px;font-weight:600;}
+.bc-datas-data{font-size:11px;color:var(--soft);}
+.bc-datas-lembrete{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:var(--soft);}
+.bc-catinput-data{flex:0 0 auto;width:auto;}
+
 .bc-notas{width:100%;margin-top:4px;font-family:inherit;font-size:13px;line-height:1.55;color:var(--ink);resize:vertical;
   background:repeating-linear-gradient(transparent,transparent 21px,rgba(205,194,170,.55) 22px);border:none;padding:1px 0;}
 .bc-notas::placeholder{color:rgba(122,112,101,.6);}
