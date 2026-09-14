@@ -88,7 +88,7 @@
 <script>
 "use strict";
 const { useState, useEffect, useRef, useCallback } = React;
-const SONDAGEM_VERSAO = "1.28.0";
+const SONDAGEM_VERSAO = "1.28.9";
 const STORE_KEY = "sondagem:v1";
 const MISSAO_KEY = "sondagem:missao";
 const TOKENMAX_KEY = "sondagem:tokenmax";
@@ -811,14 +811,14 @@ const css = `
 .sd-btn-feito[data-pressionado="1"] { background: #2E7D46; border-color: #2E7D46; }
 .sd-chip { font-size: 13px; padding: 6px 11px; border-radius: 3px; border: 1px solid ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
 .sd-chip[data-on="1"] { background: ${T.ink}; border-color: ${T.ink}; color: #F2F3EF; }
-.sd-seg { font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 999px; border: 1.5px solid ${T.ink}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.ink}; white-space: nowrap; }
-.sd-seg[data-on="1"] { background: ${T.ink}; border-color: ${T.ink}; color: #F2F3EF; }
-.sd-tag-status { font-size: 12.5px; padding: 5px 12px; border-radius: 3px; border: 1px solid ${T.line}; border-bottom: 3px solid ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
+.sd-seg { font-size: 13px; font-weight: 600; padding: 7px 16px; border-radius: 999px; border: 1.5px solid ${T.ink}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.ink}; white-space: nowrap; display: inline-flex; align-items: center; }
+.sd-seg[data-on="1"] { background: ${T.surface}; border-color: ${T.action}; color: ${T.action}; }
+.sd-tag-status { font-size: 12.5px; padding: 5px 12px; border-radius: 999px; border: 1px solid ${T.line}; border-bottom: 3px solid ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
 .sd-tag-status[data-on="1"] { background: ${T.surface}; border-color: ${T.line}; border-bottom-color: ${T.action}; color: ${T.ink}; font-weight: 700; }
 .sd-tag-tipo { font-size: 12.5px; padding: 5px 12px; border-radius: 999px; border: 1.5px solid ${T.action}; background: transparent; cursor: pointer; font-family: 'Fraunces', Georgia, serif; font-style: italic; color: ${T.action}; white-space: nowrap; }
 .sd-tag-tipo[data-on="1"] { background: ${T.action}; color: #FFFDF7; }
-.sd-tag-cor { font-size: 12.5px; padding: 5px 12px 5px 9px; border-radius: 6px; border: 1px dashed ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
-.sd-tag-voto { font-size: 12.5px; padding: 5px 12px; border-radius: 6px; border: 1px dashed ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
+.sd-tag-cor { font-size: 12.5px; padding: 5px 12px 5px 9px; border-radius: 999px; border: 1px dashed ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.sd-tag-voto { font-size: 12.5px; padding: 5px 12px; border-radius: 999px; border: 1px dashed ${T.line}; background: ${T.surface}; cursor: pointer; font-family: inherit; color: ${T.muted}; white-space: nowrap; }
 .sd-tag-voto[data-on="1"] { background: #E1EBF3; border-color: #2F6FA8; border-style: solid; color: #21507A; font-weight: 700; }
 .sd-limpar { font-size: 12px; padding: 5px 4px; border: none; border-bottom: 1px solid #8A3A2C; background: transparent; cursor: pointer; font-family: inherit; color: #8A3A2C; white-space: nowrap; }
 .sd-limpar:hover { color: #6E2E23; border-color: #6E2E23; }
@@ -838,6 +838,14 @@ const css = `
 .sd-hxcell { background: ${T.surface}; border: 1px solid ${T.line}; padding: 10px; }
 .sd-tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 5px; border-radius: 2px; background: #E3E6DF; color: #4A5347; margin-right: 6px; }
 .sd-card { background: ${T.surface}; border: 1px solid ${T.line}; border-radius: 4px; }
+.sd-icon-btn { background: transparent; border: none; cursor: pointer; padding: 4px; line-height: 1; font-size: 14px; color: ${T.muted}; opacity: 0.65; border-radius: 3px; }
+.sd-icon-btn:hover { opacity: 1; color: ${T.action}; }
+.sd-confete-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 9999; overflow: hidden; }
+.sd-confete-peca { position: absolute; top: -20px; border-radius: 2px; animation-name: sd-confete-cair; animation-timing-function: cubic-bezier(0.4, 0.1, 0.6, 1); animation-fill-mode: forwards; }
+@keyframes sd-confete-cair {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(720deg); opacity: 0.9; }
+}
 `;
 function blankOkr() {
   return { ciclo: "", objetivos: [] };
@@ -5879,6 +5887,7 @@ function Sondagem() {
   const [missaoEditando, setMissaoEditando] = useState(false);
   const [tokenmaxLog, setTokenmaxLog] = useState([]);
   const [tokenmaxLivroAberto, setTokenmaxLivroAberto] = useState(false);
+  const [confetePecas, setConfetePecas] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [view, setView] = useState("meusprojetos");
   const [openLayers, setOpenLayers] = useState({ direcao: true });
@@ -5886,6 +5895,8 @@ function Sondagem() {
   const [guideNode, setGuideNode] = useState("root");
   const [guiaOpen, setGuiaOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmDeleteNota, setConfirmDeleteNota] = useState(null);
+  const confirmDeleteNotaTimeoutRef = useRef(null);
   const [configAberta, setConfigAberta] = useState(null);
   const [tituloEditando, setTituloEditando] = useState(null);
   const [templatePickerAberto, setTemplatePickerAberto] = useState(false);
@@ -5951,7 +5962,7 @@ function Sondagem() {
       try {
         const res = await window.storage.get(MISSAO_KEY);
         if (res && typeof res.value === "string") setMissaoState(res.value);
-      } catch (e) {
+      } catch {
       }
     })();
     (async () => {
@@ -5959,7 +5970,7 @@ function Sondagem() {
         const res = await window.storage.get(TOKENMAX_KEY);
         const parsed = res ? JSON.parse(res.value) : null;
         if (Array.isArray(parsed)) setTokenmaxLog(parsed);
-      } catch (e) {
+      } catch {
       }
     })();
   }, []);
@@ -5977,7 +5988,7 @@ function Sondagem() {
           setActiveId(idea.id);
         }
         setStatus("pronto");
-      } catch (e) {
+      } catch {
         const idea = emptyIdea();
         setIdeas([idea]);
         setActiveId(idea.id);
@@ -5992,7 +6003,7 @@ function Sondagem() {
       try {
         await window.storage.set(STORE_KEY, JSON.stringify({ ideas: nextIdeas, activeId: nextActive }));
         setStatus("salvo");
-      } catch (e) {
+      } catch {
         setStatus("n\xE3o foi poss\xEDvel salvar");
       }
     }, 500);
@@ -6130,6 +6141,7 @@ function Sondagem() {
     setOpenRows({});
     setOpenLayers({ direcao: true });
     setConfirmDelete(null);
+    limparConfirmDeleteNota();
     setConfigAberta(null);
   }
   function selecionarProjetoNaLista(id) {
@@ -6145,7 +6157,7 @@ function Sondagem() {
     (async () => {
       try {
         await window.storage.set(MISSAO_KEY, limpo);
-      } catch (e) {
+      } catch {
       }
     })();
   }
@@ -6155,9 +6167,50 @@ function Sondagem() {
     (async () => {
       try {
         await window.storage.set(TOKENMAX_KEY, JSON.stringify(novo));
-      } catch (e) {
+      } catch {
       }
     })();
+    tocarSomCampainha();
+    dispararConfeteTokenmax();
+  }
+  function tocarSomCampainha() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const tocarNota = (freq, inicio, duracao) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(1e-4, ctx.currentTime + inicio);
+        gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + inicio + 0.01);
+        gain.gain.exponentialRampToValueAtTime(1e-4, ctx.currentTime + inicio + duracao);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + inicio);
+        osc.stop(ctx.currentTime + inicio + duracao + 0.05);
+      };
+      tocarNota(1318.51, 0, 0.45);
+      tocarNota(1760, 0.09, 0.55);
+      setTimeout(() => ctx.close().catch(() => {
+      }), 1200);
+    } catch {
+    }
+  }
+  function dispararConfeteTokenmax() {
+    const cores = ["#C9971E", "#8A3A2C", "#2E7D46", "#2F6FA8", "#A8791F", "#7A6A4C"];
+    const pecas = Array.from({ length: 46 }, (_, idx) => ({
+      id: Date.now() + "-" + idx,
+      esquerda: Math.random() * 100,
+      atraso: Math.random() * 0.4,
+      duracao: 2.4 + Math.random() * 1.2,
+      cor: cores[idx % cores.length],
+      largura: 6 + Math.round(Math.random() * 4),
+      altura: 10 + Math.round(Math.random() * 6)
+    }));
+    setConfetePecas(pecas);
+    setTimeout(() => setConfetePecas([]), 4200);
   }
   function registrarExclusao(label) {
     setUltimaExclusao({ label, ideasAntes: ideas, ts: Date.now() });
@@ -6174,6 +6227,7 @@ function Sondagem() {
     setIdeas(rest);
     if (activeId === id) setActiveId(rest.length ? rest[0].id : null);
     setConfirmDelete(null);
+    limparConfirmDeleteNota();
     setConfigAberta(null);
   }
   function salvarTituloProjeto(id) {
@@ -6247,10 +6301,7 @@ function Sondagem() {
       (p) => p.map((i) => i.id === ideaId ? { ...i, feitoLog: [...i.feitoLog || [], Date.now()] } : i)
     );
     setNotaFeitoPressionado((p) => ({ ...p, [notaId]: true }));
-    if (notaFeitoTimers.current[notaId]) clearTimeout(notaFeitoTimers.current[notaId]);
-    notaFeitoTimers.current[notaId] = setTimeout(() => {
-      setNotaFeitoPressionado((p) => ({ ...p, [notaId]: false }));
-    }, 1200);
+    tocarSomCampainha();
   }
   function contarFeitoPorPeriodo(feitoLog) {
     const lista = feitoLog || [];
@@ -6258,7 +6309,9 @@ function Sondagem() {
     const hojeStr = agora.toDateString();
     const inicioSemana = new Date(agora);
     inicioSemana.setHours(0, 0, 0, 0);
-    inicioSemana.setDate(agora.getDate() - agora.getDay());
+    const diaSemana = agora.getDay();
+    const diasDesdeSegunda = diaSemana === 0 ? 6 : diaSemana - 1;
+    inicioSemana.setDate(agora.getDate() - diasDesdeSegunda);
     const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
     let hoje = 0, semana = 0, mes = 0;
     lista.forEach((ts) => {
@@ -6653,8 +6706,16 @@ function Sondagem() {
     setNotasAbertas((p) => ({ ...p, [ideaId]: true }));
     setNotaEditando((p) => ({ ...p, [ideaId]: null }));
     setConfirmDelete(null);
+    limparConfirmDeleteNota();
     setLinkPickerAberto(null);
     setNotaDestaque(notaId);
+  }
+  function limparConfirmDeleteNota() {
+    if (confirmDeleteNotaTimeoutRef.current) {
+      clearTimeout(confirmDeleteNotaTimeoutRef.current);
+      confirmDeleteNotaTimeoutRef.current = null;
+    }
+    setConfirmDeleteNota(null);
   }
   function removerNota(ideaId, notaId) {
     const idea = ideas.find((i) => i.id === ideaId);
@@ -6664,6 +6725,7 @@ function Sondagem() {
     (nota && nota.anexos ? nota.anexos : []).forEach((a) => {
       if (a.key) apagarArquivoDoR2Sondagem(a.key);
     });
+    limparConfirmDeleteNota();
   }
   function toggleNotas(ideaId) {
     setNotasAbertas((p) => ({ ...p, [ideaId]: !p[ideaId] }));
@@ -7071,7 +7133,7 @@ function Sondagem() {
       navigator.clipboard.writeText(out);
       setCopied(true);
       setTimeout(() => setCopied(false), 2e3);
-    } catch (e) {
+    } catch {
       setCopied(false);
     }
   }
@@ -7104,7 +7166,21 @@ function Sondagem() {
     const items = hx[h.key];
     return /* @__PURE__ */ React.createElement("div", { className: "sd-hxcell" }, /* @__PURE__ */ React.createElement("div", { className: "sd-serif", style: { fontSize: 15, fontWeight: 600, marginBottom: 2 } }, h.title), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 11.5, color: T.muted, margin: "0 0 8px", lineHeight: 1.4 } }, h.sub), items.length === 0 ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: "#A2A79C", margin: 0 } }, "Adicione itens abaixo da matriz.") : /* @__PURE__ */ React.createElement("div", { style: { display: horizontal ? "flex" : "block", flexWrap: "wrap", gap: horizontal ? 6 : 0 } }, items.map((it, n) => /* @__PURE__ */ React.createElement("div", { key: it.id, style: { fontSize: 12.5, lineHeight: 1.4, marginBottom: horizontal ? 0 : 6, maxWidth: horizontal ? 150 : "none" } }, /* @__PURE__ */ React.createElement("span", { className: "sd-tag" }, h.code + (n + 1)), it.text))));
   }
-  return /* @__PURE__ */ React.createElement("div", { className: "sd" }, /* @__PURE__ */ React.createElement("style", null, css), /* @__PURE__ */ React.createElement("div", { className: "sd-wrap" }, /* @__PURE__ */ React.createElement("header", { style: { marginBottom: 26 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("h1", { className: "sd-serif", style: { fontSize: 30, fontWeight: 600, margin: "0 0 6px", letterSpacing: "-0.01em", flex: 1, minWidth: 0 } }, "Rosh Chanit"), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { className: "sd" }, /* @__PURE__ */ React.createElement("style", null, css), confetePecas.length > 0 && /* @__PURE__ */ React.createElement("div", { className: "sd-confete-overlay", "aria-hidden": "true" }, confetePecas.map((p) => /* @__PURE__ */ React.createElement(
+    "span",
+    {
+      key: p.id,
+      className: "sd-confete-peca",
+      style: {
+        left: p.esquerda + "%",
+        width: p.largura,
+        height: p.altura,
+        background: p.cor,
+        animationDelay: p.atraso + "s",
+        animationDuration: p.duracao + "s"
+      }
+    }
+  ))), /* @__PURE__ */ React.createElement("div", { className: "sd-wrap" }, /* @__PURE__ */ React.createElement("header", { style: { marginBottom: 26 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("h1", { className: "sd-serif", style: { fontSize: 30, fontWeight: 600, margin: "0 0 6px", letterSpacing: "-0.01em", flex: 1, minWidth: 0 } }, "Rosh Chanit"), /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-chip",
@@ -7116,7 +7192,7 @@ function Sondagem() {
       "aria-label": "Voltar para o Cherubion"
     },
     "\u2302 Cherubion"
-  )), /* @__PURE__ */ React.createElement("p", { style: { margin: 0, fontSize: 14, color: T.muted, maxWidth: 480, lineHeight: 1.5 } }, "Uma ideia entra pela superf\xEDcie e desce camada por camada, at\xE9 virar instru\xE7\xE3o que d\xE1 para executar.")), status === "carregando" ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted } }, "Abrindo suas ideias\u2026") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 22 } }, ideas.map((i) => /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("p", { style: { margin: 0, fontSize: 14, color: T.muted, maxWidth: 480, lineHeight: 1.5 } }, "Uma ideia entra pela superf\xEDcie e desce camada por camada, at\xE9 virar instru\xE7\xE3o que d\xE1 para executar.")), status === "carregando" ? /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted } }, "Abrindo suas ideias\u2026") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 22 } }, [...ideas].sort((a, b) => compararIdeias(a, b, "recentes")).map((i) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: i.id,
@@ -7219,7 +7295,7 @@ function Sondagem() {
     },
     /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { className: "sd-serif", style: { fontSize: 17, fontWeight: 600, color: T.ink } }, col.titulo), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: T.muted } }, col.lista.length, " m\xE9todos")),
     col.sub && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13.5, color: T.muted, lineHeight: 1.55, marginTop: 4 } }, col.sub)
-  ))), view === "meusprojetos" && /* @__PURE__ */ React.createElement("section", null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "sd-serif", style: { fontSize: 23, fontWeight: 600, margin: "0 0 4px" } }, "Miss\xE3o"), missaoEditando ? /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement(
+  ))), view === "meusprojetos" && /* @__PURE__ */ React.createElement("section", null, /* @__PURE__ */ React.createElement("div", { className: "sd-card", style: { padding: 20, marginBottom: 14, position: "relative" } }, /* @__PURE__ */ React.createElement("h2", { className: "sd-serif", style: { fontSize: 23, fontWeight: 600, margin: "0 0 4px" } }, "Miss\xE3o"), missaoEditando ? /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement(
     "textarea",
     {
       className: "sd-ta",
@@ -7240,18 +7316,20 @@ function Sondagem() {
       }
     },
     "Cancelar"
-  ))) : missao ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-start", gap: 10 } }, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.55, flex: 1, whiteSpace: "pre-wrap" } }, missao), /* @__PURE__ */ React.createElement(
+  ))) : missao ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-chip",
-      style: { fontSize: 11, flexShrink: 0 },
+      className: "sd-icon-btn",
+      style: { position: "absolute", top: 14, right: 14 },
+      "aria-label": "Editar miss\xE3o",
+      title: "Editar miss\xE3o",
       onClick: () => {
         setMissaoDraft(missao);
         setMissaoEditando(true);
       }
     },
-    "\u270F\uFE0F Editar"
-  )) : /* @__PURE__ */ React.createElement(
+    "\u270F\uFE0F"
+  ), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, margin: 0, lineHeight: 1.55, paddingRight: 26, whiteSpace: "pre-wrap" } }, missao)) : /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-chip",
@@ -7413,7 +7491,7 @@ function Sondagem() {
       },
       op.label
     ))), guideNode !== "root" && /* @__PURE__ */ React.createElement("button", { className: "sd-chip", style: { marginTop: 10 }, onClick: () => setGuideNode("root") }, "\u2039 Recome\xE7ar"), guideNode === "root" && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.ink, opacity: 0.7, lineHeight: 1.6, margin: "14px 0 0" } }, "Para quem come\xE7a sozinho: 12 Week Year para o horizonte, Ivy Lee para o dia, pr\xE9-mortem antes de gastar dinheiro e Kanban com limite baixo para n\xE3o abrir cinco frentes ao mesmo tempo. Os outros rendem quando existe equipe para coordenar."))
-  ), ideas.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra os projetos em lista, um abaixo do outro." }, /* @__PURE__ */ React.createElement(
+  ), ideas.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra os projetos em lista, um abaixo do outro." }, /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-seg",
@@ -7429,10 +7507,10 @@ function Sondagem() {
       onClick: () => setViewMeusProjetos("quadro")
     },
     "\u25A4 Quadro"
-  )), viewMeusProjetos === "lista" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra todos os projetos, sem filtrar por status." }, /* @__PURE__ */ React.createElement(
+  ))), viewMeusProjetos === "lista" && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra todos os projetos, sem filtrar por status." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-tag-status",
+      className: "sd-seg",
       "data-on": filtroStatus === "todos" ? "1" : "0",
       onClick: () => setFiltroStatus("todos")
     },
@@ -7440,63 +7518,59 @@ function Sondagem() {
   )), STATUS_OPTS.map((o) => /* @__PURE__ */ React.createElement(Tooltip, { key: o.id, texto: 'Mostra s\xF3 os projetos com status "' + o.label + '".' }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-tag-status",
+      className: "sd-seg",
       "data-on": filtroStatus === o.id ? "1" : "0",
       onClick: () => setFiltroStatus(o.id),
       style: o.id === "concluido" ? {
-        background: filtroStatus === o.id ? "#C9AD73" : "#EFE6D2",
         borderColor: "#B8A272",
-        borderBottomColor: filtroStatus === o.id ? "#8C7B45" : "#B8A272",
+        background: filtroStatus === o.id ? "#C9AD73" : "#EFE6D2",
         color: filtroStatus === o.id ? "#3A2E14" : "#7A6A44"
       } : void 0
     },
     o.label
-  ))), TIPO_OPTS.map((o) => /* @__PURE__ */ React.createElement(Tooltip, { key: o.id, texto: 'Mostra s\xF3 os projetos do tipo "' + o.label + '".' }, /* @__PURE__ */ React.createElement(
+  )))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } }, TIPO_OPTS.map((o) => /* @__PURE__ */ React.createElement(Tooltip, { key: o.id, texto: 'Mostra s\xF3 os projetos do tipo "' + o.label + '".' }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-tag-tipo",
+      className: "sd-seg",
       "data-on": filtroTipo === o.id ? "1" : "0",
       "aria-label": "Filtrar projetos por tipo: " + o.label,
       onClick: () => setFiltroTipo((p) => p === o.id ? "todos" : o.id)
     },
     o.label
-  ))), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com o interruptor App verde (abre 'Ver notas' automaticamente)." }, /* @__PURE__ */ React.createElement(
+  )))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com o interruptor App verde (abre 'Ver notas' automaticamente)." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-tag-cor",
+      className: "sd-seg",
       "data-on": filtroProjetoApp === "on" ? "1" : "0",
-      style: filtroProjetoApp === "on" ? { background: "#CFE8D3", borderColor: "#2E7D46", borderStyle: "solid", color: "#1D5C34", fontWeight: 700 } : void 0,
       "aria-label": "Filtrar notas verdes, em qualquer projeto",
       onClick: () => alternarFiltroProjetoApp("on")
     },
-    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#2E7D46", display: "inline-block", flexShrink: 0 } }),
+    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#2E7D46", display: "inline-block", flexShrink: 0, marginRight: 6 } }),
     "Verde"
   )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com o interruptor App amarelo (intermedi\xE1rio)." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-tag-cor",
+      className: "sd-seg",
       "data-on": filtroProjetoApp === "meio" ? "1" : "0",
-      style: filtroProjetoApp === "meio" ? { background: "#F3E6BE", borderColor: "#C9971E", borderStyle: "solid", color: "#8A6D1A", fontWeight: 700 } : void 0,
       "aria-label": "Filtrar notas amarelas, em qualquer projeto",
       onClick: () => alternarFiltroProjetoApp("meio")
     },
-    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#C9971E", display: "inline-block", flexShrink: 0 } }),
+    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#C9971E", display: "inline-block", flexShrink: 0, marginRight: 6 } }),
     "Amarela"
   )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com o interruptor App cinza (desligado)." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-tag-cor",
+      className: "sd-seg",
       "data-on": filtroProjetoApp === "off" ? "1" : "0",
-      style: filtroProjetoApp === "off" ? { background: "#E4E1D6", borderColor: "#8F8A7C", borderStyle: "solid", color: "#5B5646", fontWeight: 700 } : void 0,
       "aria-label": "Filtrar notas cinzas, em qualquer projeto",
       onClick: () => alternarFiltroProjetoApp("off")
     },
-    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#B9B4A5", display: "inline-block", flexShrink: 0 } }),
+    /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: "50%", background: "#B9B4A5", display: "inline-block", flexShrink: 0, marginRight: 6 } }),
     "Cinza"
-  )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com pelo menos 1 voto (dot voting)." }, /* @__PURE__ */ React.createElement(
+  ))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas com pelo menos 1 voto (dot voting)." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-tag-voto",
+      className: "sd-seg",
       "data-on": filtroProjetoVoto === "com" ? "1" : "0",
       "aria-label": "Filtrar notas com voto, em qualquer projeto",
       onClick: () => alternarFiltroProjetoVoto("com")
@@ -7505,13 +7579,13 @@ function Sondagem() {
   )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra, em cada projeto que tiver, s\xF3 as notas sem nenhum voto." }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "sd-tag-voto",
+      className: "sd-seg",
       "data-on": filtroProjetoVoto === "sem" ? "1" : "0",
       "aria-label": "Filtrar notas sem voto, em qualquer projeto",
       onClick: () => alternarFiltroProjetoVoto("sem")
     },
     "\u26AA Sem voto"
-  )), (filtroTipo !== "todos" || filtroProjetoApp !== "todos" || filtroProjetoVoto !== "todos") && /* @__PURE__ */ React.createElement(
+  )))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } }, viewMeusProjetos === "lista" && (filtroTipo !== "todos" || filtroProjetoApp !== "todos" || filtroProjetoVoto !== "todos") && /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "sd-limpar",
@@ -7536,7 +7610,7 @@ function Sondagem() {
       }
     },
     "\u2715 Limpar filtro"
-  )), /* @__PURE__ */ React.createElement(
+  ), /* @__PURE__ */ React.createElement(
     "select",
     {
       className: "sd-inp",
@@ -7548,7 +7622,7 @@ function Sondagem() {
     /* @__PURE__ */ React.createElement("option", { value: "recentes" }, "Mais recentes"),
     /* @__PURE__ */ React.createElement("option", { value: "prioridade" }, "Prioridade"),
     /* @__PURE__ */ React.createElement("option", { value: "nome" }, "Nome (A\u2013Z)")
-  )), ideas.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, padding: "10px 4px" } }, 'Nenhum projeto ainda. Toque em "+ novo projeto" para come\xE7ar o primeiro.'), ideas.length > 0 && viewMeusProjetos === "quadro" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 } }, STATUS_OPTS.map((opt) => {
+  ))), ideas.length === 0 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, padding: "10px 4px" } }, 'Nenhum projeto ainda. Toque em "+ novo projeto" para come\xE7ar o primeiro.'), ideas.length > 0 && viewMeusProjetos === "quadro" ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 } }, STATUS_OPTS.map((opt) => {
     const itens = ideas.filter((i) => (i.status || "ideia") === opt.id).sort((a, b) => compararIdeias(a, b, ordenacao));
     return /* @__PURE__ */ React.createElement("div", { key: opt.id, style: { flex: "1 1 220px", minWidth: 220 } }, /* @__PURE__ */ React.createElement(
       "div",
@@ -7924,7 +7998,7 @@ function Sondagem() {
           style: { background: "#F6DCD3", borderColor: "#D98B72", color: "#8A3A2C", fontWeight: 600 }
         },
         "\u{1F4BE} Salvar nota"
-      )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Cria e gerencia pastas para agrupar as notas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-tag-pastanota", onClick: () => togglePastasNotas(i.id) }, "\u{1F5C2}\uFE0F Pastas", pastasNotasDoProjeto.length > 0 ? " (" + pastasNotasDoProjeto.length + ")" : "")), (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra ou esconde as notas j\xE1 salvas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-tag-notas", onClick: () => toggleNotas(i.id) }, (notasAbertas[i.id] ? "Ocultar " : "Ver ") + i.notas.length + " " + (i.notas.length === 1 ? "nota" : "notas"))), feitoContagem.total > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Total desde o in\xEDcio: " + feitoContagem.total + " toques em 'Feito'." }, /* @__PURE__ */ React.createElement(
+      )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Cria e gerencia pastas para agrupar as notas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-chip", onClick: () => togglePastasNotas(i.id) }, "\u{1F5C2}\uFE0F Pastas", pastasNotasDoProjeto.length > 0 ? " (" + pastasNotasDoProjeto.length + ")" : "")), (i.notas || []).length > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Mostra ou esconde as notas j\xE1 salvas deste projeto." }, /* @__PURE__ */ React.createElement("button", { className: "sd-tag-notas", onClick: () => toggleNotas(i.id) }, (notasAbertas[i.id] ? "Ocultar " : "Ver ") + i.notas.length + " " + (i.notas.length === 1 ? "nota" : "notas"))), feitoContagem.total > 0 && /* @__PURE__ */ React.createElement(Tooltip, { texto: "Total desde o in\xEDcio: " + feitoContagem.total + " toques em 'Feito'." }, /* @__PURE__ */ React.createElement(
         "span",
         {
           style: {
@@ -8518,14 +8592,28 @@ function Sondagem() {
               onClick: () => iniciarEdicaoNota(i.id, n)
             },
             "Editar"
-          )), /* @__PURE__ */ React.createElement(Tooltip, { texto: "Apaga esta nota (e os anexos dela)." }, /* @__PURE__ */ React.createElement(
+          )), /* @__PURE__ */ React.createElement(Tooltip, { texto: confirmDeleteNota === n.id ? "Toque de novo para confirmar." : "Apaga esta nota (e os anexos dela). Pede confirma\xE7\xE3o: toque duas vezes." }, /* @__PURE__ */ React.createElement(
             "button",
             {
               className: "sd-chip",
               style: { fontSize: 11, padding: "3px 8px", color: "#8A3A2C" },
-              onClick: () => removerNota(i.id, n.id)
+              onClick: () => {
+                if (confirmDeleteNotaTimeoutRef.current) {
+                  clearTimeout(confirmDeleteNotaTimeoutRef.current);
+                  confirmDeleteNotaTimeoutRef.current = null;
+                }
+                if (confirmDeleteNota === n.id) {
+                  removerNota(i.id, n.id);
+                } else {
+                  setConfirmDeleteNota(n.id);
+                  confirmDeleteNotaTimeoutRef.current = setTimeout(() => {
+                    setConfirmDeleteNota(null);
+                    confirmDeleteNotaTimeoutRef.current = null;
+                  }, 3e3);
+                }
+              }
             },
-            "Apagar"
+            confirmDeleteNota === n.id ? "Confirmar?" : "Apagar"
           )))))
         );
       }))))))
@@ -9214,8 +9302,7 @@ function Sondagem() {
     }
   )), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { className: "sd-btn", onClick: copySummary }, copied ? "Copiado" : "Copiar resumo"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: T.muted } }, status)))) : /* @__PURE__ */ React.createElement("p", { style: { fontSize: 14, color: T.muted, padding: "24px 4px" } }, 'Nenhum projeto aberto. Abra ou crie um em "Meus projetos".')))));
 }
-
-window.__SONDAGEM_VERSAO__ = "1.28.0";
+window.__SONDAGEM_VERSAO__ = "1.28.9";
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Sondagem, null));
 
   var __carr = document.getElementById('carregando');
