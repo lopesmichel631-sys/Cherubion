@@ -1,5 +1,12 @@
+window.__CHERUBION_VERSAO__ = "2026-09-14 17:42";
+const { useState, useEffect, useRef, useMemo } = React;
+
 "use strict";
-window.__CHERUBION_VERSAO__ = "2026-09-13 13:50";
+// ===== constantes =====
+// ======================================================================
+// Constantes de configuração do app: cores, listas de checklists, abas do Livro Razão,
+// categorias padrão e as funções que normalizam esses dados ao carregar do storage.
+// ======================================================================
 var __rest = (this && this.__rest) || function (s, e) {
     var t = {};
     for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
@@ -11,12 +18,6 @@ var __rest = (this && this.__rest) || function (s, e) {
         }
     return t;
 };
-const { useState, useEffect, useRef, useMemo } = React;
-// ===== constantes =====
-// ======================================================================
-// Constantes de configuração do app: cores, listas de checklists, abas do Livro Razão,
-// categorias padrão e as funções que normalizam esses dados ao carregar do storage.
-// ======================================================================
 const STORAGE_KEY = 'minhas-tarefas-data';
 const CORES = ['#5B7C99', '#D96C4F', '#6E8C82', '#A85C4D', '#8E6BAE', '#C9A227'];
 const DURACOES = [5, 10, 15, 30, 60];
@@ -7376,8 +7377,8 @@ function App() {
           border: 1px solid #e7e5df;
         }
         .mt-alerta-swipe {
-          min-height: 64px; display: flex; align-items: center;
-          cursor: pointer; user-select: none; overflow: hidden; padding: 4px 0;
+          height: 110px; display: flex; align-items: center;
+          cursor: pointer; user-select: none; overflow-x: hidden; overflow-y: auto; padding: 4px 0;
         }
         .mt-alerta-conteudo { flex: 1; }
         .mt-alerta-texto { font-size: 26px; line-height: 1.45; color: #4A7FD9; transition: transform 0.2s, opacity 0.2s; font-weight: 500; text-align: center; }
@@ -9514,4 +9515,6 @@ function App() {
             } }))))),
         React.createElement(VisualizadorMidia, { midia: midiaAmpliada, onFechar: () => setMidiaAmpliada(null) })));
 }
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
+
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
