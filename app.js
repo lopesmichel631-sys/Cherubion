@@ -1,4 +1,9 @@
-window.__CHERUBION_VERSAO__ = "2026-09-14 17:42";
+// ================================================================
+// Cherubion — app.js (miolo compilado)
+// Versão: 2026-09-17 07:37
+// Gerado a partir de App.jsx (Project Files) — JSX -> JS puro (tsc, target ES2017)
+// ================================================================
+window.__CHERUBION_VERSAO__ = '2026-09-17 07:37';
 const { useState, useEffect, useRef, useMemo } = React;
 
 "use strict";
@@ -118,10 +123,37 @@ const ABAS_RAZAO_FIXAS = [
 // tipos de evento padrão da aba História — protegidos (não podem ser apagados),
 // os demais que o Michel criar pelo ⚙️ entram soltos, sem essa marca. "Geral" não tem cor
 // própria: é só um filtro que reúne os eventos de todos os tipos, não registra evento nenhum.
+// `simbolo` (opcional): quando presente, os eventos daquele tipo aparecem na linha do tempo
+// com esse emoji no lugar do pontinho colorido. Tipos sem `simbolo` continuam com o ponto.
 const HIST_TIPOS_PADRAO = [
     { id: 'geral', nome: 'Geral', fixo: true },
     { id: 'civilizacoes', nome: 'Civilizações e Culturas', fixo: true, cor: '#8A6D3B' },
+    { id: 'batalhas', nome: 'Batalhas Épicas', fixo: true, cor: '#8B2E2E', simbolo: '⚔️' },
+    { id: 'livros', nome: 'Livros', fixo: true, cor: '#3F6C4E', simbolo: '📕' },
 ];
+// ‼️ MIGRAÇÃO: a lista de tipos vive salva no localStorage. Sem isto, qualquer tipo fixo
+// novo que eu acrescente em HIST_TIPOS_PADRAO nunca apareceria pra quem já tem dados
+// salvos — o app carregaria a lista antiga e ignoraria a nova. Esta função garante que
+// TODOS os tipos padrão existam sempre, preservando os tipos criados pelo Michel e a
+// ordem/nomes dele. Rode-a em todo ponto que restaura histTipos (carregar e backup).
+const mesclarTiposPadraoHistoria = (salvos) => {
+    const lista = Array.isArray(salvos) && salvos.length ? salvos.slice() : [];
+    if (lista.length === 0)
+        return HIST_TIPOS_PADRAO.slice();
+    HIST_TIPOS_PADRAO.forEach((padrao, i) => {
+        const existente = lista.findIndex((t) => t && t.id === padrao.id);
+        if (existente === -1) {
+            // insere o tipo padrão que falta na mesma posição relativa da lista padrão
+            lista.splice(Math.min(i, lista.length), 0, Object.assign({}, padrao));
+        }
+        else {
+            // garante que o tipo padrão continue marcado como fixo, com a cor e o símbolo oficiais
+            // (o símbolo vem SEMPRE do padrão: é o código que manda nele, não o dado antigo salvo)
+            lista[existente] = Object.assign(Object.assign(Object.assign({}, lista[existente]), { fixo: true, cor: lista[existente].cor || padrao.cor }), (padrao.simbolo ? { simbolo: padrao.simbolo } : {}));
+        }
+    });
+    return lista;
+};
 // regiões/continentes selecionáveis ao registrar um evento do tipo "Civilizações e Culturas".
 // continentes sem `subs` (Oceania, Eurásia) são selecionáveis diretamente; os demais só revelam
 // suas subdivisões ao serem tocados — a seleção em si acontece na subdivisão.
@@ -1253,7 +1285,13 @@ function App() {
     const [histNovoTexto, setHistNovoTexto] = useState('');
     const [histNovoAno, setHistNovoAno] = useState('');
     const [histNovoEra, setHistNovoEra] = useState('dC'); // 'dC' | 'aC'
+    // ano FINAL opcional: quando preenchido, o evento vira um período (usado no modo "Períodos")
+    const [histNovoAnoFim, setHistNovoAnoFim] = useState('');
+    const [histNovoEraFim, setHistNovoEraFim] = useState('dC'); // 'dC' | 'aC'
+    // modo de visualização da linha do tempo: 'vertical' | 'faixas' | 'comprimida' | 'periodos'
+    const [histModoVisual, setHistModoVisual] = useState('vertical');
     const [histNovoTipoNome, setHistNovoTipoNome] = useState('');
+    const [histNovoTipoSimbolo, setHistNovoTipoSimbolo] = useState(''); // emoji opcional do tipo: vira o marcador dele na linha do tempo
     const [msgHistoria, setMsgHistoria] = useState('');
     // seleção de regiões/continentes para o próximo evento do tipo "Civilizações e Culturas"
     const [histRegioesPainelAberto, setHistRegioesPainelAberto] = useState(false); // botão principal que revela os continentes
@@ -1751,7 +1789,8 @@ function App() {
                 setMedidasRegistro(Array.isArray(dados.medidasRegistro) ? dados.medidasRegistro : []);
                 setFaceRegistro(Array.isArray(dados.faceRegistro) ? dados.faceRegistro : []);
                 setHistEventos(Array.isArray(dados.histEventos) ? dados.histEventos : []);
-                setHistTipos(Array.isArray(dados.histTipos) && dados.histTipos.length ? dados.histTipos : HIST_TIPOS_PADRAO);
+                setHistTipos(mesclarTiposPadraoHistoria(dados.histTipos));
+                setHistModoVisual(['vertical', 'faixas', 'comprimida', 'periodos'].includes(dados.histModoVisual) ? dados.histModoVisual : 'vertical');
                 setBankSaldo(typeof dados.bankSaldo === 'number' ? dados.bankSaldo : 0);
                 setBankRegistro(Array.isArray(dados.bankRegistro) ? dados.bankRegistro : []);
                 setSnatBankSaldo(typeof dados.snatBankSaldo === 'number' ? dados.snatBankSaldo : 0);
@@ -1952,7 +1991,7 @@ function App() {
         }
         setStatus('Salvando…');
         try {
-            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, medalhasVistasScriptSucesso, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, goalsPendentes, goalsConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, gratidaoRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const ok = await tentarSalvarComRetry(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, medalhasVistasScriptSucesso, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, histModoVisual, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, goalsPendentes, goalsConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, gratidaoRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (ok) {
                 setSujo(false);
                 marcarQueJaUsou(); // a partir daqui, storage vazio = dados apagados, não estreia
@@ -1966,7 +2005,7 @@ function App() {
         catch (e) {
             // window.storage falhou (comum no preview do Claude.ai). Grava no localStorage real:
             // os dados ficam salvos e não mostramos alarme falso.
-            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, medalhasVistasScriptSucesso, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, goalsPendentes, goalsConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, gratidaoRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
+            const salvouLocal = lsSet(STORAGE_KEY, JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, medalhasVistasScriptSucesso, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, histModoVisual, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, goalsPendentes, goalsConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, gratidaoRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current }));
             if (salvouLocal) {
                 setSujo(false);
                 const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -3887,10 +3926,25 @@ function App() {
             return;
         }
         const ano = magnitude === 0 ? 0 : (histNovoEra === 'aC' ? -magnitude : magnitude);
+        // ano final opcional — transforma o evento num período (barra) no modo "Períodos"
+        let anoFim = null;
+        if (histNovoAnoFim.trim() !== '') {
+            const magFim = Math.abs(parseInt(histNovoAnoFim, 10));
+            if (Number.isNaN(magFim)) {
+                setMsgHistoria('Ano final inválido.');
+                return;
+            }
+            anoFim = magFim === 0 ? 0 : (histNovoEraFim === 'aC' ? -magFim : magFim);
+            if (anoFim < ano) {
+                setMsgHistoria('O ano final não pode ser anterior ao inicial.');
+                return;
+            }
+        }
         const regioes = histTipoSelecionado === 'civilizacoes' ? histRegioesSelecionadas : [];
-        setHistEventos((prev) => [...prev, { id: genIdHistoria(), tipo: histTipoSelecionado, ano, texto, regioes }]);
+        setHistEventos((prev) => [...prev, Object.assign({ id: genIdHistoria(), tipo: histTipoSelecionado, ano, texto, regioes }, (anoFim !== null ? { anoFim } : {}))]);
         setHistNovoTexto('');
         setHistNovoAno('');
+        setHistNovoAnoFim('');
         setHistRegioesSelecionadas([]);
         setMsgHistoria('');
     };
@@ -3927,6 +3981,12 @@ function App() {
     // cor final de um evento na linha do tempo e nas listagens: eventos de Civilizações e Culturas
     // usam a cor da região marcada; os demais usam a cor do próprio tipo.
     const corDoEventoHistoria = (e) => (e.tipo === 'civilizacoes' ? corRegiaoPrincipal(e.regioes) : corDoTipoHistoria(e.tipo));
+    // emoji marcador do tipo de um evento (ex: ⚔️ em Batalhas Épicas, 📕 em Livros).
+    // Quando o tipo não define `simbolo`, devolve null e a linha do tempo desenha o ponto normal.
+    const simboloDoEventoHistoria = (e) => {
+        const t = histTipos.find((x) => x.id === e.tipo);
+        return (t && t.simbolo) || null;
+    };
     const adicionarTipoHistoria = () => {
         const nome = histNovoTipoNome.trim();
         if (!nome)
@@ -3934,9 +3994,26 @@ function App() {
         const id = 'custom_' + genIdHistoria();
         const usados = histTipos.filter((t) => !t.fixo).length; // quantos tipos "meus" já existem — decide a próxima cor da paleta
         const cor = CORES[usados % CORES.length];
-        setHistTipos((prev) => [...prev, { id, nome, fixo: false, cor }]);
+        const simbolo = histNovoTipoSimbolo.trim(); // vazio = o tipo usa o pontinho colorido de sempre
+        setHistTipos((prev) => [...prev, Object.assign({ id, nome, fixo: false, cor }, (simbolo ? { simbolo } : {}))]);
         setHistNovoTipoNome('');
+        setHistNovoTipoSimbolo('');
         setHistTipoSelecionado(id);
+    };
+    // troca (ou remove, se vier vazio) o emoji marcador de um tipo criado por mim.
+    // Tipos padrão têm símbolo definido no código e não são alterados por aqui.
+    const definirSimboloTipoHistoria = (id, simbolo) => {
+        const limpo = (simbolo || '').trim();
+        setHistTipos((prev) => prev.map((t) => {
+            if (t.id !== id || t.fixo)
+                return t;
+            const novo = Object.assign({}, t);
+            if (limpo)
+                novo.simbolo = limpo;
+            else
+                delete novo.simbolo;
+            return novo;
+        }));
     };
     const removerTipoHistoria = (id) => {
         const tipo = histTipos.find((t) => t.id === id);
@@ -5211,47 +5288,209 @@ function App() {
                         faceRegistroConfigAberto ? (React.createElement("input", { className: "mt-nota-input", value: r.comentario || '', onChange: (e) => setFaceRegistro((l) => l.map((x) => (x.id === r.id ? Object.assign(Object.assign({}, x), { comentario: e.target.value }) : x))), style: { width: '100%', marginBottom: 4, boxSizing: 'border-box' } })) : (r.comentario && React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, r.comentario)),
                         React.createElement("span", { style: { fontSize: 11.5, color: '#999' } }, r.data)),
                     faceRegistroConfigAberto && (React.createElement("button", { className: "mt-del", onClick: () => removerRegistroFace(r.id) }, "\u00D7"))))))))));
-    // Linha do tempo gráfica da aba História: reta horizontal com um ponto por evento,
-    // posicionado conforme o ano (negativo = a.C., positivo = d.C., 0 = ano zero).
-    // Escala 'anos' aproxima (10 em 10 anos nas marcações); 'seculo' afasta (100 em 100).
-    // "Geral" é o único que mistura eventos de todos os tipos numa linha só; os demais mostram
-    // só os eventos do tipo selecionado. Cada ponto usa a cor do tipo (ou da região, em
-    // Civilizações e Culturas) — a mesma cor do botão que ele pertence.
-    const renderLinhaDoTempoHistoria = () => {
+    // ---- Linha do tempo da aba História: 4 modos de visualização ----
+    // O botão de modo escolhe qual render roda. Todos compartilham o mesmo filtro de tipo
+    // ("Geral" mistura todos os tipos; os demais mostram só os seus) e as mesmas cores/símbolos.
+    // Modos: 'vertical' (rolagem natural, texto junto), 'faixas' (uma trilha por tipo),
+    // 'comprimida' (horizontal com dobras nos vazios + minimapa), 'periodos' (barras início→fim).
+    // eventos visíveis no momento, já ordenados por ano — base de todos os 4 modos
+    const eventosVisiveisHistoria = () => {
         const todosOsTipos = histTipoSelecionado === 'geral';
-        const eventos = (todosOsTipos ? histEventos : histEventos.filter((e) => e.tipo === histTipoSelecionado)).slice().sort((a, b) => a.ano - b.ano);
-        if (eventos.length === 0) {
-            return React.createElement("p", { className: "mt-empty", style: { marginTop: 10 } }, todosOsTipos ? 'Nenhum evento registrado ainda em nenhum tipo.' : 'Nenhum evento neste tipo ainda — a linha do tempo aparece aqui assim que você registrar o primeiro.');
-        }
+        return (todosOsTipos ? histEventos : histEventos.filter((e) => e.tipo === histTipoSelecionado))
+            .slice()
+            .sort((a, b) => a.ano - b.ano);
+    };
+    // rótulo curto de intervalo: "331 a.C." ou "27 a.C. – 476 d.C." quando há ano final
+    const rotuloAnoHistoria = (e) => ((e.anoFim === null || e.anoFim === undefined || e.anoFim === e.ano)
+        ? formatAnoHistoria(e.ano)
+        : formatAnoHistoria(e.ano) + ' – ' + formatAnoHistoria(e.anoFim));
+    // MODO 1 — VERTICAL: espinha à esquerda, cartão com ano + texto à direita.
+    // É o modo que melhor se comporta no iPhone: rola pra baixo, sem rolagem lateral.
+    const renderHistoriaVertical = (eventos) => (React.createElement("div", { style: { marginTop: 12, background: '#FBFAF6', borderRadius: 10, border: '1px solid #ddd8c9', padding: '12px 10px 12px 0' } }, eventos.map((e, i) => {
+        const cor = corDoEventoHistoria(e);
+        const simbolo = simboloDoEventoHistoria(e);
+        const ultimo = i === eventos.length - 1;
+        return (React.createElement("div", { key: e.id, style: { display: 'flex', gap: 10, alignItems: 'stretch' } },
+            React.createElement("div", { style: { width: 40, position: 'relative', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+                React.createElement("div", { style: { width: 2, height: 10, background: i === 0 ? 'transparent' : '#ddd8c9' } }),
+                React.createElement("div", { style: {
+                        width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                        background: simbolo ? 'transparent' : cor,
+                        border: simbolo ? 'none' : '2px solid #fff',
+                        boxShadow: simbolo ? 'none' : '0 0 0 1px ' + cor,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
+                    } }, simbolo || ''),
+                React.createElement("div", { style: { width: 2, flex: 1, minHeight: 10, background: ultimo ? 'transparent' : '#ddd8c9' } })),
+            React.createElement("div", { style: { flex: 1, minWidth: 0, background: '#fff', border: '1px solid #e8e2d4', borderLeft: '3px solid ' + cor, borderRadius: 8, padding: '8px 10px', marginBottom: 8 } },
+                React.createElement("div", { style: { display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' } },
+                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: cor } }, rotuloAnoHistoria(e)),
+                    React.createElement("span", { style: { fontSize: 10, color: '#a8a293' } }, formatSeculoHistoria(e.ano))),
+                React.createElement("p", { style: { margin: '3px 0 0', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap', lineHeight: 1.35 } }, e.texto))));
+    })));
+    // MODO 2 — FAIXAS POR TIPO: uma trilha horizontal por tipo, então eventos de tipos
+    // diferentes nunca colidem entre si. Só faz sentido com o filtro "Geral" mostrando vários
+    // tipos, mas funciona igual com um tipo só (aí é uma faixa única).
+    const renderHistoriaFaixas = (eventos) => {
+        const tiposComEvento = histTipos.filter((t) => t.id !== 'geral' && eventos.some((e) => e.tipo === t.id));
+        if (tiposComEvento.length === 0)
+            return null;
         const pxPorAno = 4;
-        const anos = eventos.map((e) => e.ano);
         const margem = 20;
+        const anos = eventos.map((e) => e.ano);
         const anoMin = Math.min(...anos, 0) - margem;
         const anoMax = Math.max(...anos, 0) + margem;
-        const largura = Math.max(320, (anoMax - anoMin) * pxPorAno);
-        const y = 42;
-        const anoParaX = (ano) => (ano - anoMin) * pxPorAno;
-        const passo = 10;
+        const larguraLinha = Math.max(280, (anoMax - anoMin) * pxPorAno);
+        const rotulo = 62; // coluna fixa com o nome do tipo
+        const largura = rotulo + larguraLinha;
+        const alturaFaixa = 34;
+        const alturaEixo = 26;
+        const altura = tiposComEvento.length * alturaFaixa + alturaEixo + 10;
+        const anoParaX = (ano) => rotulo + (ano - anoMin) * pxPorAno;
+        const passo = 100;
         const marcas = [];
         for (let a = Math.ceil(anoMin / passo) * passo; a <= anoMax; a += passo)
             marcas.push(a);
         return (React.createElement("div", { style: { overflowX: 'auto', marginTop: 12, background: '#FBFAF6', borderRadius: 10, border: '1px solid #ddd8c9', WebkitOverflowScrolling: 'touch' } },
-            React.createElement("svg", { width: largura, height: 104, style: { display: 'block' } },
-                React.createElement("line", { x1: 0, y1: y, x2: largura, y2: y, stroke: "#ddd8c9", strokeWidth: 2 }),
-                marcas.map((a) => {
-                    const marcaDeSeculo = a % 100 === 0;
-                    return (React.createElement("g", { key: a },
-                        React.createElement("line", { x1: anoParaX(a), y1: y - (marcaDeSeculo ? 6 : 4), x2: anoParaX(a), y2: y + (marcaDeSeculo ? 6 : 4), stroke: a === 0 ? '#C0492E' : (marcaDeSeculo ? '#8A6D3B' : '#c9c4b4'), strokeWidth: a === 0 ? 2 : (marcaDeSeculo ? 1.5 : 1) }),
-                        React.createElement("text", { x: anoParaX(a), y: y + 18, fontSize: "9", textAnchor: "middle", fill: a === 0 ? '#C0492E' : '#999' }, formatAnoHistoria(a)),
-                        marcaDeSeculo && (React.createElement("text", { x: anoParaX(a), y: y + 30, fontSize: "8", fontWeight: "700", textAnchor: "middle", fill: "#8A6D3B" }, formatSeculoHistoria(a === 0 ? 1 : a)))));
+            React.createElement("svg", { width: largura, height: altura, style: { display: 'block' } },
+                tiposComEvento.map((t, i) => {
+                    const yFaixa = 20 + i * alturaFaixa;
+                    const doTipo = eventos.filter((e) => e.tipo === t.id);
+                    return (React.createElement("g", { key: t.id },
+                        React.createElement("text", { x: 0, y: yFaixa + 4, fontSize: "9.5", fill: "#6b6b6b" }, (t.simbolo ? t.simbolo + ' ' : '') + t.nome.slice(0, 9)),
+                        React.createElement("line", { x1: rotulo, y1: yFaixa, x2: largura, y2: yFaixa, stroke: "#e4dfd0", strokeWidth: 1.5 }),
+                        doTipo.map((e) => {
+                            const cor = corDoEventoHistoria(e);
+                            const simbolo = simboloDoEventoHistoria(e);
+                            return (React.createElement("g", { key: e.id },
+                                simbolo
+                                    ? React.createElement("text", { x: anoParaX(e.ano), y: yFaixa + 4, fontSize: "12", textAnchor: "middle" }, simbolo)
+                                    : React.createElement("circle", { cx: anoParaX(e.ano), cy: yFaixa, r: 4.5, fill: cor, stroke: "#fff", strokeWidth: 1.5 }),
+                                React.createElement("text", { x: anoParaX(e.ano), y: yFaixa - 9, fontSize: "8", textAnchor: "middle", fill: "#8a8478" }, formatAnoHistoria(e.ano))));
+                        })));
                 }),
-                eventos.map((e) => {
+                React.createElement("line", { x1: rotulo, y1: altura - alturaEixo, x2: largura, y2: altura - alturaEixo, stroke: "#ddd8c9", strokeWidth: 2 }),
+                marcas.map((a) => (React.createElement("g", { key: a },
+                    React.createElement("line", { x1: anoParaX(a), y1: altura - alturaEixo - 4, x2: anoParaX(a), y2: altura - alturaEixo + 4, stroke: a === 0 ? '#C0492E' : '#8A6D3B', strokeWidth: a === 0 ? 2 : 1 }),
+                    React.createElement("text", { x: anoParaX(a), y: altura - alturaEixo + 15, fontSize: "8.5", textAnchor: "middle", fill: a === 0 ? '#C0492E' : '#999' }, formatAnoHistoria(a))))))));
+    };
+    // ---- escala comprimida: monta as "dobras" ----
+    // Trechos longos sem nenhum evento viram uma dobra de largura fixa, em vez de milhares de
+    // pixels vazios. Devolve uma função ano→x já com as dobras aplicadas, e a lista de dobras.
+    const montarEscalaComprimidaHistoria = (eventos) => {
+        const pxPorAno = 4;
+        const larguraDobra = 26; // largura fixa que um vazio comprimido ocupa
+        const vaoMinimo = 120; // vazio (em anos) a partir do qual comprime
+        const margem = 20;
+        const anos = eventos.map((e) => e.ano);
+        const anoMin = Math.min(...anos) - margem;
+        const anoMax = Math.max(...anos) + margem;
+        // trechos vazios entre eventos consecutivos que passam do vão mínimo
+        const dobras = [];
+        const ordenados = anos.slice().sort((a, b) => a - b);
+        for (let i = 0; i < ordenados.length - 1; i += 1) {
+            const vao = ordenados[i + 1] - ordenados[i];
+            if (vao > vaoMinimo)
+                dobras.push({ de: ordenados[i] + margem, ate: ordenados[i + 1] - margem });
+        }
+        const anoParaX = (ano) => {
+            let x = (Math.min(Math.max(ano, anoMin), anoMax) - anoMin) * pxPorAno;
+            dobras.forEach((d) => {
+                if (ano >= d.ate)
+                    x -= (d.ate - d.de) * pxPorAno - larguraDobra; // passou a dobra inteira
+                else if (ano > d.de)
+                    x -= (ano - d.de) * pxPorAno - larguraDobra / 2; // está dentro dela
+            });
+            return x;
+        };
+        const largura = Math.max(300, anoParaX(anoMax) + 20);
+        return { anoParaX, dobras, largura, anoMin, anoMax };
+    };
+    // MODO 3 — COMPRIMIDA + MINIMAPA: horizontal como antes, mas os séculos vazios encolhem
+    // e o minimapa no topo mostra a distribuição completa dos eventos de uma olhada.
+    const renderHistoriaComprimida = (eventos) => {
+        const { anoParaX, dobras, largura, anoMin, anoMax } = montarEscalaComprimidaHistoria(eventos);
+        const y = 58;
+        const altura = 104;
+        const larguraMini = Math.min(largura, 300);
+        const anoParaXMini = (ano) => ((ano - anoMin) / Math.max(1, anoMax - anoMin)) * (larguraMini - 4) + 2;
+        return (React.createElement("div", { style: { marginTop: 12, background: '#FBFAF6', borderRadius: 10, border: '1px solid #ddd8c9' } },
+            React.createElement("div", { style: { padding: '8px 10px 0' } },
+                React.createElement("svg", { width: larguraMini, height: 22, style: { display: 'block' } },
+                    React.createElement("rect", { x: 0, y: 4, width: larguraMini, height: 14, rx: 4, fill: "#fff", stroke: "#e4dfd0", strokeWidth: 1 }),
+                    eventos.map((e) => (React.createElement("circle", { key: e.id, cx: anoParaXMini(e.ano), cy: 11, r: 2.5, fill: corDoEventoHistoria(e) })))),
+                React.createElement("p", { style: { margin: '2px 0 0', fontSize: 9.5, color: '#a8a293' } }, "vis\u00E3o geral em escala real \u00B7 abaixo, os vazios s\u00E3o comprimidos")),
+            React.createElement("div", { style: { overflowX: 'auto', WebkitOverflowScrolling: 'touch' } },
+                React.createElement("svg", { width: largura, height: altura, style: { display: 'block' } },
+                    React.createElement("line", { x1: 0, y1: y, x2: largura, y2: y, stroke: "#ddd8c9", strokeWidth: 2 }),
+                    dobras.map((d, i) => {
+                        const xm = (anoParaX(d.de) + anoParaX(d.ate)) / 2;
+                        return (React.createElement("g", { key: 'dobra' + i },
+                            React.createElement("path", { d: 'M' + (xm - 7) + ' ' + (y - 9) + ' L' + (xm - 1) + ' ' + (y + 9), stroke: "#c9c4b4", strokeWidth: 1.5, fill: "none" }),
+                            React.createElement("path", { d: 'M' + (xm + 1) + ' ' + (y - 9) + ' L' + (xm + 7) + ' ' + (y + 9), stroke: "#c9c4b4", strokeWidth: 1.5, fill: "none" }),
+                            React.createElement("text", { x: xm, y: y + 24, fontSize: "7.5", textAnchor: "middle", fill: "#b5afa0" }, (d.ate - d.de) + ' anos')));
+                    }),
+                    eventos.map((e) => {
+                        const cor = corDoEventoHistoria(e);
+                        const simbolo = simboloDoEventoHistoria(e);
+                        return (React.createElement("g", { key: e.id },
+                            simbolo
+                                ? React.createElement("text", { x: anoParaX(e.ano), y: y + 5, fontSize: "13", textAnchor: "middle" }, simbolo)
+                                : React.createElement("circle", { cx: anoParaX(e.ano), cy: y, r: 5, fill: cor, stroke: "#fff", strokeWidth: 1.5 }),
+                            React.createElement("text", { x: anoParaX(e.ano), y: y - 12, fontSize: "9", textAnchor: "middle", fill: "#232323" }, formatAnoHistoria(e.ano)),
+                            React.createElement("text", { x: anoParaX(e.ano), y: y - 22, fontSize: "7.5", textAnchor: "middle", fill: cor }, formatSeculoHistoria(e.ano))));
+                    })))));
+    };
+    // MODO 4 — PERÍODOS: cada evento vira uma barra do ano inicial ao ano final. Eventos sem
+    // ano final (a maioria) viram uma barra mínima, para continuarem visíveis na mesma régua.
+    const renderHistoriaPeriodos = (eventos) => {
+        const pxPorAno = 4;
+        const margem = 20;
+        const limites = [];
+        eventos.forEach((e) => { limites.push(e.ano); limites.push(e.anoFim === null || e.anoFim === undefined ? e.ano : e.anoFim); });
+        const anoMin = Math.min(...limites) - margem;
+        const anoMax = Math.max(...limites) + margem;
+        const largura = Math.max(300, (anoMax - anoMin) * pxPorAno);
+        const anoParaX = (ano) => (ano - anoMin) * pxPorAno;
+        const alturaBarra = 22;
+        const espaco = 8;
+        const alturaEixo = 26;
+        const altura = eventos.length * (alturaBarra + espaco) + alturaEixo + 8;
+        const passo = 100;
+        const marcas = [];
+        for (let a = Math.ceil(anoMin / passo) * passo; a <= anoMax; a += passo)
+            marcas.push(a);
+        return (React.createElement("div", { style: { overflowX: 'auto', marginTop: 12, background: '#FBFAF6', borderRadius: 10, border: '1px solid #ddd8c9', WebkitOverflowScrolling: 'touch' } },
+            React.createElement("svg", { width: largura, height: altura, style: { display: 'block' } },
+                marcas.map((a) => (React.createElement("line", { key: 'g' + a, x1: anoParaX(a), y1: 0, x2: anoParaX(a), y2: altura - alturaEixo, stroke: a === 0 ? '#eecfc7' : '#efeade', strokeWidth: 1 }))),
+                eventos.map((e, i) => {
                     const cor = corDoEventoHistoria(e);
+                    const simbolo = simboloDoEventoHistoria(e);
+                    const fim = (e.anoFim === null || e.anoFim === undefined) ? e.ano : e.anoFim;
+                    const x = anoParaX(e.ano);
+                    const larguraBarra = Math.max(8, anoParaX(fim) - x); // mínimo visível para evento pontual
+                    const yBarra = 6 + i * (alturaBarra + espaco);
                     return (React.createElement("g", { key: e.id },
-                        React.createElement("circle", { cx: anoParaX(e.ano), cy: y, r: 5, fill: cor, stroke: "#fff", strokeWidth: 1.5 }),
-                        React.createElement("text", { x: anoParaX(e.ano), y: y - 12, fontSize: "9", textAnchor: "middle", fill: "#232323" }, formatAnoHistoria(e.ano)),
-                        React.createElement("text", { x: anoParaX(e.ano), y: y - 22, fontSize: "7.5", textAnchor: "middle", fill: cor }, formatSeculoHistoria(e.ano))));
-                }))));
+                        React.createElement("rect", { x: x, y: yBarra, width: larguraBarra, height: alturaBarra, rx: 5, fill: cor, opacity: 0.88 }),
+                        React.createElement("text", { x: x + larguraBarra + 6, y: yBarra + alturaBarra / 2 + 3.5, fontSize: "9.5", fill: "#232323" }, (simbolo ? simbolo + ' ' : '') + e.texto.slice(0, 26) + (e.texto.length > 26 ? '…' : '')),
+                        React.createElement("text", { x: x, y: yBarra - 2, fontSize: "7.5", fill: "#8a8478" }, rotuloAnoHistoria(e))));
+                }),
+                React.createElement("line", { x1: 0, y1: altura - alturaEixo, x2: largura, y2: altura - alturaEixo, stroke: "#ddd8c9", strokeWidth: 2 }),
+                marcas.map((a) => (React.createElement("text", { key: 'r' + a, x: anoParaX(a), y: altura - alturaEixo + 15, fontSize: "8.5", textAnchor: "middle", fill: a === 0 ? '#C0492E' : '#999' }, formatAnoHistoria(a)))))));
+    };
+    // despachante: escolhe o render conforme o modo selecionado nos botões
+    const renderLinhaDoTempoHistoria = () => {
+        const todosOsTipos = histTipoSelecionado === 'geral';
+        const eventos = eventosVisiveisHistoria();
+        if (eventos.length === 0) {
+            return React.createElement("p", { className: "mt-empty", style: { marginTop: 10 } }, todosOsTipos ? 'Nenhum evento registrado ainda em nenhum tipo.' : 'Nenhum evento neste tipo ainda — a linha do tempo aparece aqui assim que você registrar o primeiro.');
+        }
+        if (histModoVisual === 'vertical')
+            return renderHistoriaVertical(eventos);
+        if (histModoVisual === 'faixas')
+            return renderHistoriaFaixas(eventos);
+        if (histModoVisual === 'periodos')
+            return renderHistoriaPeriodos(eventos);
+        return renderHistoriaComprimida(eventos);
     };
     // Painel "💰 Bank": mora dentro da aba Finanças, no botão "Bank" ao lado das sessões.
     const renderBank = () => {
@@ -7028,7 +7267,7 @@ function App() {
         catch (e) { /* localStorage indisponível: backup segue só com os dados do Minha Tela */ }
         return dados;
     };
-    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, medalhasVistasScriptSucesso, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, goalsPendentes, goalsConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, gratidaoRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
+    const textoBackup = JSON.stringify({ categorias, fixas, lista, livro, quadroMedalhas, quadroPercentuais, resumoMedalhas, medalhasVistasScriptSucesso, frases, alertasSemana, alertasNotas, notasRapidas, notasPastas, notasPastasUsos, notasPastaCmeeSeed, bancoDeHoras, valorHora, regrasEstrelas, gruposCustom, ordemJanelas, ordemJanelasVersao, fixasGruposOcultos, fixasGruposComoCard, fixasGruposOrdem, notaCatPrioridade, saldoLivroRazao, livroRazao, corteDeCabeloRegistro, medidasRegistro, faceRegistro, histEventos, histTipos, histModoVisual, bankSaldo, bankRegistro, snatBankSaldo, snatBankRegistro, ordemAbasRazao, pumpTarefas, pumpRegistro, psoRegistro, psoTarefas, psoProtocolos, psoTestes, psoContadorDias, psoContadorInicioISO, psoContadorZerado, reservas, checklistItens, checklistSessoes, ganhosRegistro, desbloqueiosRegistro, antesDeIrPendentes, antesDeIrConcluidos, goalsPendentes, goalsConcluidos, autoSalvarAtivo, autoSalvarSegundos, notaAutoSalvarAtivo, notaAutoSalvarSegundos, eraDeOuroRegistro, momentumRegistro, gratidaoRegistro, batalhaNotas, contadoresRegressivos, modoConcluir, modoDone, livroConclusoes, prefeituras: (checklistItens.prefeituras || []), prefeiturasSessoes: (checklistSessoes.prefeituras || []), comentariosFixas, aberturasApp, periodosFechamento: periodosRef.current, cofreDeNotas: lerBackupAppNotas(), baralhoDeContatos: lerBackupAppContatos() }, null, 2);
     const copiarBackup = () => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard
@@ -7150,7 +7389,8 @@ function App() {
             setMedidasRegistro(Array.isArray(dados.medidasRegistro) ? dados.medidasRegistro : []);
             setFaceRegistro(Array.isArray(dados.faceRegistro) ? dados.faceRegistro : []);
             setHistEventos(Array.isArray(dados.histEventos) ? dados.histEventos : []);
-            setHistTipos(Array.isArray(dados.histTipos) && dados.histTipos.length ? dados.histTipos : HIST_TIPOS_PADRAO);
+            setHistTipos(mesclarTiposPadraoHistoria(dados.histTipos));
+            setHistModoVisual(['vertical', 'faixas', 'comprimida', 'periodos'].includes(dados.histModoVisual) ? dados.histModoVisual : 'vertical');
             setBankSaldo(typeof dados.bankSaldo === 'number' ? dados.bankSaldo : 0);
             setBankRegistro(Array.isArray(dados.bankRegistro) ? dados.bankRegistro : []);
             setSnatBankSaldo(typeof dados.snatBankSaldo === 'number' ? dados.snatBankSaldo : 0);
@@ -8775,7 +9015,7 @@ function App() {
                                     const ativo = histTipoSelecionado === t.id;
                                     const cor = t.id === 'geral' ? '#6b6b6b' : corDoTipoHistoria(t.id);
                                     return (React.createElement("button", { key: t.id, className: "mt-btn-sm", style: ativo ? { background: cor, color: '#fff', borderColor: cor } : { color: cor, borderColor: cor }, onClick: () => setHistTipoSelecionado(t.id) },
-                                        t.id === 'geral' ? '📚 ' : '',
+                                        t.id === 'geral' ? '📚 ' : (t.simbolo ? t.simbolo + ' ' : ''),
                                         t.nome));
                                 })),
                                 histTipoSelecionado === 'civilizacoes' && (React.createElement("div", { style: { marginTop: 10 } },
@@ -8796,12 +9036,31 @@ function App() {
                                         }))))))),
                                 histConfigAberto && (React.createElement(React.Fragment, null,
                                     React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                                        React.createElement("input", { className: "mt-nota-input", style: { width: 58, textAlign: 'center' }, placeholder: "\uD83D\uDE00", maxLength: 4, value: histNovoTipoSimbolo, onChange: (e) => setHistNovoTipoSimbolo(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarTipoHistoria(), title: "Emoji opcional \u2014 vira o marcador do tipo na linha do tempo" }),
                                         React.createElement("input", { className: "mt-nota-input", style: { flex: 1 }, placeholder: "Nome do novo tipo de evento\u2026", value: histNovoTipoNome, onChange: (e) => setHistNovoTipoNome(e.target.value), onKeyDown: (e) => e.key === 'Enter' && adicionarTipoHistoria() }),
                                         React.createElement("button", { className: "mt-btn-sm", onClick: adicionarTipoHistoria }, "+ Tipo")),
+                                    React.createElement("p", { className: "mt-empty", style: { marginTop: 4, fontSize: 11 } }, "O emoji \u00E9 opcional \u2014 com ele, os eventos desse tipo aparecem na linha do tempo com o emoji no lugar do pontinho."),
+                                    !(tipoAtual === null || tipoAtual === void 0 ? void 0 : tipoAtual.fixo) && tipoAtual && (React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' } },
+                                        React.createElement("input", { className: "mt-nota-input", style: { width: 58, textAlign: 'center' }, placeholder: "\uD83D\uDE00", maxLength: 4, value: tipoAtual.simbolo || '', onChange: (e) => definirSimboloTipoHistoria(tipoAtual.id, e.target.value), title: 'Emoji do tipo "' + tipoAtual.nome + '" — apague para voltar ao pontinho' }),
+                                        React.createElement("span", { style: { fontSize: 11.5, color: '#8a8478' } },
+                                            "Emoji de \"",
+                                            tipoAtual.nome,
+                                            "\" na linha do tempo (vazio = pontinho)"))),
                                     !(tipoAtual === null || tipoAtual === void 0 ? void 0 : tipoAtual.fixo) && (React.createElement("button", { className: "mt-btn-sm", style: { marginTop: 8 }, onClick: () => removerTipoHistoria(histTipoSelecionado) },
                                         "\uD83D\uDDD1\uFE0F Apagar tipo \"", tipoAtual === null || tipoAtual === void 0 ? void 0 :
                                         tipoAtual.nome,
                                         "\" (e os eventos dele)")))),
+                                React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 } }, [
+                                    { id: 'vertical', rotulo: '↕️ Vertical' },
+                                    { id: 'faixas', rotulo: '🚦 Faixas' },
+                                    { id: 'comprimida', rotulo: '↔️ Comprimida' },
+                                    { id: 'periodos', rotulo: '📊 Períodos' },
+                                ].map((m) => {
+                                    const ativo = histModoVisual === m.id;
+                                    return (React.createElement("button", { key: m.id, className: "mt-btn-sm", style: ativo
+                                            ? { background: '#8A6D3B', color: '#fff', borderColor: '#8A6D3B', fontSize: 11.5 }
+                                            : { color: '#8A6D3B', borderColor: '#d8c9a0', fontSize: 11.5 }, onClick: () => setHistModoVisual(m.id) }, m.rotulo));
+                                })),
                                 renderLinhaDoTempoHistoria(),
                                 todosOsTipos ? (React.createElement("p", { className: "mt-empty", style: { marginTop: 14 } }, "\"Geral\" re\u00FAne os eventos de todos os tipos aqui embaixo \u2014 escolha um tipo espec\u00EDfico ali em cima pra registrar um novo evento.")) : (React.createElement("div", { style: { marginTop: 14 } },
                                     React.createElement("textarea", { className: "mt-bloco-textarea", placeholder: "Texto do evento\u2026", value: histNovoTexto, onChange: (e) => setHistNovoTexto(e.target.value), style: { minHeight: 50 } }),
@@ -8810,6 +9069,12 @@ function App() {
                                         React.createElement("select", { className: "mt-nota-input", value: histNovoEra, onChange: (e) => setHistNovoEra(e.target.value), style: { flex: 1 } },
                                             React.createElement("option", { value: "dC" }, "d.C."),
                                             React.createElement("option", { value: "aC" }, "a.C."))),
+                                    React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                                        React.createElement("input", { className: "mt-nota-input", type: "text", inputMode: "numeric", placeholder: "at\u00E9\u2026 (opcional)", value: histNovoAnoFim, onChange: (e) => setHistNovoAnoFim(e.target.value.replace(/\D/g, '')), onKeyDown: (e) => e.key === 'Enter' && adicionarEventoHistoria(), style: { flex: 1 } }),
+                                        React.createElement("select", { className: "mt-nota-input", value: histNovoEraFim, onChange: (e) => setHistNovoEraFim(e.target.value), style: { flex: 1 } },
+                                            React.createElement("option", { value: "dC" }, "d.C."),
+                                            React.createElement("option", { value: "aC" }, "a.C."))),
+                                    React.createElement("p", { className: "mt-empty", style: { marginTop: 4, fontSize: 11 } }, "O ano final \u00E9 opcional \u2014 s\u00F3 preencha para coisas que duraram anos (imp\u00E9rios, guerras, eras). Ele vira uma barra no modo \uD83D\uDCCA Per\u00EDodos."),
                                     React.createElement("button", { className: "mt-btn-sm primary", style: { marginTop: 8 }, onClick: adicionarEventoHistoria },
                                         "Registrar evento \u2014 ", tipoAtual === null || tipoAtual === void 0 ? void 0 :
                                         tipoAtual.nome),
@@ -8820,7 +9085,7 @@ function App() {
                                         const corEvento = corDoEventoHistoria(e);
                                         return (React.createElement("div", { key: e.id, className: "mt-fixa-item" },
                                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                                React.createElement("span", { style: { fontSize: 11.5, color: corEvento, fontWeight: 700 } }, formatAnoHistoria(e.ano)),
+                                                React.createElement("span", { style: { fontSize: 11.5, color: corEvento, fontWeight: 700 } }, rotuloAnoHistoria(e)),
                                                 todosOsTipos && (React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: corEvento, background: '#fff', border: `1px solid ${corEvento}`, borderRadius: 8, padding: '1px 6px', marginLeft: 6 } }, (histTipos.find((t) => t.id === e.tipo) || {}).nome || e.tipo)),
                                                 histConfigAberto ? (React.createElement("textarea", { className: "mt-bloco-textarea", style: { minHeight: 36, marginTop: 4 }, value: e.texto, onChange: (ev) => editarTextoEventoHistoria(e.id, ev.target.value) })) : (React.createElement("span", { style: { display: 'block', fontSize: 13.5, color: '#232323', whiteSpace: 'pre-wrap' } }, e.texto)),
                                                 Array.isArray(e.regioes) && e.regioes.length > 0 && (React.createElement("div", { style: { display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 } }, e.regioes.map((rid) => (React.createElement("span", { key: rid, style: { fontSize: 10.5, color: '#8A6D3B', background: '#F5EFE0', border: '1px solid #8A6D3B', borderRadius: 10, padding: '1px 7px' } }, nomeRegiaoCivilizacao(rid))))))),
@@ -9515,6 +9780,5 @@ function App() {
             } }))))),
         React.createElement(VisualizadorMidia, { midia: midiaAmpliada, onFechar: () => setMidiaAmpliada(null) })));
 }
-
 
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
