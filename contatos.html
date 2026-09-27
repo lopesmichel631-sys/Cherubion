@@ -19672,6 +19672,13 @@ function ModalConfig({ minhaCidade, onMudarCidade, temCidade, chaveMinha, status
                     react_1.default.createElement("p", { className: temCidade && !chaveMinha ? "bc-mini bc-homestatus-erro" : "bc-mini" }, statusOrigem),
                     react_1.default.createElement("p", { className: "bc-mini bc-leitordica" }, "Usada como ponto de partida para calcular dist\u00E2ncia at\u00E9 os contatos.")),
                 react_1.default.createElement("hr", { className: "bc-hr" }),
+                /* mudança para o Império: abre a página que salva uma cópia e copia os dados para colar lá */
+                react_1.default.createElement("section", { className: "bc-nextbloco" },
+                    react_1.default.createElement("span", { className: "bc-lbl" }, "Imp\u00E9rio"),
+                    react_1.default.createElement("p", { className: "bc-mini bc-leitordica", style: { marginTop: 4 } }, "O Contatos agora mora no Imp\u00E9rio (Sal\u00E3o do Baralho). A mudan\u00E7a salva uma c\u00F3pia e leva todas as cartas para l\u00E1; nada \u00E9 apagado daqui."),
+                    react_1.default.createElement("div", { className: "bc-bancoacoes", style: { marginTop: 8 } },
+                        react_1.default.createElement("button", { className: "bc-feito", onClick: () => { window.location.href = "mudanca-contatos.html"; } }, "\uD83C\uDFEF Mudan\u00E7a para o Imp\u00E9rio"))),
+                react_1.default.createElement("hr", { className: "bc-hr" }),
                 react_1.default.createElement("section", { className: "bc-nextbloco" },
                     react_1.default.createElement("span", { className: "bc-lbl" }, "Armazenamento de m\u00EDdia (R2)"),
                     react_1.default.createElement("p", { className: "bc-mini bc-leitordica", style: { marginTop: 4 } }, "Compartilhado com o resto do conjunto Cherubion. Sem isso configurado, fotos ficam salvas s\u00F3 neste dispositivo e v\u00EDdeos n\u00E3o podem ser anexados."),
