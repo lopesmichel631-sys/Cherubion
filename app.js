@@ -1,9 +1,9 @@
 // ================================================================
 // Cherubion — app.js (miolo compilado)
-// Versão: 2026-09-17 07:37
+// Versão: 2026-09-26 (botão "Mudança para o Império" em Configurações gerais)
 // Gerado a partir de App.jsx (Project Files) — JSX -> JS puro (tsc, target ES2017)
 // ================================================================
-window.__CHERUBION_VERSAO__ = '2026-09-17 07:37';
+window.__CHERUBION_VERSAO__ = '2026-09-26';
 const { useState, useEffect, useRef, useMemo } = React;
 
 "use strict";
@@ -9669,6 +9669,7 @@ function App() {
                     React.createElement("button", { className: "mt-config-gear-btn", onClick: () => setMostrarConfiguracoes((v) => !v), title: "Configura\u00E7\u00F5es gerais" }, "\u2699\uFE0F"),
                     mostrarConfiguracoes && (React.createElement("div", { className: "mt-config-panel" },
                         React.createElement("p", { className: "mt-fixa-grupo-label", style: { margin: '0 0 6px' } }, "CONFIGURA\u00C7\u00D5ES GERAIS"),
+                        React.createElement("button", { className: "mt-btn-sm primary", style: { width: '100%', padding: '12px', fontSize: 14, margin: '4px 0 10px' }, onClick: () => { window.location.href = 'mudanca-minhatela.html'; } }, "\uD83C\uDFEF Mudan\u00E7a para o Imp\u00E9rio"),
                         React.createElement("div", { className: "mt-config-item" },
                             React.createElement("div", null,
                                 React.createElement("p", { className: "mt-config-item-label" }, "Modificar posi\u00E7\u00E3o das janelas"),
