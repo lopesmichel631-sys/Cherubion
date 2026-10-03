@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Mudança do Cofre de Notas para o Império</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #F2F2F7; color: #1C1C1E; }
+  main { max-width: 520px; margin: 0 auto; padding: calc(24px + env(safe-area-inset-top, 0px)) 18px 48px; }
+  h1 { font-size: 28px; line-height: 1.15; margin: 10px 0 8px; letter-spacing: -0.02em; }
+  p { line-height: 1.55; color: #3C3C43; }
+  .caixa { background: #FFFFFF; border-radius: 16px; padding: 16px; margin: 14px 0; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04); }
+  .caixa b.n { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; background: #B3122B; color: #fff; align-items: center; justify-content: center; font-size: 14px; margin-right: 8px; }
+  button, a.bt { display: block; width: 100%; text-align: center; font: inherit; font-size: 17px; font-weight: 600; border: none; border-radius: 14px; padding: 14px; margin-top: 12px; cursor: pointer; text-decoration: none; }
+  .primario { background: #B3122B; color: #fff; }
+  .claro { background: #F1F1F4; color: #B3122B; }
+  .ok { color: #1E7B35; font-weight: 600; font-size: 14px; margin: 10px 0 0; }
+  .erro { color: #D70015; font-weight: 600; font-size: 14px; margin: 10px 0 0; }
+  textarea { width: 100%; height: 90px; font: 11px ui-monospace, Menlo, monospace; border: none; background: #F1F1F4; border-radius: 10px; padding: 8px; margin-top: 10px; display: none; }
+  small { color: #6C6C70; }
+  a { color: #B3122B; }
+</style>
+</head>
+<body>
+<main>
+  <a href="notas.html">‹ voltar ao Meg</a>
+  <h1>Mudança para o Império</h1>
+  <p id="resumo">Lendo os dados deste aparelho…</p>
+
+  <div class="caixa">
+    <b class="n">1</b><b>Guarde uma cópia de segurança</b>
+    <p><small>Salva um arquivo com todas as suas notas e abas. Escolha “Salvar em Arquivos”. Nada é apagado daqui.</small></p>
+    <button type="button" class="primario" id="bt-copia">Salvar cópia de segurança</button>
+    <p id="msg-copia"></p>
+  </div>
+
+  <div class="caixa">
+    <b class="n">2</b><b>Copie os dados</b>
+    <p><small>Coloca tudo na área de transferência, pronto para colar no Império.</small></p>
+    <button type="button" class="primario" id="bt-copiar">Copiar dados</button>
+    <p id="msg-copiar"></p>
+    <textarea id="reserva" readonly aria-label="Dados para copiar manualmente"></textarea>
+  </div>
+
+  <div class="caixa">
+    <b class="n">3</b><b>Cole no Império</b>
+    <p><small>Abra o Cofre de Notas no Império, entre com a senha do cofre e toque em “Colar dados copiados”. As imagens das notas passam a ficar no cofre privado.</small></p>
+    <a class="bt claro" href="https://imperio.lopesmichel631.workers.dev/residencia/notas/">Abrir o Cofre de Notas no Império</a>
+  </div>
+
+  <p><small>Esta página só lê os dados deste aparelho e não envia nada para lugar nenhum: a cópia vai para o seu arquivo e para a área de transferência.</small></p>
+</main>
+<script>
+(function () {
+  // a chave única em que o Meg guarda tudo: { notes, activeId, abas }
+  var CHAVE = "meg-fallback:notes-store";
+  var chaves = {};
+  try {
+    var v = window.localStorage.getItem(CHAVE);
+    if (v !== null) chaves[CHAVE] = v;
+  } catch (e) {}
+  var dados = null;
+  try { dados = JSON.parse(chaves[CHAVE] || "null"); } catch (e) {}
+  var agora = new Date().toISOString();
+  var pacote = JSON.stringify({ origem: "meg-antigo", exportadoEm: agora, chaves: chaves });
+  var resumo = document.getElementById("resumo");
+  if (!dados || !dados.notes || typeof dados.notes !== "object") {
+    resumo.innerHTML = "<b>Não encontrei as notas do Meg neste aparelho.</b> Abra esta página pelo mesmo ícone do Meg que você usa no dia a dia (a Tela de Início guarda os dados separados do Safari): no Meg, toque em “🏯 Mudança para o Império”, no canto da tela.";
+  } else {
+    var lista = Object.keys(dados.notes).map(function (k) { return dados.notes[k]; });
+    var imagens = 0;
+    lista.forEach(function (n) { var t = (n && n.content) || ""; var m = t.match(/!\[[^\]]*\]\([^)]+\)|<img\b|data:(image|video)\//g); imagens += m ? m.length : 0; });
+    resumo.innerHTML = "Encontrei <b>" + lista.length + " nota" + (lista.length === 1 ? "" : "s") + "</b>" + (imagens ? " e cerca de <b>" + imagens + " imagem" + (imagens === 1 ? "" : "ns") + " ou vídeo" + (imagens === 1 ? "" : "s") + "</b>" : "") + ". Faça os passos na ordem:";
+  }
+
+  var nomeArquivo = "meg-copia-" + agora.slice(0, 10) + ".json";
+  document.getElementById("bt-copia").onclick = function () {
+    var msg = document.getElementById("msg-copia");
+    var blob = new Blob([pacote], { type: "application/json" });
+    var arquivo = null;
+    try { arquivo = new File([blob], nomeArquivo, { type: "application/json" }); } catch (e) {}
+    if (arquivo && navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+      navigator.share({ files: [arquivo], title: nomeArquivo }).then(function () {
+        msg.className = "ok"; msg.textContent = "Cópia salva. ✓";
+      }).catch(function () { msg.className = "erro"; msg.textContent = "Cancelado. Toque de novo para salvar."; });
+      return;
+    }
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = nomeArquivo;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+    msg.className = "ok"; msg.textContent = "Arquivo gerado: " + nomeArquivo;
+  };
+
+  document.getElementById("bt-copiar").onclick = function () {
+    var msg = document.getElementById("msg-copiar");
+    var reserva = document.getElementById("reserva");
+    var copiarNaMao = function () {
+      reserva.style.display = "block";
+      reserva.value = pacote;
+      reserva.focus(); reserva.select();
+      try { document.execCommand("copy"); msg.className = "ok"; msg.textContent = "Copiado. ✓"; }
+      catch (e) { msg.className = "erro"; msg.textContent = "Selecione o texto abaixo e copie manualmente."; }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pacote).then(function () {
+        msg.className = "ok"; msg.textContent = "Copiado. ✓ Agora abra o Império (passo 3).";
+      }, copiarNaMao);
+    } else copiarNaMao();
+  };
+})();
+</script>
+</body>
+</html>
