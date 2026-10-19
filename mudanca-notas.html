@@ -46,9 +46,9 @@
   </div>
 
   <div class="caixa">
-    <b class="n">3</b><b>Cole no Império</b>
-    <p><small>Abra o Cofre de Notas no Império, entre com a senha do cofre e toque em “Colar dados copiados”. As imagens das notas passam a ficar no cofre privado.</small></p>
-    <a class="bt claro" href="https://imperio.lopesmichel631.workers.dev/residencia/notas/">Abrir o Cofre de Notas no Império</a>
+    <b class="n">3</b><b>Cole no Cofre de Notas</b>
+    <p><small>O botão abaixo abre o Cofre direto na tela de colar (ele pede a senha do cofre uma vez). Toque em “Colar o que copiei” (ou segure o dedo na caixa e escolha “Colar”) e depois em “Trazer para o Cofre”. As imagens das notas passam a ficar no cofre privado.</small></p>
+    <a class="bt claro" href="https://imperio.lopesmichel631.workers.dev/residencia/notas/#importar">Abrir o Cofre e colar</a>
   </div>
 
   <p><small>Esta página só lê os dados deste aparelho e não envia nada para lugar nenhum: a cópia vai para o seu arquivo e para a área de transferência.</small></p>
@@ -108,7 +108,7 @@
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(pacote).then(function () {
-        msg.className = "ok"; msg.textContent = "Copiado. ✓ Agora abra o Império (passo 3).";
+        msg.className = "ok"; msg.textContent = "Copiado. ✓ Agora toque no botão do passo 3.";
       }, copiarNaMao);
     } else copiarNaMao();
   };
